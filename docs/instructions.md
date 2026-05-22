@@ -15,6 +15,17 @@ This guide gets a fresh clone running locally on Windows.
 git clone <your-repo-url>
 cd GSports
 ```
+If project haven't folder media, static or template. You can create it using:
+```powershell
+mkdir static 
+mkdir static\css
+mkdir static\js
+mkdir static\img 
+
+mkdir -p media
+
+mkdir -p templates/tasks/components
+```powershell
 
 2) Create and activate the virtual environment:
 
