@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Đăng ký chủ sân — GSports{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/auth.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-bg">
+        <div class="auth-bg__shape auth-bg__shape--1"></div>
+        <div class="auth-bg__shape auth-bg__shape--2"></div>
+        <div class="auth-bg__shape auth-bg__shape--3"></div>
+    </div>
+
+    <div class="auth-card auth-card--wide">
+        <div class="auth-card__header">
+            <a href="{% url 'accounts:login' %}" class="auth-card__logo">
+                <span class="auth-card__logo-icon">⚽</span>
+                <span class="auth-card__logo-text">GSports</span>
+            </a>
+            <h1 class="auth-card__title">Đăng ký chủ sân</h1>
+            <p class="auth-card__subtitle">Đưa sân thể thao của bạn lên nền tảng GSports</p>
+        </div>
+
+        <form method="post" class="auth-form" novalidate id="register-owner-form">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="auth-form__errors">
+                {% for error in form.non_field_errors %}
+                <p class="auth-form__error-text">{{ error }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Section: Thông tin tài khoản -->
+            <div class="form-section">
+                <h2 class="form-section__title">Thông tin tài khoản</h2>
+
+                <div class="form-row">
+                        <div class="form-group {% if form.email.errors %}form-group--error{% endif %}">
+                            <label for="{{ form.email.id_for_label }}" class="form-label">{{ form.email.label }}</label>
+                            {{ form.email }}
+                            {% if form.email.errors %}<div class="form-error">{% for e in form.email.errors %}{{ e }}{% endfor %}</div>{% endif %}
+                        </div>
+                        <div class="form-group {% if form.first_name.errors or form.last_name.errors %}form-group--error{% endif %}">
+                            <div class="form-row">
+                                <div class="form-group" style="flex:1; margin-right:8px;">
+                                    <label for="{{ form.first_name.id_for_label }}" class="form-label">{{ form.first_name.label }}</label>
+                                    {{ form.first_name }}
+                                    {% if form.first_name.errors %}<div class="form-error">{% for e in form.first_name.errors %}{{ e }}{% endfor %}</div>{% endif %}
+                                </div>
+                                <div class="form-group" style="flex:1;">
+                                    <label for="{{ form.last_name.id_for_label }}" class="form-label">{{ form.last_name.label }}</label>
+                                    {{ form.last_name }}
+                                    {% if form.last_name.errors %}<div class="form-error">{% for e in form.last_name.errors %}{{ e }}{% endfor %}</div>{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                </div>
+
+                <div class="form-group {% if form.phone.errors %}form-group--error{% endif %}">
+                    <label for="{{ form.phone.id_for_label }}" class="form-label">{{ form.phone.label }}</label>
+                    {{ form.phone }}
+                    {% if form.phone.errors %}<div class="form-error">{% for e in form.phone.errors %}{{ e }}{% endfor %}</div>{% endif %}
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group {% if form.password.errors %}form-group--error{% endif %}">
+                        <label for="{{ form.password.id_for_label }}" class="form-label">{{ form.password.label }}</label>
+                        {{ form.password }}
+                        {% if form.password.errors %}<div class="form-error">{% for e in form.password.errors %}{{ e }}{% endfor %}</div>{% endif %}
+                    </div>
+                    <div class="form-group {% if form.password_confirm.errors %}form-group--error{% endif %}">
+                        <label for="{{ form.password_confirm.id_for_label }}" class="form-label">{{ form.password_confirm.label }}</label>
+                        {{ form.password_confirm }}
+                        {% if form.password_confirm.errors %}<div class="form-error">{% for e in form.password_confirm.errors %}{{ e }}{% endfor %}</div>{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section: Thông tin doanh nghiệp -->
+            <div class="form-section">
+                <h2 class="form-section__title">Thông tin doanh nghiệp</h2>
+
+                <div class="form-group {% if form.business_name.errors %}form-group--error{% endif %}">
+                    <label for="{{ form.business_name.id_for_label }}" class="form-label">{{ form.business_name.label }}</label>
+                    {{ form.business_name }}
+                    {% if form.business_name.errors %}<div class="form-error">{% for e in form.business_name.errors %}{{ e }}{% endfor %}</div>{% endif %}
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group {% if form.bank_name.errors %}form-group--error{% endif %}">
+                        <label for="{{ form.bank_name.id_for_label }}" class="form-label">{{ form.bank_name.label }}</label>
+                        {{ form.bank_name }}
+                        {% if form.bank_name.errors %}<div class="form-error">{% for e in form.bank_name.errors %}{{ e }}{% endfor %}</div>{% endif %}
+                    </div>
+                    <div class="form-group {% if form.bank_account_number.errors %}form-group--error{% endif %}">
+                        <label for="{{ form.bank_account_number.id_for_label }}" class="form-label">{{ form.bank_account_number.label }}</label>
+                        {{ form.bank_account_number }}
+                        {% if form.bank_account_number.errors %}<div class="form-error">{% for e in form.bank_account_number.errors %}{{ e }}{% endfor %}</div>{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn--primary btn--full" id="register-owner-submit">
+                <span>Đăng ký chủ sân</span>
+                <svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </button>
+        </form>
+
+        <div class="auth-card__footer">
+            <p>Đã có tài khoản? <a href="{% url 'accounts:login' %}" class="auth-link">Đăng nhập</a></p>
+            <p class="auth-card__divider-text">hoặc</p>
+            <p>Bạn là khách hàng? <a href="{% url 'accounts:register' %}" class="auth-link">Đăng ký tài khoản thường</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

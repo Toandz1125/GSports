@@ -1,0 +1,136 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }} — GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .venue-form-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 2rem;
+        box-shadow: var(--shadow-sm);
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .venue-form-card__title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text-main);
+        margin-bottom: 1.5rem;
+        border-left: 4px solid var(--primary-600);
+        padding-left: 0.75rem;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text-muted);
+    }
+
+    .form-group input, 
+    .form-group textarea,
+    .form-group select {
+        padding: 0.75rem 1rem;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-color);
+        background-color: var(--bg-main);
+        color: var(--text-main);
+        font-size: 0.875rem;
+        transition: border-color var(--transition-fast);
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+        border-color: var(--primary-500);
+        outline: none;
+        background-color: var(--bg-surface);
+    }
+
+    .form-group--error input,
+    .form-group--error textarea,
+    .form-group--error select {
+        border-color: var(--error-500) !important;
+    }
+
+    .form-error {
+        color: var(--error-500);
+        font-size: 0.75rem;
+        margin-top: 0.25rem;
+    }
+
+    .venue-form-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: flex-end;
+        margin-top: 2rem;
+        border-top: 1px solid var(--border-color);
+        padding-top: 1.5rem;
+    }
+
+    .btn--secondary {
+        background-color: var(--bg-main);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+    }
+
+    .btn--secondary:hover {
+        background-color: var(--border-color);
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="venue-form-card">
+    <h2 class="venue-form-card__title">{{ page_title }}</h2>
+    
+    <form method="post" novalidate>
+        {% csrf_token %}
+        
+        {% if form.non_field_errors %}
+        <div class="form-group form-group--error">
+            {% for error in form.non_field_errors %}
+            <div class="form-error">{{ error }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% for field in form %}
+        <div class="form-group {% if field.errors %}form-group--error{% endif %}">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}
+            <span style="font-size: 0.75rem; color: var(--text-muted);">{{ field.help_text }}</span>
+            {% endif %}
+            {% if field.errors %}
+            {% for error in field.errors %}
+            <span class="form-error">{{ error }}</span>
+            {% endfor %}
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        <div class="venue-form-actions">
+            {% if is_create %}
+            <a href="{% url 'venues:venue_list' %}" class="btn btn--secondary">Hủy bỏ</a>
+            {% else %}
+            <a href="{% url 'venues:venue_detail' venue.pk %}" class="btn btn--secondary">Hủy bỏ</a>
+            {% endif %}
+            <button type="submit" class="btn btn--primary">Lưu lại</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

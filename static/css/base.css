@@ -1,0 +1,327 @@
+/* ==========================================================================
+   Base Styles & Variables
+   ========================================================================== */
+
+:root {
+    color-scheme: light;
+    /* ── Accent color palette (Indigo default) ── */
+    --primary-50:  #eef2ff;
+    --primary-100: #e0e7ff;
+    --primary-200: #c7d2fe;
+    --primary-500: #6366f1;
+    --primary-600: #4f46e5;
+    --primary-700: #4338ca;
+
+    /* Status colors */
+    --success-500: #10b981;
+    --error-500:   #ef4444;
+    --warning-500: #f59e0b;
+    --info-500:    #3b82f6;
+
+    /* ── Light theme ── */
+    --bg-body:    #f8fafc;
+    --bg-main:    #f8fafc;
+    --bg-surface: #ffffff;
+    --text-main:  #0f172a;
+    --text-muted: #64748b;
+    --border-color: #e2e8f0;
+    --input-bg:   #ffffff;
+    --input-text: #0f172a;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+
+    /* Border Radius */
+    --radius-sm:   0.25rem;
+    --radius-md:   0.5rem;
+    --radius-lg:   0.75rem;
+    --radius-xl:   1rem;
+    --radius-full: 9999px;
+
+    /* Transitions */
+    --transition-fast:   150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-normal: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Dark theme ── */
+[data-theme="dark"] {
+    color-scheme: dark;
+    --bg-body:    #0f172a;
+    --bg-main:    #0f172a;
+    --bg-surface: #1e293b;
+    --text-main:  #f8fafc;
+    --text-muted: #94a3b8;
+    --border-color: #334155;
+    --input-bg:   #1e293b;
+    --input-text: #f8fafc;
+
+    --primary-50:  rgba(99, 102, 241, 0.1);
+    --primary-100: rgba(99, 102, 241, 0.15);
+    --primary-200: rgba(99, 102, 241, 0.2);
+}
+
+/* System default dark (fallback for initial load before JS) */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+        color-scheme: dark;
+        --bg-body:    #0f172a;
+        --bg-main:    #0f172a;
+        --bg-surface: #1e293b;
+        --text-main:  #f8fafc;
+        --text-muted: #94a3b8;
+        --border-color: #334155;
+        --input-bg:   #1e293b;
+        --input-text: #f8fafc;
+
+        --primary-50:  rgba(99, 102, 241, 0.1);
+        --primary-100: rgba(99, 102, 241, 0.15);
+        --primary-200: rgba(99, 102, 241, 0.2);
+    }
+}
+
+/* ── Accent Color Presets ── */
+[data-accent="indigo"] {
+    --primary-50:  #eef2ff;
+    --primary-100: #e0e7ff;
+    --primary-200: #c7d2fe;
+    --primary-500: #6366f1;
+    --primary-600: #4f46e5;
+    --primary-700: #4338ca;
+}
+[data-theme="dark"][data-accent="indigo"] {
+    --primary-50:  rgba(99, 102, 241, 0.1);
+    --primary-100: rgba(99, 102, 241, 0.15);
+}
+
+[data-accent="violet"] {
+    --primary-50:  #f5f3ff;
+    --primary-100: #ede9fe;
+    --primary-200: #ddd6fe;
+    --primary-500: #8b5cf6;
+    --primary-600: #7c3aed;
+    --primary-700: #6d28d9;
+}
+[data-theme="dark"][data-accent="violet"] {
+    --primary-50:  rgba(139, 92, 246, 0.1);
+    --primary-100: rgba(139, 92, 246, 0.15);
+}
+
+[data-accent="blue"] {
+    --primary-50:  #eff6ff;
+    --primary-100: #dbeafe;
+    --primary-200: #bfdbfe;
+    --primary-500: #3b82f6;
+    --primary-600: #2563eb;
+    --primary-700: #1d4ed8;
+}
+[data-theme="dark"][data-accent="blue"] {
+    --primary-50:  rgba(59, 130, 246, 0.1);
+    --primary-100: rgba(59, 130, 246, 0.15);
+}
+
+[data-accent="emerald"] {
+    --primary-50:  #ecfdf5;
+    --primary-100: #d1fae5;
+    --primary-200: #a7f3d0;
+    --primary-500: #10b981;
+    --primary-600: #059669;
+    --primary-700: #047857;
+}
+[data-theme="dark"][data-accent="emerald"] {
+    --primary-50:  rgba(16, 185, 129, 0.1);
+    --primary-100: rgba(16, 185, 129, 0.15);
+}
+
+[data-accent="rose"] {
+    --primary-50:  #fff1f2;
+    --primary-100: #ffe4e6;
+    --primary-200: #fecdd3;
+    --primary-500: #f43f5e;
+    --primary-600: #e11d48;
+    --primary-700: #be123c;
+}
+[data-theme="dark"][data-accent="rose"] {
+    --primary-50:  rgba(244, 63, 94, 0.1);
+    --primary-100: rgba(244, 63, 94, 0.15);
+}
+
+[data-accent="amber"] {
+    --primary-50:  #fffbeb;
+    --primary-100: #fef3c7;
+    --primary-200: #fde68a;
+    --primary-500: #f59e0b;
+    --primary-600: #d97706;
+    --primary-700: #b45309;
+}
+[data-theme="dark"][data-accent="amber"] {
+    --primary-50:  rgba(245, 158, 11, 0.1);
+    --primary-100: rgba(245, 158, 11, 0.15);
+}
+
+/* =========================================================================
+   Reset
+   ========================================================================= */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    transition: background-color 0.25s, color 0.25s;
+}
+
+body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+a {
+    color: var(--primary-600);
+    text-decoration: none;
+    transition: color var(--transition-fast);
+}
+
+a:hover { color: var(--primary-700); }
+
+button, input, select, textarea {
+    font-family: inherit;
+    color: inherit;
+}
+
+/* All form inputs inherit theme colors */
+input, select, textarea {
+    background-color: var(--input-bg);
+    color: var(--input-text);
+    border-color: var(--border-color);
+}
+select option {
+    background-color: var(--bg-surface);
+    color: var(--text-main);
+}
+
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    border-radius: var(--radius-md);
+    border: none;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-size: 0.875rem;
+}
+
+.btn svg { width: 1rem; height: 1rem; }
+
+.btn--primary {
+    background-color: var(--primary-600);
+    color: white;
+    box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);
+}
+.btn--primary:hover {
+    background-color: var(--primary-700);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 8px -1px rgba(79, 70, 229, 0.3);
+    color: white;
+}
+.btn--primary:active { transform: translateY(0); }
+
+.btn--secondary {
+    background-color: var(--bg-surface);
+    color: var(--text-main);
+    border: 1.5px solid var(--border-color);
+}
+.btn--secondary:hover {
+    border-color: var(--primary-500);
+    color: var(--primary-600);
+    background-color: var(--primary-50);
+}
+
+.btn--danger {
+    background-color: rgba(239,68,68,0.1);
+    color: #ef4444;
+    border: 1.5px solid rgba(239,68,68,0.2);
+}
+.btn--danger:hover {
+    background-color: #ef4444;
+    color: white;
+}
+
+.btn--full { width: 100%; }
+
+.btn__arrow {
+    width: 1.25rem;
+    height: 1.25rem;
+    transition: transform var(--transition-fast);
+}
+.btn:hover .btn__arrow { transform: translateX(4px); }
+
+/* ==========================================================================
+   Toasts / Messages
+   ========================================================================== */
+.toast-container {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    pointer-events: none;
+}
+
+.toast {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    pointer-events: auto;
+    animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transform: translateX(120%);
+    min-width: 280px;
+    max-width: 400px;
+}
+
+.toast--hide { animation: slideOut 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+.toast__icon { width: 1.5rem; height: 1.5rem; flex-shrink: 0; }
+
+.toast--success .toast__icon { color: var(--success-500); }
+.toast--error   .toast__icon { color: var(--error-500); }
+.toast--warning .toast__icon { color: var(--warning-500); }
+.toast--info    .toast__icon { color: var(--info-500); }
+
+.toast__text { font-size: 0.875rem; font-weight: 500; color: var(--text-main); flex: 1; }
+
+.toast__close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 0.25rem;
+    line-height: 1;
+    margin-left: auto;
+    transition: color var(--transition-fast);
+}
+.toast__close:hover { color: var(--text-main); }
+
+@keyframes slideIn { to { transform: translateX(0); } }
+@keyframes slideOut { to { transform: translateX(120%); opacity: 0; } }

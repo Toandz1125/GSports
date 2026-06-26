@@ -1,0 +1,466 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}Hồ sơ cá nhân — GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/profile.css' %}?v=1.1">
+<style>
+    /* ── Live Filter Bar ── */
+    .live-filter-bar {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 1.25rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.85rem;
+        align-items: flex-end;
+    }
+
+    .live-filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+        flex: 1 1 170px;
+    }
+
+    .live-filter-group.live-filter-group--wide {
+        flex: 1 1 240px;
+    }
+
+    .live-filter-label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+
+    .live-filter-input,
+    .live-filter-select {
+        padding: 0.55rem 0.85rem;
+        border-radius: var(--radius-md);
+        border: 1.5px solid var(--border-color);
+        background: var(--bg-body);
+        color: var(--text-main);
+        font-size: 0.85rem;
+        transition: border-color 0.18s;
+        width: 100%;
+        box-sizing: border-box;
+        outline: none;
+    }
+
+    .live-filter-input:focus,
+    .live-filter-select:focus {
+        border-color: var(--primary-500);
+        box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+    }
+
+    .live-filter-input option,
+    .live-filter-select option {
+        background-color: var(--bg-surface);
+        color: var(--text-main);
+    }
+
+
+    .live-filter-actions {
+        display: flex;
+        gap: 0.5rem;
+        align-items: flex-end;
+    }
+
+    .live-filter-clear {
+        padding: 0.55rem 1rem;
+        border-radius: var(--radius-md);
+        border: 1.5px solid var(--border-color);
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 0.82rem;
+        cursor: pointer;
+        transition: all 0.18s;
+        white-space: nowrap;
+    }
+
+    .live-filter-clear:hover {
+        border-color: var(--primary-500);
+        color: var(--primary-600);
+    }
+
+    /* Count badge */
+    .filter-count {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .filter-count-num {
+        font-weight: 700;
+        color: var(--primary-600);
+    }
+
+    /* Highlight matched text */
+    .hl {
+        background: rgba(99,102,241,0.18);
+        color: var(--primary-700);
+        border-radius: 2px;
+        padding: 0 1px;
+    }
+
+    /* Hidden row */
+    tr.row-hidden { display: none; }
+
+    /* No results row */
+    tr.no-results-row td {
+        text-align: center;
+        padding: 2rem;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+    }
+
+    @media (max-width: 576px) {
+        .live-filter-actions { width: 100%; }
+        .live-filter-clear { flex: 1; text-align: center; }
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="profile-container">
+    <!-- Profile Info Card -->
+    <div class="profile-card">
+        <div class="profile-card__header">
+            <div class="profile-card__avatar-section">
+                <div class="profile-card__avatar">
+                    {% if user.avatar %}
+                    <img src="{{ user.avatar.url }}" alt="Avatar">
+                    {% else %}
+                    <span>{% if user.first_name or user.last_name %}{{ user.first_name|first|upper }}{% else %}{{ user.username|first|upper }}{% endif %}</span>
+                    {% endif %}
+                </div>
+                <a href="{% url 'accounts:avatar_edit' %}" class="profile-card__avatar-edit-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                </a>
+            </div>
+            <div class="profile-card__title-section">
+                <h2>{% if user.first_name or user.last_name %}{{ user.first_name }} {{ user.last_name }}{% else %}{{ user.email }}{% endif %}</h2>
+                <p class="profile-card__email">{{ user.email }}</p>
+                <div class="profile-card__badges">
+                    {% for role in user_roles %}
+                    <span class="role-badge role-badge--{{ role|lower }}">{{ role }}</span>
+                    {% empty %}
+                    <span class="role-badge">Chưa gán</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="profile-card__details">
+            <div class="profile-detail-item">
+                <span class="profile-detail-label">Họ và Tên</span>
+                <span class="profile-detail-value">
+                    {% if user.first_name or user.last_name %}{{ user.first_name }} {{ user.last_name }}{% else %}<span class="text-muted">Chưa cập nhật</span>{% endif %}
+                </span>
+            </div>
+            <div class="profile-detail-item">
+                <span class="profile-detail-label">Số điện thoại</span>
+                <span class="profile-detail-value">
+                    {% if user.phone %}{{ user.phone }}{% else %}<span class="text-muted">Chưa cập nhật</span>{% endif %}
+                </span>
+            </div>
+            {% if owner_profile %}
+            <div class="profile-detail-item">
+                <span class="profile-detail-label">Tên doanh nghiệp</span>
+                <span class="profile-detail-value">{{ owner_profile.business_name }}</span>
+            </div>
+            <div class="profile-detail-item">
+                <span class="profile-detail-label">Tài khoản ngân hàng</span>
+                <span class="profile-detail-value">
+                    {% if owner_profile.bank_account_number %}{{ owner_profile.bank_account_number }} ({{ owner_profile.bank_name }}){% else %}<span class="text-muted">Chưa cập nhật</span>{% endif %}
+                </span>
+            </div>
+            <div class="profile-detail-item">
+                <span class="profile-detail-label">Trạng thái xác minh</span>
+                <span class="profile-detail-value">
+                    {% if owner_profile.is_verified %}
+                    <span class="badge badge--success">Đã xác minh</span>
+                    {% else %}
+                    <span class="badge badge--warning">Chờ xác minh</span>
+                    {% endif %}
+                </span>
+            </div>
+            {% endif %}
+            {% if customer_profile %}
+            <div class="profile-detail-item">
+                <span class="profile-detail-label">Điểm tích lũy</span>
+                <span class="profile-detail-value">{{ customer_profile.loyalty_points }} điểm</span>
+            </div>
+            {% endif %}
+            <div class="profile-detail-item">
+                <span class="profile-detail-label">Số dư ví</span>
+                <span class="profile-detail-value font-semibold text-primary">
+                    {% if wallet %}{{ wallet.balance|floatformat:0 }} VNĐ{% else %}0 VNĐ{% endif %}
+                </span>
+            </div>
+            <div class="profile-detail-item">
+                <span class="profile-detail-label">Ngày tham gia</span>
+                <span class="profile-detail-value">{{ user.date_joined|date:"d/m/Y H:i" }}</span>
+            </div>
+        </div>
+
+        <div class="profile-card__actions">
+            <a href="{% url 'accounts:profile_edit' %}" class="btn btn--primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                <span>Chỉnh sửa hồ sơ</span>
+            </a>
+            <a href="{% url 'accounts:change_password' %}" class="btn btn--secondary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                <span>Đổi mật khẩu</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- History Card -->
+    <div class="history-card">
+
+        {% if 'ADMIN' in user_roles %}
+        <!-- ══════════ ADMIN: Phê duyệt đăng ký chủ sân ══════════ -->
+        {% if pending_owner_requests %}
+        <div class="pending-requests-section" style="margin-bottom: 2rem;">
+            <h3 class="history-card__title" style="margin-top:0;color:var(--primary-600);border-bottom:2px solid var(--border-color);padding-bottom:0.5rem;margin-bottom:1rem;">
+                Yêu cầu đăng ký chủ sân chờ duyệt
+            </h3>
+            <div class="table-responsive">
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th>Thông tin chủ sân</th>
+                            <th>Doanh nghiệp</th>
+                            <th>Ngân hàng</th>
+                            <th style="text-align:right;">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in pending_owner_requests %}
+                        <tr>
+                            <td>
+                                <div class="user-info">
+                                    <span class="user-info__email">{{ req.email }}</span>
+                                    <span class="user-info__name">{{ req.first_name }} {{ req.last_name }}{% if req.phone %} — {{ req.phone }}{% endif %}</span>
+                                </div>
+                            </td>
+                            <td><strong>{{ req.business_name }}</strong></td>
+                            <td>
+                                {% if req.bank_account_number %}
+                                {{ req.bank_account_number }} ({{ req.bank_name }})
+                                {% else %}<span class="text-muted">—</span>{% endif %}
+                            </td>
+                            <td style="text-align:right;">
+                                <div style="display:inline-flex; gap:0.5rem; justify-content:flex-end;">
+                                    <form action="{% url 'accounts:admin_approve_owner' req.pk %}" method="post" style="margin:0;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn--primary" style="padding:0.4rem 0.8rem; font-size:0.8rem; background-color:var(--emerald-600); border-color:var(--emerald-600); height:auto; line-height:1;">Duyệt</button>
+                                    </form>
+                                    <form action="{% url 'accounts:admin_reject_owner' req.pk %}" method="post" style="margin:0;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn--secondary" style="padding:0.4rem 0.8rem; font-size:0.8rem; background-color:var(--rose-600); border-color:var(--rose-600); color:white; height:auto; line-height:1;">Từ chối</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+        {% endif %}
+        
+        <!-- ══════════ Lịch sử thay đổi tài khoản ══════════ -->
+        <h3 class="history-card__title">Lịch sử thay đổi tài khoản</h3>
+
+        <!-- Live filter bar (Audit log) -->
+        <div class="live-filter-bar">
+            <div class="live-filter-group live-filter-group--wide">
+                <label class="live-filter-label">🔍 Tìm kiếm (hành động, đối tượng, giá trị)</label>
+                <input type="text" id="owner-search" class="live-filter-input" placeholder="Nhập bất kỳ ký tự để lọc ngay...">
+            </div>
+            <div class="live-filter-group">
+                <label class="live-filter-label">Hành động</label>
+                <select id="owner-status" class="live-filter-select">
+                    <option value="">-- Tất cả --</option>
+                    <option value="create">Tạo mới (Create)</option>
+                    <option value="update">Cập nhật (Update)</option>
+                    <option value="delete">Xóa (Delete)</option>
+                </select>
+            </div>
+            <div class="live-filter-group">
+                <label class="live-filter-label">Từ ngày</label>
+                <input type="date" id="owner-date-from" class="live-filter-input">
+            </div>
+            <div class="live-filter-group">
+                <label class="live-filter-label">Đến ngày</label>
+                <input type="date" id="owner-date-to" class="live-filter-input">
+            </div>
+            <div class="live-filter-actions">
+                <button class="live-filter-clear" onclick="clearOwnerFilters()">✕ Xóa lọc</button>
+            </div>
+        </div>
+        <div class="filter-count" id="owner-count"></div>
+
+        <div class="table-responsive">
+            <table class="history-table" id="owner-table">
+                <thead>
+                    <tr>
+                        <th>Hành động</th>
+                        <th>Đối tượng</th>
+                        <th>Giá trị cũ</th>
+                        <th>Giá trị mới</th>
+                        <th>Thời gian</th>
+                    </tr>
+                </thead>
+                <tbody id="owner-tbody">
+                    {% for log in user_audit_logs %}
+                    <tr
+                        data-action="{{ log.action|lower }}"
+                        data-target="{{ log.target_type|lower }}"
+                        data-old="{{ log.old_value|lower }}"
+                        data-new="{{ log.new_value|lower }}"
+                        data-date="{{ log.created_at|date:'Y-m-d' }}"
+                        data-status="{{ log.action|lower }}"
+                    >
+                        <td><strong>{{ log.action }}</strong></td>
+                        <td><span class="badge badge--info">{{ log.target_type }}</span></td>
+                        <td style="max-width: 200px; word-break: break-all;">{% if log.old_value %}{{ log.old_value }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                        <td style="max-width: 200px; word-break: break-all;">{% if log.new_value %}{{ log.new_value }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                        <td>{{ log.created_at|date:"d/m/Y H:i:s" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr class="no-results-row"><td colspan="5">Chưa có lịch sử thay đổi tài khoản nào.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div><!-- end history-card -->
+</div><!-- end profile-container -->
+
+<script>
+/* ================================================================
+   Live Table Filter Engine
+   - Kết hợp: search text (any key) + dropdown status + date range
+   - Không cần nhấn nút, lọc ngay khi gõ/chọn
+   ================================================================ */
+(function () {
+
+    function buildFilter(config) {
+        const {
+            searchId, venueId, statusId, dateFromId, dateToId,
+            tbodyId, countId, emptyColspan
+        } = config;
+
+        const searchEl   = document.getElementById(searchId);
+        const venueEl    = document.getElementById(venueId);
+        const statusEl   = document.getElementById(statusId);
+        const dateFromEl = document.getElementById(dateFromId);
+        const dateToEl   = document.getElementById(dateToId);
+        const tbody      = document.getElementById(tbodyId);
+        const countEl    = document.getElementById(countId);
+
+        if (!tbody) return;
+
+        const allRows = Array.from(tbody.querySelectorAll('tr:not(.no-results-row)'));
+        let noResultsRow = tbody.querySelector('tr.no-results-row');
+
+        // Create no-results row if not exists
+        if (!noResultsRow) {
+            noResultsRow = document.createElement('tr');
+            noResultsRow.className = 'no-results-row';
+            noResultsRow.innerHTML = `<td colspan="${emptyColspan}" style="text-align:center;padding:2rem;color:var(--text-muted);">Không tìm thấy kết quả phù hợp.</td>`;
+            tbody.appendChild(noResultsRow);
+            noResultsRow.style.display = 'none';
+        }
+
+        function doFilter() {
+            const q        = searchEl ? searchEl.value.trim().toLowerCase() : '';
+            const venueQ   = venueEl  ? venueEl.value.toLowerCase() : '';
+            const statusQ  = statusEl ? statusEl.value.toLowerCase() : '';
+            const dateFrom = dateFromEl && dateFromEl.value ? dateFromEl.value : '';
+            const dateTo   = dateToEl  && dateToEl.value   ? dateToEl.value   : '';
+
+            let visibleCount = 0;
+
+            allRows.forEach(row => {
+                const venue  = (row.dataset.venue  || '').toLowerCase();
+                const date   = (row.dataset.date   || '');
+                const status = (row.dataset.status || '').toLowerCase();
+
+                // Dynamic search: matches ANY data- attribute on the <tr>
+                const dataValues = Object.values(row.dataset).map(v => (v || '').toLowerCase());
+                const searchMatch = !q || dataValues.some(val => val.includes(q));
+
+                // Venue dropdown
+                const venueMatch = !venueQ || venue.includes(venueQ);
+
+                // Status dropdown (or action dropdown in audit logs)
+                const statusMatch = !statusQ || status === statusQ || status.includes(statusQ);
+
+                // Date range
+                const dateFromMatch = !dateFrom || date >= dateFrom;
+                const dateToMatch   = !dateTo   || date <= dateTo;
+
+                const show = searchMatch && venueMatch && statusMatch && dateFromMatch && dateToMatch;
+                row.classList.toggle('row-hidden', !show);
+                if (show) visibleCount++;
+            });
+
+            // Update count
+            if (countEl) {
+                const total = allRows.length;
+                if (q || venueQ || statusQ || dateFrom || dateTo) {
+                    countEl.innerHTML = `<span class="filter-count-num">${visibleCount}</span> / ${total} kết quả`;
+                } else {
+                    countEl.textContent = '';
+                }
+            }
+
+            // Show/hide no-results row
+            noResultsRow.style.display = visibleCount === 0 ? '' : 'none';
+        }
+
+        // Attach events — search fires on every keyup
+        [searchEl, venueEl, statusEl, dateFromEl, dateToEl].forEach(el => {
+            if (!el) return;
+            el.addEventListener('input', doFilter);
+            el.addEventListener('change', doFilter);
+        });
+
+        return doFilter; // expose for clear functions
+    }
+
+    /* ── OWNER table ── */
+    if (document.getElementById('owner-tbody')) {
+        const doOwnerFilter = buildFilter({
+            searchId: 'owner-search', venueId: null, statusId: 'owner-status',
+            dateFromId: 'owner-date-from', dateToId: 'owner-date-to',
+            tbodyId: 'owner-tbody', countId: 'owner-count', emptyColspan: 5
+        });
+
+        window.clearOwnerFilters = function () {
+            ['owner-search','owner-status','owner-date-from','owner-date-to'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            if (doOwnerFilter) doOwnerFilter();
+        };
+    }
+
+})();
+</script>
+{% endblock %}
+

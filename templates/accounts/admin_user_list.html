@@ -1,0 +1,537 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}Quản lý tài khoản — GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .admin-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .admin-header-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .admin-title-area h2 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-main);
+        margin: 0;
+    }
+
+    .admin-title-area p {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        margin: 0.25rem 0 0 0;
+    }
+
+    /* ── Filter Bar ── */
+    .filter-bar {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 0.5rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.85rem;
+        align-items: flex-end;
+    }
+
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+        flex: 1 1 200px;
+    }
+
+    .filter-group label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+    }
+
+    .filter-input {
+        background: var(--bg-body);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        padding: 0.6rem 0.85rem;
+        border-radius: var(--radius-md);
+        font-size: 0.875rem;
+        outline: none;
+        width: 100%;
+        transition: border-color var(--transition-fast);
+    }
+
+    .filter-input:focus {
+        border-color: var(--primary-500);
+    }
+
+    .filter-input option {
+        background-color: var(--bg-surface);
+        color: var(--text-main);
+    }
+
+    .btn-clear-filter {
+        background: transparent;
+        border: 1px solid var(--border-color);
+        color: var(--text-muted);
+        padding: 0.6rem 1rem;
+        border-radius: var(--radius-md);
+        font-size: 0.875rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        height: 38px;
+    }
+
+    .btn-clear-filter:hover {
+        background: var(--bg-body);
+        color: var(--text-main);
+        border-color: var(--text-muted);
+    }
+
+    /* ── Table Layout ── */
+    .table-responsive {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        overflow-x: auto;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .admin-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+        font-size: 0.875rem;
+    }
+
+    .admin-table th {
+        background: var(--bg-body);
+        color: var(--text-muted);
+        font-weight: 600;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid var(--border-color);
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+    }
+
+    .admin-table td {
+        padding: 1.25rem;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-main);
+        vertical-align: middle;
+    }
+
+    .admin-table tbody tr:hover {
+        background: rgba(var(--primary-rgb), 0.02);
+    }
+
+    .user-info-wrap {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .user-fullname {
+        font-weight: 600;
+        color: var(--text-main);
+    }
+
+    .user-email {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-top: 0.15rem;
+    }
+
+    .role-badge-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+    }
+
+    .role-tag {
+        display: inline-block;
+        padding: 0.15rem 0.45rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .role-tag--admin { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+    .role-tag--owner { background: rgba(99, 102, 241, 0.1); color: #6366f1; }
+    .role-tag--staff { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+    .role-tag--customer { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+
+    /* Action Buttons */
+    .btn-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-color);
+        background: var(--bg-surface);
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        outline: none;
+    }
+
+    .btn-action:hover {
+        color: var(--text-main);
+        background: var(--bg-body);
+        border-color: var(--text-muted);
+    }
+
+    .btn-action--lock:hover {
+        color: #ef4444;
+        background: rgba(239, 68, 68, 0.05);
+        border-color: #ef4444;
+    }
+
+    .btn-action--unlock:hover {
+        color: #10b981;
+        background: rgba(16, 185, 129, 0.05);
+        border-color: #10b981;
+    }
+
+    .btn-action--delete:hover {
+        color: #ef4444;
+        background: rgba(239, 68, 68, 0.05);
+        border-color: #ef4444;
+    }
+
+    /* Status Badge */
+    .status-badge {
+        display: inline-block;
+        padding: 0.15rem 0.5rem;
+        border-radius: var(--radius-full);
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    .status-badge--active { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+    .status-badge--inactive { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+
+    /* Modal Styling */
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity var(--transition-fast);
+    }
+
+    .modal--open {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .modal__content {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        width: 100%;
+        max-width: 450px;
+        padding: 2rem;
+        box-shadow: var(--shadow-lg);
+        transform: translateY(-20px);
+        transition: transform var(--transition-fast);
+    }
+
+    .modal--open .modal__content {
+        transform: translateY(0);
+    }
+
+    .modal__title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text-main);
+        margin: 0 0 1rem 0;
+    }
+
+    .modal__body {
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        line-height: 1.5;
+        margin-bottom: 1.5rem;
+    }
+
+    .modal__footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+    }
+
+    /* Pagination */
+    .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.25rem;
+        margin-top: 1.5rem;
+    }
+
+    .page-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 32px;
+        height: 32px;
+        padding: 0 0.5rem;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-color);
+        background: var(--bg-surface);
+        color: var(--text-muted);
+        text-decoration: none;
+        font-size: 0.875rem;
+        font-weight: 500;
+        transition: all var(--transition-fast);
+    }
+
+    .page-link:hover,
+    .page-link--active {
+        color: var(--primary-600);
+        background: rgba(var(--primary-rgb), 0.05);
+        border-color: var(--primary-300);
+    }
+
+    .page-link--active {
+        background: var(--primary-600);
+        color: white !important;
+        border-color: var(--primary-600);
+    }
+
+    .page-link--disabled {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="admin-container">
+    <div class="admin-header-row">
+        <div class="admin-title-area">
+            <h2>Quản lý tài khoản hệ thống</h2>
+            <p>Xem, quản lý trạng thái hoạt động và phân quyền người dùng.</p>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <form method="get" action="{% url 'accounts:admin_user_list' %}" class="filter-bar" id="filter-form">
+        <!-- Search bar -->
+        <div class="filter-group">
+            <label for="q">Tìm kiếm</label>
+            <input type="text" id="q" name="q" value="{{ current_q }}" class="filter-input" placeholder="Tìm tên, email, SĐT, tên đăng nhập...">
+        </div>
+
+        <!-- Role Filter -->
+        <div class="filter-group">
+            <label for="role">Vai trò</label>
+            <select id="role" name="role" class="filter-input" onchange="this.form.submit()">
+                <option value="">-- Tất cả vai trò --</option>
+                {% for role in available_roles %}
+                <option value="{{ role }}" {% if current_role == role %}selected{% endif %}>{{ role }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Status Filter -->
+        <div class="filter-group">
+            <label for="status">Trạng thái</label>
+            <select id="status" name="status" class="filter-input" onchange="this.form.submit()">
+                <option value="">-- Tất cả trạng thái --</option>
+                <option value="active" {% if current_status == 'active' %}selected{% endif %}>Hoạt động</option>
+                <option value="inactive" {% if current_status == 'inactive' %}selected{% endif %}>Bị khóa</option>
+            </select>
+        </div>
+
+        <button type="button" class="btn-clear-filter" onclick="clearFilters()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            Xóa bộ lọc
+        </button>
+    </form>
+
+    <!-- Table -->
+    <div class="table-responsive">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Người dùng</th>
+                    <th>Tên đăng nhập</th>
+                    <th>Số điện thoại</th>
+                    <th>Vai trò</th>
+                    <th>Trạng thái</th>
+                    <th>Ngày tham gia</th>
+                    <th style="text-align:right;">Hành động</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td>
+                        <div class="user-info-wrap">
+                            <span class="user-fullname">{% if u.first_name or u.last_name %}{{ u.first_name }} {{ u.last_name }}{% else %}<span class="text-muted">Chưa cập nhật</span>{% endif %}</span>
+                            <span class="user-email">{{ u.email }}</span>
+                        </div>
+                    </td>
+                    <td><code>{{ u.username }}</code></td>
+                    <td>{{ u.phone|default:"—" }}</td>
+                    <td>
+                        <div class="role-badge-list">
+                            {% for ur in u.user_roles.all %}
+                            <span class="role-tag role-tag--{{ ur.role.name|lower }}">{{ ur.role.name }}</span>
+                            {% empty %}
+                            <span class="text-muted">—</span>
+                            {% endfor %}
+                        </div>
+                    </td>
+                    <td>
+                        {% if u.is_active %}
+                        <span class="status-badge status-badge--active">Hoạt động</span>
+                        {% else %}
+                        <span class="status-badge status-badge--inactive">Bị khóa</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ u.date_joined|date:"d/m/Y" }}</td>
+                    <td style="text-align:right;">
+                        <div style="display:inline-flex; gap:0.4rem; justify-content:flex-end;">
+                            <!-- Lock/Unlock action -->
+                            {% if u != request.user %}
+                            <form action="{% url 'accounts:admin_user_toggle_active' u.pk %}" method="post" style="margin:0;">
+                                {% csrf_token %}
+                                {% if u.is_active %}
+                                <button type="submit" class="btn-action btn-action--lock" title="Khóa tài khoản">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                </button>
+                                {% else %}
+                                <button type="submit" class="btn-action btn-action--unlock" title="Mở khóa tài khoản">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+                                </button>
+                                {% endif %}
+                            </form>
+                            <!-- Delete action -->
+                            <button type="button" class="btn-action btn-action--delete" title="Xóa vĩnh viễn" onclick="showDeleteModal('{{ u.pk }}', '{{ u.email }}')">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                            </button>
+                            {% else %}
+                            <span class="text-muted" style="font-size:0.8rem; font-style:italic;">Bản thân</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 3rem 1rem;" class="text-muted">
+                        Không tìm thấy tài khoản người dùng nào.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if is_paginated %}
+    <div class="pagination">
+        {% if page_obj.has_previous %}
+        <a href="?page=1{% if query_params %}&{{ query_params }}{% endif %}" class="page-link">&laquo;</a>
+        <a href="?page={{ page_obj.previous_page_number }}{% if query_params %}&{{ query_params }}{% endif %}" class="page-link">&lsaquo;</a>
+        {% else %}
+        <span class="page-link page-link--disabled">&laquo;</span>
+        <span class="page-link page-link--disabled">&lsaquo;</span>
+        {% endif %}
+
+        {% for num in page_obj.paginator.page_range %}
+        {% if page_obj.number == num %}
+        <span class="page-link page-link--active">{{ num }}</span>
+        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+        <a href="?page={{ num }}{% if query_params %}&{{ query_params }}{% endif %}" class="page-link">{{ num }}</a>
+        {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if query_params %}&{{ query_params }}{% endif %}" class="page-link">&rsaquo;</a>
+        <a href="?page={{ page_obj.paginator.num_pages }}{% if query_params %}&{{ query_params }}{% endif %}" class="page-link">&raquo;</a>
+        {% else %}
+        <span class="page-link page-link--disabled">&rsaquo;</span>
+        <span class="page-link page-link--disabled">&raquo;</span>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal xác nhận xóa -->
+<div class="modal" id="delete-modal">
+    <div class="modal__content">
+        <h3 class="modal__title">Xác nhận xóa tài khoản</h3>
+        <p class="modal__body">
+            Bạn có chắc chắn muốn xóa vĩnh viễn tài khoản <strong id="delete-email"></strong> khỏi hệ thống? 
+            Hành động này sẽ xóa toàn bộ thông tin hồ sơ liên quan và không thể khôi phục.
+        </p>
+        <div class="modal__footer">
+            <button type="button" class="btn btn--secondary" onclick="closeDeleteModal()" style="height:38px;">Hủy bỏ</button>
+            <form id="delete-form" action="" method="post" style="margin:0;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn--primary" style="background-color:var(--rose-600); border-color:var(--rose-600); height:38px;">Xác nhận xóa</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function clearFilters() {
+        document.getElementById('q').value = '';
+        document.getElementById('role').value = '';
+        document.getElementById('status').value = '';
+        document.getElementById('filter-form').submit();
+    }
+
+    const modal = document.getElementById('delete-modal');
+    const deleteEmail = document.getElementById('delete-email');
+    const deleteForm = document.getElementById('delete-form');
+
+    function showDeleteModal(pk, email) {
+        deleteEmail.textContent = email;
+        deleteForm.action = `/quan-ly-tai-khoan/${pk}/xoa/`;
+        modal.classList.add('modal--open');
+    }
+
+    function closeDeleteModal() {
+        modal.classList.remove('modal--open');
+    }
+
+    // Close modal on click outside content
+    window.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            closeDeleteModal();
+        }
+    });
+</script>
+{% endblock %}
