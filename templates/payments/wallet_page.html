@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Ví điện tử GSports{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="wallet-container">
+        <!-- Card số dư -->
+        <div class="balance-card">
+            <div class="balance-header">
+                <i class="fas fa-wallet"></i>
+                <span>Số dư khả dụng</span>
+            </div>
+            <div class="balance-amount">
+                {{ wallet.balance|floatformat:0 }} <small>đ</small>
+            </div>
+            <div class="balance-actions">
+                <button class="btn-deposit" onclick="document.getElementById('depositModal').style.display='block'">
+                    <i class="fas fa-plus-circle"></i> Nạp tiền
+                </button>
+                <button class="btn-withdraw" onclick="alert('Tính năng đang phát triển')">
+                    <i class="fas fa-minus-circle"></i> Rút tiền
+                </button>
+            </div>
+        </div>
+
+        <!-- Lịch sử giao dịch -->
+        <div class="transaction-section">
+            <div class="section-header">
+                <h3><i class="fas fa-history"></i> Lịch sử giao dịch</h3>
+                <span class="transaction-count">{{ transactions|length }} giao dịch</span>
+            </div>
+            
+            <div class="transaction-list">
+                {% for tx in transactions %}
+                <div class="transaction-item">
+                    <div class="tx-icon {% if tx.amount > 0 %}income{% else %}expense{% endif %}">
+                        <i class="fas {% if tx.transaction_type == 'DEPOSIT' %}fa-arrow-down{% elif tx.transaction_type == 'PAYMENT' %}fa-shopping-cart{% else %}fa-arrow-up{% endif %}"></i>
+                    </div>
+                    <div class="tx-info">
+                        <div class="tx-title">{{ tx.description|default:tx.get_transaction_type_display }}</div>
+                        <div class="tx-date">{{ tx.created_at|date:"d/m/Y H:i" }}</div>
+                        {% if tx.reference_id %}
+                        <div class="tx-ref">Mã: {{ tx.reference_id|slice:":8" }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="tx-amount {% if tx.amount > 0 %}text-success{% else %}text-danger{% endif %}">
+                        {{ tx.amount|floatformat:0 }}đ
+                    </div>
+                    <div class="tx-status">
+                        <span class="badge badge-{{ tx.status|lower }}">
+                            {{ tx.get_status_display }}
+                        </span>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="empty-state">
+                    <i class="fas fa-inbox"></i>
+                    <p>Chưa có giao dịch nào</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal nạp tiền -->
+<div id="depositModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Nạp tiền vào ví</h3>
+            <span class="close" onclick="document.getElementById('depositModal').style.display='none'">&times;</span>
+        </div>
+        <form method="post" action="{% url 'payments:deposit' %}">
+            {% csrf_token %}
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Số tiền nạp</label>
+                    <div class="amount-input">
+                        <input type="number" name="amount" id="depositAmount" min="10000" step="10000" required>
+                        <span class="currency">VNĐ</span>
+                    </div>
+                </div>
+                <div class="quick-amounts">
+                    <button type="button" onclick="document.getElementById('depositAmount').value=50000">50k</button>
+                    <button type="button" onclick="document.getElementById('depositAmount').value=100000">100k</button>
+                    <button type="button" onclick="document.getElementById('depositAmount').value=200000">200k</button>
+                    <button type="button" onclick="document.getElementById('depositAmount').value=500000">500k</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-cancel" onclick="document.getElementById('depositModal').style.display='none'">Hủy</button>
+                <button type="submit" class="btn-submit">Nạp tiền</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
