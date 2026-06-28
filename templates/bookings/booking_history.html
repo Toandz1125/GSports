@@ -1,0 +1,422 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }} — GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/profile.css' %}?v=1.1">
+<style>
+    .booking-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .booking-header-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .booking-title-area h2 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-main);
+        margin: 0;
+    }
+
+    .booking-title-area p {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        margin: 0.25rem 0 0 0;
+    }
+
+    /* ── Live Filter Bar ── */
+    .live-filter-bar {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 0.5rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.85rem;
+        align-items: flex-end;
+    }
+
+    .live-filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+        flex: 1 1 170px;
+    }
+
+    .live-filter-group label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+    }
+
+    .live-filter-input {
+        background: var(--bg-body);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        padding: 0.6rem 0.85rem;
+        border-radius: var(--radius-md);
+        font-size: 0.875rem;
+        outline: none;
+        width: 100%;
+        transition: border-color var(--transition-fast);
+    }
+
+    .live-filter-input:focus {
+        border-color: var(--primary-500);
+    }
+
+    .live-filter-input option {
+        background-color: var(--bg-surface);
+        color: var(--text-main);
+    }
+
+
+    .btn-clear-filter {
+        background: transparent;
+        border: 1px solid var(--border-color);
+        color: var(--text-muted);
+        padding: 0.6rem 1rem;
+        border-radius: var(--radius-md);
+        font-size: 0.875rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        height: 38px;
+    }
+
+    .btn-clear-filter:hover {
+        background: var(--bg-body);
+        color: var(--text-main);
+        border-color: var(--text-muted);
+    }
+
+    /* ── Table Layout ── */
+    .table-responsive {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        overflow-x: auto;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .booking-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+        font-size: 0.875rem;
+    }
+
+    .booking-table th {
+        background: var(--bg-body);
+        color: var(--text-muted);
+        font-weight: 600;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid var(--border-color);
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+    }
+
+    .booking-table td {
+        padding: 1.25rem;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-main);
+        vertical-align: middle;
+    }
+
+    .booking-table tbody tr:hover {
+        background: rgba(var(--primary-rgb), 0.02);
+    }
+
+    .venue-info {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .venue-info__name {
+        font-weight: 600;
+        color: var(--text-main);
+    }
+
+    .venue-info__sub {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-top: 0.15rem;
+    }
+
+    .user-info {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .user-info__name {
+        font-weight: 600;
+    }
+
+    .user-info__email {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    .time-badge {
+        display: inline-block;
+        background: var(--bg-body);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        font-size: 0.8rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: var(--radius-sm);
+        margin: 0.1rem;
+    }
+
+    .row-hidden {
+        display: none !important;
+    }
+
+    .no-results-row td {
+        padding: 3rem;
+        text-align: center;
+        color: var(--text-muted);
+    }
+
+    .filter-count {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-top: -0.5rem;
+        padding-left: 0.5rem;
+        min-height: 18px;
+    }
+
+    .filter-count-num {
+        font-weight: 700;
+        color: var(--primary-600);
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="booking-container">
+    <div class="booking-header-row">
+        <div class="booking-title-area">
+            <h2>{{ page_title }}</h2>
+            <p>Xem danh sách các lượt đặt lịch và trạng thái thanh toán</p>
+        </div>
+    </div>
+
+    <!-- Live Filter Bar -->
+    <div class="live-filter-bar">
+        <!-- Search bar (live filter) -->
+        <div class="live-filter-group">
+            <label for="booking-search">Tìm kiếm</label>
+            <input type="text" id="booking-search" class="live-filter-input" placeholder="Tìm tên, email, cơ sở, sân...">
+        </div>
+
+        <!-- Venue filter dropdown (if context provides) -->
+        {% if filter_venues %}
+        <div class="live-filter-group">
+            <label for="booking-venue">Cơ sở</label>
+            <select id="booking-venue" class="live-filter-input">
+                <option value="">-- Tất cả cơ sở --</option>
+                {% for venue in filter_venues %}
+                <option value="{{ venue.name|lower }}">{{ venue.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        <!-- Status filter dropdown -->
+        <div class="live-filter-group">
+            <label for="booking-status">Trạng thái</label>
+            <select id="booking-status" class="live-filter-input">
+                <option value="">-- Tất cả trạng thái --</option>
+                <option value="pending">Chờ thanh toán (Pending)</option>
+                <option value="paid">Đã thanh toán (Paid)</option>
+                <option value="waiting">Chờ nhận sân (Waiting)</option>
+                <option value="cancelled">Đã hủy (Cancelled)</option>
+            </select>
+        </div>
+
+        <!-- Date Range: From -->
+        <div class="live-filter-group">
+            <label for="booking-date-from">Từ ngày</label>
+            <input type="date" id="booking-date-from" class="live-filter-input">
+        </div>
+
+        <!-- Date Range: To -->
+        <div class="live-filter-group">
+            <label for="booking-date-to">Đến ngày</label>
+            <input type="date" id="booking-date-to" class="live-filter-input">
+        </div>
+
+        <button class="btn-clear-filter" onclick="clearBookingFilters()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            Xoá bộ lọc
+        </button>
+    </div>
+
+    <!-- Filter Counter -->
+    <div class="filter-count" id="booking-filter-count"></div>
+
+    <!-- Table -->
+    <div class="table-responsive">
+        <table class="booking-table">
+            <thead>
+                <tr>
+                    <th>Cơ sở & Sân</th>
+                    <th>Khách hàng</th>
+                    <th>Ngày đặt</th>
+                    <th>Giờ đặt</th>
+                    <th>Tổng tiền</th>
+                    <th>Trạng thái</th>
+                </tr>
+            </thead>
+            <tbody id="booking-tbody">
+                {% for booking in bookings %}
+                <tr 
+                    data-venue="{{ booking.venue.name|lower }}"
+                    data-field="{{ booking.field.name|lower }}"
+                    data-email="{{ booking.booking_package.user.email|lower }}"
+                    data-name="{% if booking.booking_package.user.first_name or booking.booking_package.user.last_name %}{{ booking.booking_package.user.first_name|lower }} {{ booking.booking_package.user.last_name|lower }}{% endif %}"
+                    data-date="{{ booking.booking_date|date:'Y-m-d' }}"
+                    data-status="{{ booking.status|lower }}"
+                >
+                    <td>
+                        <div class="venue-info">
+                            <span class="venue-info__name">{{ booking.venue.name }}</span>
+                            <span class="venue-info__sub">{{ booking.field.name }}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="user-info">
+                            <span class="user-info__name">{% if booking.booking_package.user.first_name or booking.booking_package.user.last_name %}{{ booking.booking_package.user.first_name }} {{ booking.booking_package.user.last_name }}{% else %}Khách hàng{% endif %}</span>
+                            <span class="user-info__email">{{ booking.booking_package.user.email }}</span>
+                        </div>
+                    </td>
+                    <td>{{ booking.booking_date|date:"d/m/Y" }}</td>
+                    <td>
+                        {% for slot in booking.slots.all %}
+                        <span class="time-badge">{{ slot.start_time|time:"H:i" }}-{{ slot.end_time|time:"H:i" }}</span>
+                        {% empty %}—{% endfor %}
+                    </td>
+                    <td class="font-semibold" style="color: var(--text-main);">{{ booking.total_amount|floatformat:0 }} VNĐ</td>
+                    <td>
+                        <span class="status-badge status-badge--{{ booking.status|lower }}">{{ booking.get_status_display }}</span>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr class="no-results-row">
+                    <td colspan="6" style="text-align: center; padding: 3rem 1rem;">
+                        Chưa có lịch sử đặt sân nào.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+(function () {
+    const searchEl   = document.getElementById('booking-search');
+    const venueEl    = document.getElementById('booking-venue');
+    const statusEl   = document.getElementById('booking-status');
+    const dateFromEl = document.getElementById('booking-date-from');
+    const dateToEl   = document.getElementById('booking-date-to');
+    const tbody      = document.getElementById('booking-tbody');
+    const countEl    = document.getElementById('booking-filter-count');
+
+    if (!tbody) return;
+
+    const allRows = Array.from(tbody.querySelectorAll('tr:not(.no-results-row)'));
+    let noResultsRow = tbody.querySelector('tr.no-results-row');
+
+    if (!noResultsRow) {
+        noResultsRow = document.createElement('tr');
+        noResultsRow.className = 'no-results-row';
+        noResultsRow.innerHTML = `<td colspan="6" style="text-align:center;padding:2rem;color:var(--text-muted);">Không tìm thấy đặt lịch phù hợp.</td>`;
+        tbody.appendChild(noResultsRow);
+        noResultsRow.style.display = 'none';
+    }
+
+    function doFilter() {
+        const q        = searchEl.value.trim().toLowerCase();
+        const venueQ   = venueEl ? venueEl.value.toLowerCase() : '';
+        const statusQ  = statusEl.value.toLowerCase();
+        const dateFrom = dateFromEl.value ? dateFromEl.value : '';
+        const dateTo   = dateToEl.value   ? dateToEl.value   : '';
+
+        let visibleCount = 0;
+
+        allRows.forEach(row => {
+            const venue  = (row.dataset.venue || '').toLowerCase();
+            const field  = (row.dataset.field || '').toLowerCase();
+            const email  = (row.dataset.email || '').toLowerCase();
+            const name   = (row.dataset.name  || '').toLowerCase();
+            const date   = (row.dataset.date   || '');
+            const status = (row.dataset.status || '').toLowerCase();
+
+            // Search: matches venue, field, email, or name
+            const searchMatch = !q || [venue, field, email, name].some(f => f.includes(q));
+
+            // Venue filter
+            const venueMatch = !venueQ || venue.includes(venueQ);
+
+            // Status filter
+            const statusMatch = !statusQ || status === statusQ;
+
+            // Date range filter
+            const dateFromMatch = !dateFrom || date >= dateFrom;
+            const dateToMatch   = !dateTo   || date <= dateTo;
+
+            const show = searchMatch && venueMatch && statusMatch && dateFromMatch && dateToMatch;
+            row.classList.toggle('row-hidden', !show);
+            if (show) visibleCount++;
+        });
+
+        // Update counts
+        if (countEl) {
+            const total = allRows.length;
+            if (q || venueQ || statusQ || dateFrom || dateTo) {
+                countEl.innerHTML = `<span class="filter-count-num">${visibleCount}</span> / ${total} đặt lịch`;
+            } else {
+                countEl.textContent = '';
+            }
+        }
+
+        // Show/hide no-results
+        noResultsRow.style.display = visibleCount === 0 ? '' : 'none';
+    }
+
+    [searchEl, venueEl, statusEl, dateFromEl, dateToEl].forEach(el => {
+        if (!el) return;
+        el.addEventListener('input', doFilter);
+        el.addEventListener('change', doFilter);
+    });
+
+    window.clearBookingFilters = function () {
+        if (searchEl) searchEl.value = '';
+        if (venueEl) venueEl.value = '';
+        if (statusEl) statusEl.value = '';
+        if (dateFromEl) dateFromEl.value = '';
+        if (dateToEl) dateToEl.value = '';
+        doFilter();
+    };
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,100 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}Xác nhận xóa sân con — GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .delete-card {
+        background: var(--bg-surface);
+        border: 1px solid rgba(239, 68, 68, 0.2);
+        border-radius: var(--radius-lg);
+        padding: 2.5rem;
+        box-shadow: var(--shadow-sm);
+        max-width: 550px;
+        margin: 2rem auto;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.5rem;
+    }
+
+    .delete-card__icon {
+        width: 4rem;
+        height: 4rem;
+        color: var(--error-500);
+        background-color: rgba(239, 68, 68, 0.1);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .delete-card__icon svg {
+        width: 2.25rem;
+        height: 2.25rem;
+    }
+
+    .delete-card h2 {
+        color: var(--text-main);
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
+
+    .delete-card p {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        line-height: 1.6;
+    }
+
+    .delete-card__actions {
+        display: flex;
+        gap: 1rem;
+        width: 100%;
+        margin-top: 1rem;
+    }
+
+    .delete-card__actions .btn {
+        flex: 1;
+    }
+
+    .btn--secondary {
+        background-color: var(--bg-main);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+    }
+
+    .btn--secondary:hover {
+        background-color: var(--border-color);
+    }
+
+    .btn--danger {
+        background-color: var(--error-500);
+        color: white;
+    }
+
+    .btn--danger:hover {
+        background-color: #dc2626;
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="delete-card">
+    <div class="delete-card__icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+    </div>
+    <h2>Xác nhận xóa sân con</h2>
+    <p>Bạn có chắc chắn muốn xóa sân con <strong>"{{ object.name }}"</strong> thuộc cơ sở <strong>"{{ object.venue.name }}"</strong>? <br>Hành động này không thể hoàn tác.</p>
+    
+    <form method="post" style="width: 100%;">
+        {% csrf_token %}
+        <div class="delete-card__actions">
+            <a href="{% url 'venues:venue_detail' object.venue.pk %}" class="btn btn--secondary">Hủy bỏ</a>
+            <button type="submit" class="btn btn--danger">Xác nhận xóa</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

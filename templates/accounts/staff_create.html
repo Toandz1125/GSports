@@ -1,0 +1,254 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}Thêm nhân viên mới — GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/profile.css' %}?v=1.1">
+
+<style>
+    .edit-profile-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 2rem;
+        box-shadow: var(--shadow-sm);
+        margin-bottom: 2rem;
+    }
+
+    .edit-profile-card__title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text-main);
+        margin-bottom: 0.5rem;
+        border-left: 4px solid var(--primary-600);
+        padding-left: 0.75rem;
+    }
+
+    .edit-profile-card__subtitle {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        margin-bottom: 1.75rem;
+        padding-left: 0.75rem;
+    }
+
+    .business-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        background: var(--primary-50);
+        color: var(--primary-700);
+        border: 1px solid var(--primary-200);
+        border-radius: 9999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 0.25rem 0.75rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+
+    @media (min-width: 768px) {
+        .form-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+        .form-grid--full-width {
+            grid-column: span 2;
+        }
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .form-group label {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text-muted);
+    }
+
+    .form-group input,
+    .form-group select {
+        padding: 0.75rem 1rem;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-color);
+        background-color: var(--bg-body);
+        color: var(--text-main);
+        font-size: 0.875rem;
+        transition: border-color var(--transition-fast);
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+        border-color: var(--primary-500);
+        outline: none;
+    }
+
+    .form-group--error input,
+    .form-group--error select {
+        border-color: #dc2626 !important;
+    }
+
+    .form-error {
+        color: #dc2626;
+        font-size: 0.75rem;
+        margin-top: 0.25rem;
+    }
+
+    .edit-profile-card__actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: flex-end;
+        margin-top: 2rem;
+        border-top: 1px solid var(--border-color);
+        padding-top: 1.5rem;
+    }
+
+    .info-note {
+        background: var(--primary-50, #eff6ff);
+        border: 1px solid var(--primary-200, #bfdbfe);
+        border-radius: var(--radius-md);
+        padding: 0.875rem 1.125rem;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        color: var(--primary-800, #1e40af);
+        font-size: 0.85rem;
+    }
+
+    .info-note svg {
+        flex-shrink: 0;
+        margin-top: 1px;
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="edit-profile-container">
+    <div class="edit-profile-card">
+        <h3 class="edit-profile-card__title">Thêm nhân viên mới</h3>
+        <p class="edit-profile-card__subtitle">Tạo tài khoản và phân quyền quản lý cơ sở cho nhân viên</p>
+
+        <!-- Business badge -->
+        {% if owner_profile %}
+        <div class="business-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <path d="M9 3v18M15 3v18M3 9h18M3 15h18"/>
+            </svg>
+            {{ owner_profile.business_name }}
+        </div>
+        {% endif %}
+
+        <!-- Info note -->
+        <div class="info-note">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <span>Tài khoản nhân viên sẽ có vai trò <strong>STAFF</strong>. Họ có thể đăng nhập bằng email và mật khẩu bạn thiết lập bên dưới để quản lý cơ sở được chỉ định.</span>
+        </div>
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="auth-form__errors" style="margin-bottom: 1.5rem;">
+                {% for error in form.non_field_errors %}
+                <p class="auth-form__error-text" style="color: #dc2626; font-size: 0.875rem;">{{ error }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="form-grid">
+                <!-- Họ -->
+                <div class="form-group {% if form.first_name.errors %}form-group--error{% endif %}">
+                    <label for="{{ form.first_name.id_for_label }}">{{ form.first_name.label }}</label>
+                    {{ form.first_name }}
+                    {% if form.first_name.errors %}
+                    <div class="form-error">{% for e in form.first_name.errors %}{{ e }}{% endfor %}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Tên -->
+                <div class="form-group {% if form.last_name.errors %}form-group--error{% endif %}">
+                    <label for="{{ form.last_name.id_for_label }}">{{ form.last_name.label }}</label>
+                    {{ form.last_name }}
+                    {% if form.last_name.errors %}
+                    <div class="form-error">{% for e in form.last_name.errors %}{{ e }}{% endfor %}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Email -->
+                <div class="form-group form-grid--full-width {% if form.email.errors %}form-group--error{% endif %}">
+                    <label for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+                    {{ form.email }}
+                    {% if form.email.errors %}
+                    <div class="form-error">{% for e in form.email.errors %}{{ e }}{% endfor %}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Số điện thoại -->
+                <div class="form-group form-grid--full-width {% if form.phone.errors %}form-group--error{% endif %}">
+                    <label for="{{ form.phone.id_for_label }}">{{ form.phone.label }}</label>
+                    {{ form.phone }}
+                    {% if form.phone.errors %}
+                    <div class="form-error">{% for e in form.phone.errors %}{{ e }}{% endfor %}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Cơ sở làm việc -->
+                <div class="form-group form-grid--full-width {% if form.venue.errors %}form-group--error{% endif %}">
+                    <label for="{{ form.venue.id_for_label }}">{{ form.venue.label }}</label>
+                    {{ form.venue }}
+                    {% if form.venue.errors %}
+                    <div class="form-error">{% for e in form.venue.errors %}{{ e }}{% endfor %}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Mật khẩu -->
+                <div class="form-group {% if form.password.errors %}form-group--error{% endif %}">
+                    <label for="{{ form.password.id_for_label }}">{{ form.password.label }}</label>
+                    {{ form.password }}
+                    {% if form.password.errors %}
+                    <div class="form-error">{% for e in form.password.errors %}{{ e }}{% endfor %}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Xác nhận mật khẩu -->
+                <div class="form-group {% if form.password_confirm.errors %}form-group--error{% endif %}">
+                    <label for="{{ form.password_confirm.id_for_label }}">{{ form.password_confirm.label }}</label>
+                    {{ form.password_confirm }}
+                    {% if form.password_confirm.errors %}
+                    <div class="form-error">{% for e in form.password_confirm.errors %}{{ e }}{% endfor %}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="edit-profile-card__actions">
+                <a href="{% url 'accounts:staff_list' %}" class="btn btn--secondary">Hủy bỏ</a>
+                <button type="submit" class="btn btn--primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;margin-right:6px;">
+                        <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <line x1="19" y1="8" x2="19" y2="14"/>
+                        <line x1="22" y1="11" x2="16" y2="11"/>
+                    </svg>
+                    Lưu nhân viên
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

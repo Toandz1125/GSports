@@ -1,8 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import (
-    User, Role, UserRole, OwnerProfile, CustomerProfile,
-    Wallet, WalletTransaction, Notification, FavoriteVenue,
+    User, Role, UserRole, OwnerProfile, CustomerProfile, StaffProfile,
+    Wallet, WalletTransaction, Notification, FavoriteVenue, OwnerRegistrationRequest,
 )
 
 
@@ -35,6 +35,13 @@ class CustomerProfileAdmin(admin.ModelAdmin):
     list_display = ('user', 'loyalty_points')
 
 
+@admin.register(StaffProfile)
+class StaffProfileAdmin(admin.ModelAdmin):
+    list_display = ('user', 'owner')
+    list_filter = ('owner',)
+    search_fields = ('user__email', 'owner__business_name')
+
+
 @admin.register(Wallet)
 class WalletAdmin(admin.ModelAdmin):
     list_display = ('user', 'balance')
@@ -55,3 +62,10 @@ class NotificationAdmin(admin.ModelAdmin):
 @admin.register(FavoriteVenue)
 class FavoriteVenueAdmin(admin.ModelAdmin):
     list_display = ('user', 'venue', 'created_at')
+
+
+@admin.register(OwnerRegistrationRequest)
+class OwnerRegistrationRequestAdmin(admin.ModelAdmin):
+    list_display = ('email', 'business_name', 'status', 'created_at')
+    list_filter = ('status',)
+    search_fields = ('email', 'business_name')

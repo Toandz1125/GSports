@@ -1,0 +1,513 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}Quản lý nhân viên — GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/profile.css' %}?v=1.1">
+<style>
+    .staff-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .staff-header-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .staff-title-area h2 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-main);
+        margin: 0;
+    }
+
+    .staff-title-area p {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        margin: 0.25rem 0 0 0;
+    }
+
+    /* ── Live Filter Bar ── */
+    .live-filter-bar {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 0.5rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.85rem;
+        align-items: flex-end;
+    }
+
+    .live-filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+        flex: 1 1 200px;
+    }
+
+    .live-filter-group label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+    }
+
+    .live-filter-input {
+        background: var(--bg-body);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        padding: 0.6rem 0.85rem;
+        border-radius: var(--radius-md);
+        font-size: 0.875rem;
+        outline: none;
+        width: 100%;
+        transition: border-color var(--transition-fast);
+    }
+
+    .live-filter-input:focus {
+        border-color: var(--primary-500);
+    }
+
+    .live-filter-input option {
+        background-color: var(--bg-surface);
+        color: var(--text-main);
+    }
+
+
+    .btn-clear-filter {
+        background: transparent;
+        border: 1px solid var(--border-color);
+        color: var(--text-muted);
+        padding: 0.6rem 1rem;
+        border-radius: var(--radius-md);
+        font-size: 0.875rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        height: 38px;
+    }
+
+    .btn-clear-filter:hover {
+        background: var(--bg-body);
+        color: var(--text-main);
+        border-color: var(--text-muted);
+    }
+
+    /* ── Table Layout ── */
+    .table-responsive {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        overflow-x: auto;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .staff-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+        font-size: 0.875rem;
+    }
+
+    .staff-table th {
+        background: var(--bg-body);
+        color: var(--text-muted);
+        font-weight: 600;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid var(--border-color);
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+    }
+
+    .staff-table td {
+        padding: 1.25rem;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-main);
+        vertical-align: middle;
+    }
+
+    .staff-table tbody tr:hover {
+        background: rgba(var(--primary-rgb), 0.02);
+    }
+
+    .staff-name-wrap {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .staff-fullname {
+        font-weight: 600;
+        color: var(--text-main);
+    }
+
+    .staff-email {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    .venue-badge {
+        display: inline-flex;
+        align-items: center;
+        background: var(--primary-50);
+        color: var(--primary-700);
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 0.25rem 0.6rem;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--primary-100);
+    }
+
+    .venue-badge--none {
+        background: var(--bg-body);
+        color: var(--text-muted);
+        border-color: var(--border-color);
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .btn-icon-action {
+        width: 32px;
+        height: 32px;
+        border-radius: var(--radius-md);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        border: 1px solid var(--border-color);
+        background: var(--bg-surface);
+    }
+
+    .btn-icon-action--edit {
+        color: var(--primary-600);
+    }
+
+    .btn-icon-action--edit:hover {
+        background: var(--primary-50);
+        border-color: var(--primary-300);
+    }
+
+    .btn-icon-action--delete {
+        color: #dc2626;
+    }
+
+    .btn-icon-action--delete:hover {
+        background: #fef2f2;
+        border-color: #fca5a5;
+    }
+
+    .row-hidden {
+        display: none !important;
+    }
+
+    .no-results-row td {
+        padding: 3rem;
+        text-align: center;
+        color: var(--text-muted);
+    }
+
+    .filter-count {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-top: -0.5rem;
+        padding-left: 0.5rem;
+        min-height: 18px;
+    }
+
+    .filter-count-num {
+        font-weight: 700;
+        color: var(--primary-600);
+    }
+
+    /* Modal */
+    .confirm-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(4px);
+        padding: 1.5rem;
+    }
+
+    .confirm-modal.is-active {
+        display: flex;
+    }
+
+    .confirm-modal-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        width: 100%;
+        max-width: 450px;
+        box-shadow: var(--shadow-lg);
+        overflow: hidden;
+        animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes modalFadeIn {
+        from { transform: scale(0.95); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+
+    .confirm-modal-header {
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        font-weight: 700;
+        font-size: 1.1rem;
+        color: var(--text-main);
+    }
+
+    .confirm-modal-body {
+        padding: 1.5rem;
+        font-size: 0.95rem;
+        color: var(--text-main);
+        line-height: 1.5;
+    }
+
+    .confirm-modal-footer {
+        padding: 1.25rem 1.5rem;
+        border-top: 1px solid var(--border-color);
+        background: var(--bg-body);
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="staff-container">
+    <div class="staff-header-row">
+        <div class="staff-title-area">
+            <h2>Quản lý nhân viên</h2>
+            <p>Danh sách nhân viên thuộc doanh nghiệp của bạn</p>
+        </div>
+        <a href="{% url 'accounts:staff_create' %}" class="btn btn--primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;margin-right:6px;">
+                <path d="M12 5v14M5 12h14"/>
+            </svg>
+            Thêm nhân viên
+        </a>
+    </div>
+
+    <!-- Live Filter Bar -->
+    <div class="live-filter-bar">
+        <div class="live-filter-group">
+            <label for="staff-search">Tìm kiếm nhân viên</label>
+            <input type="text" id="staff-search" class="live-filter-input" placeholder="Tìm theo tên, email, sđt...">
+        </div>
+
+        <div class="live-filter-group">
+            <label for="staff-venue">Lọc theo Cơ sở</label>
+            <select id="staff-venue" class="live-filter-input">
+                <option value="">-- Tất cả cơ sở --</option>
+                {% for venue in owner_profile.venues.all %}
+                {% if not venue.is_deleted %}
+                <option value="{{ venue.name|lower }}">{{ venue.name }}</option>
+                {% endif %}
+                {% endfor %}
+            </select>
+        </div>
+
+        <button class="btn-clear-filter" onclick="clearStaffFilters()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            Xoá bộ lọc
+        </button>
+    </div>
+
+    <!-- Filter Counter -->
+    <div class="filter-count" id="staff-filter-count"></div>
+
+    <!-- Table -->
+    <div class="table-responsive">
+        <table class="staff-table">
+            <thead>
+                <tr>
+                    <th>Họ & Tên</th>
+                    <th>Số điện thoại</th>
+                    <th>Cơ sở phụ trách</th>
+                    <th>Ngày tham gia</th>
+                    <th style="width: 100px; text-align: center;">Hành động</th>
+                </tr>
+            </thead>
+            <tbody id="staff-tbody">
+                {% for staff in staffs %}
+                <tr 
+                    data-name="{{ staff.first_name }} {{ staff.last_name }}"
+                    data-email="{{ staff.email }}"
+                    data-phone="{{ staff.phone|default:'' }}"
+                    data-venue="{% if staff.staff_profile.venue %}{{ staff.staff_profile.venue.name|lower }}{% else %}tất cả cơ sở{% endif %}"
+                >
+                    <td>
+                        <div class="staff-name-wrap">
+                            <span class="staff-fullname">{% if staff.first_name or staff.last_name %}{{ staff.first_name }} {{ staff.last_name }}{% else %}Chưa cập nhật{% endif %}</span>
+                            <span class="staff-email">{{ staff.email }}</span>
+                        </div>
+                    </td>
+                    <td>{{ staff.phone|default:"—" }}</td>
+                    <td>
+                        {% if staff.staff_profile.venue %}
+                        <span class="venue-badge">{{ staff.staff_profile.venue.name }}</span>
+                        {% else %}
+                        <span class="venue-badge venue-badge--none">Tất cả cơ sở</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ staff.date_joined|date:"d/m/Y" }}</td>
+                    <td>
+                        <div class="action-buttons" style="justify-content: center;">
+                            <a href="{% url 'accounts:staff_edit' staff.pk %}" class="btn-icon-action btn-icon-action--edit" title="Sửa thông tin">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            </a>
+                            <button type="button" class="btn-icon-action btn-icon-action--delete" title="Xoá tài khoản" onclick="showDeleteModal('{{ staff.pk }}', '{{ staff.email }}')">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr class="no-results-row">
+                    <td colspan="5" style="text-align: center; padding: 3rem 1rem;">
+                        Chưa có nhân viên nào được tạo. <a href="{% url 'accounts:staff_create' %}" class="text-primary font-semibold">Tạo tài khoản nhân viên đầu tiên!</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Deletion Confirmation Modal -->
+<div class="confirm-modal" id="delete-modal">
+    <div class="confirm-modal-card">
+        <div class="confirm-modal-header">Xác nhận xoá nhân viên</div>
+        <div class="confirm-modal-body">
+            Bạn có chắc chắn muốn xoá tài khoản nhân viên <strong id="delete-staff-email"></strong> không? Hành động này sẽ xoá toàn bộ quyền truy cập và dữ liệu liên quan và không thể khôi phục.
+        </div>
+        <div class="confirm-modal-footer">
+            <button type="button" class="btn btn--secondary" onclick="closeDeleteModal()">Hủy bỏ</button>
+            <form id="delete-form" method="post" style="margin: 0;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn--danger">Xác nhận xoá</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const searchEl   = document.getElementById('staff-search');
+    const venueEl    = document.getElementById('staff-venue');
+    const tbody      = document.getElementById('staff-tbody');
+    const countEl    = document.getElementById('staff-filter-count');
+
+    if (!tbody) return;
+
+    const allRows = Array.from(tbody.querySelectorAll('tr:not(.no-results-row)'));
+    let noResultsRow = tbody.querySelector('tr.no-results-row');
+
+    if (!noResultsRow) {
+        noResultsRow = document.createElement('tr');
+        noResultsRow.className = 'no-results-row';
+        noResultsRow.innerHTML = `<td colspan="5" style="text-align:center;padding:2rem;color:var(--text-muted);">Không tìm thấy nhân viên phù hợp.</td>`;
+        tbody.appendChild(noResultsRow);
+        noResultsRow.style.display = 'none';
+    }
+
+    function doFilter() {
+        const q      = searchEl.value.trim().toLowerCase();
+        const venueQ = venueEl.value.toLowerCase();
+
+        let visibleCount = 0;
+
+        allRows.forEach(row => {
+            const name  = (row.dataset.name || '').toLowerCase();
+            const email = (row.dataset.email || '').toLowerCase();
+            const phone = (row.dataset.phone || '').toLowerCase();
+            const venue = (row.dataset.venue || '').toLowerCase();
+
+            // Search: matches name, email, or phone
+            const searchMatch = !q || [name, email, phone].some(f => f.includes(q));
+
+            // Venue filter
+            const venueMatch = !venueQ || venue.includes(venueQ);
+
+            const show = searchMatch && venueMatch;
+            row.classList.toggle('row-hidden', !show);
+            if (show) visibleCount++;
+        });
+
+        // Update counts
+        if (countEl) {
+            const total = allRows.length;
+            if (q || venueQ) {
+                countEl.innerHTML = `<span class="filter-count-num">${visibleCount}</span> / ${total} nhân viên`;
+            } else {
+                countEl.textContent = '';
+            }
+        }
+
+        // Show/hide no-results
+        noResultsRow.style.display = visibleCount === 0 ? '' : 'none';
+    }
+
+    [searchEl, venueEl].forEach(el => {
+        if (!el) return;
+        el.addEventListener('input', doFilter);
+        el.addEventListener('change', doFilter);
+    });
+
+    window.clearStaffFilters = function () {
+        if (searchEl) searchEl.value = '';
+        if (venueEl) venueEl.value = '';
+        doFilter();
+    };
+
+    // Modal Handling
+    const deleteModal = document.getElementById('delete-modal');
+    const deleteEmail = document.getElementById('delete-staff-email');
+    const deleteForm  = document.getElementById('delete-form');
+
+    window.showDeleteModal = function (pk, email) {
+        if (!deleteModal || !deleteEmail || !deleteForm) return;
+        deleteEmail.textContent = email;
+        deleteForm.action = `/nhan-vien/${pk}/xoa/`;
+        deleteModal.classList.add('is-active');
+    };
+
+    window.closeDeleteModal = function () {
+        if (!deleteModal) return;
+        deleteModal.classList.remove('is-active');
+    };
+
+    // Close on click outside modal
+    window.addEventListener('click', function(e) {
+        if (e.target === deleteModal) {
+            closeDeleteModal();
+        }
+    });
+})();
+</script>
+{% endblock %}

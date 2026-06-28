@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Đăng ký — GSports{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/auth.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <!-- Animated background shapes -->
+    <div class="auth-bg">
+        <div class="auth-bg__shape auth-bg__shape--1"></div>
+        <div class="auth-bg__shape auth-bg__shape--2"></div>
+        <div class="auth-bg__shape auth-bg__shape--3"></div>
+    </div>
+
+    <div class="auth-card">
+        <!-- Header -->
+        <div class="auth-card__header">
+            <a href="{% url 'accounts:login' %}" class="auth-card__logo">
+                <span class="auth-card__logo-icon">⚽</span>
+                <span class="auth-card__logo-text">GSports</span>
+            </a>
+            <h1 class="auth-card__title">Tạo tài khoản</h1>
+            <p class="auth-card__subtitle">Đăng ký để đặt sân thể thao nhanh chóng</p>
+        </div>
+
+        <!-- Form -->
+        <form method="post" class="auth-form" novalidate id="register-form">
+            {% csrf_token %}
+
+            <!-- Non-field errors -->
+            {% if form.non_field_errors %}
+            <div class="auth-form__errors">
+                {% for error in form.non_field_errors %}
+                <p class="auth-form__error-text">{{ error }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Email -->
+            <div class="form-group {% if form.email.errors %}form-group--error{% endif %}">
+                <label for="{{ form.email.id_for_label }}" class="form-label">
+                    <svg class="form-label__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 4l-10 8L2 4"/></svg>
+                    {{ form.email.label }}
+                </label>
+                {{ form.email }}
+                {% if form.email.errors %}
+                <div class="form-error">{% for e in form.email.errors %}{{ e }}{% endfor %}</div>
+                {% endif %}
+            </div>
+
+            <!-- Username -->
+            <!-- First & Last name -->
+            <div class="form-row">
+                <div class="form-group {% if form.first_name.errors %}form-group--error{% endif %}">
+                    <label for="{{ form.first_name.id_for_label }}" class="form-label">{{ form.first_name.label }}</label>
+                    {{ form.first_name }}
+                    {% if form.first_name.errors %}<div class="form-error">{% for e in form.first_name.errors %}{{ e }}{% endfor %}</div>{% endif %}
+                </div>
+
+                <div class="form-group {% if form.last_name.errors %}form-group--error{% endif %}">
+                    <label for="{{ form.last_name.id_for_label }}" class="form-label">{{ form.last_name.label }}</label>
+                    {{ form.last_name }}
+                    {% if form.last_name.errors %}<div class="form-error">{% for e in form.last_name.errors %}{{ e }}{% endfor %}</div>{% endif %}
+                </div>
+            </div>
+
+            <!-- Phone -->
+            <div class="form-group {% if form.phone.errors %}form-group--error{% endif %}">
+                <label for="{{ form.phone.id_for_label }}" class="form-label">
+                    <svg class="form-label__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+                    {{ form.phone.label }}
+                </label>
+                {{ form.phone }}
+                {% if form.phone.errors %}
+                <div class="form-error">{% for e in form.phone.errors %}{{ e }}{% endfor %}</div>
+                {% endif %}
+            </div>
+
+            <!-- Password -->
+            <div class="form-group {% if form.password.errors %}form-group--error{% endif %}">
+                <label for="{{ form.password.id_for_label }}" class="form-label">
+                    <svg class="form-label__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                    {{ form.password.label }}
+                </label>
+                {{ form.password }}
+                {% if form.password.errors %}
+                <div class="form-error">{% for e in form.password.errors %}{{ e }}{% endfor %}</div>
+                {% endif %}
+            </div>
+
+            <!-- Password Confirm -->
+            <div class="form-group {% if form.password_confirm.errors %}form-group--error{% endif %}">
+                <label for="{{ form.password_confirm.id_for_label }}" class="form-label">
+                    <svg class="form-label__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    {{ form.password_confirm.label }}
+                </label>
+                {{ form.password_confirm }}
+                {% if form.password_confirm.errors %}
+                <div class="form-error">{% for e in form.password_confirm.errors %}{{ e }}{% endfor %}</div>
+                {% endif %}
+            </div>
+
+            <button type="submit" class="btn btn--primary btn--full" id="register-submit">
+                <span>Đăng ký</span>
+                <svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </button>
+        </form>
+
+        <!-- Footer links -->
+        <div class="auth-card__footer">
+            <p>Đã có tài khoản? <a href="{% url 'accounts:login' %}" class="auth-link">Đăng nhập</a></p>
+            <p class="auth-card__divider-text">hoặc</p>
+            <p>Bạn là chủ sân? <a href="{% url 'accounts:register_owner' %}" class="auth-link">Đăng ký chủ sân</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}
