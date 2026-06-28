@@ -14,15 +14,28 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
-from django.shortcuts import redirect
 from django.urls import include, path
+from django.views.generic import RedirectView
+
+from apps.accounts import views as account_views
 
 urlpatterns = [
-    path('', lambda request: redirect('bookings:booking_list')),
     path('admin/', admin.site.urls),
-    path('accounts/', include('apps.accounts.urls')),
+    # Redirect root "/" to login page
+    path('', RedirectView.as_view(pattern_name='accounts:login', permanent=False)),
+    path('', include('apps.accounts.urls')),
+    path('dang-nhap/', account_views.LoginView.as_view(), name='login'),
+    path('dang-xuat/', account_views.LogoutView.as_view(), name='logout'),
+    path('co-so/', include('apps.venues.urls')),
     path('bookings/', include('apps.bookings.urls')),
     path('services/', include('apps.services.urls')),
     path('payments/', include('apps.payments.urls')),
+    path('dat-san/', include(('apps.bookings.urls', 'bookings'), namespace='bookings_dat_san')),
 ]
+
+# Phục vụ media files (avatar, uploads) trong chế độ DEBUG
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Đăng nhập — GSports{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/auth.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-bg">
+        <div class="auth-bg__shape auth-bg__shape--1"></div>
+        <div class="auth-bg__shape auth-bg__shape--2"></div>
+        <div class="auth-bg__shape auth-bg__shape--3"></div>
+    </div>
+
+    <div class="auth-card">
+        <div class="auth-card__header">
+            <div class="auth-card__logo">
+                <span class="auth-card__logo-icon">⚽</span>
+                <span class="auth-card__logo-text">GSports</span>
+            </div>
+            <h1 class="auth-card__title">Chào mừng trở lại</h1>
+            <p class="auth-card__subtitle">Đăng nhập để tiếp tục sử dụng dịch vụ</p>
+        </div>
+
+        <form method="post" class="auth-form" novalidate id="login-form">
+            {% csrf_token %}
+            {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+            {% if form.non_field_errors %}
+            <div class="auth-form__errors">
+                {% for error in form.non_field_errors %}
+                <p class="auth-form__error-text">{{ error }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Email -->
+            <div class="form-group {% if form.email.errors %}form-group--error{% endif %}">
+                <label for="{{ form.email.id_for_label }}" class="form-label">
+                    <svg class="form-label__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 4l-10 8L2 4"/></svg>
+                    {{ form.email.label }}
+                </label>
+                {{ form.email }}
+                {% if form.email.errors %}
+                <div class="form-error">{% for e in form.email.errors %}{{ e }}{% endfor %}</div>
+                {% endif %}
+            </div>
+
+            <!-- Password -->
+            <div class="form-group {% if form.password.errors %}form-group--error{% endif %}">
+                <label for="{{ form.password.id_for_label }}" class="form-label">
+                    <svg class="form-label__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                    {{ form.password.label }}
+                </label>
+                {{ form.password }}
+                {% if form.password.errors %}
+                <div class="form-error">{% for e in form.password.errors %}{{ e }}{% endfor %}</div>
+                {% endif %}
+            </div>
+
+            <button type="submit" class="btn btn--primary btn--full" id="login-submit">
+                <span>Đăng nhập</span>
+                <svg class="btn__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </button>
+        </form>
+
+        <div class="auth-card__footer">
+            <p>Chưa có tài khoản? <a href="{% url 'accounts:register' %}" class="auth-link">Đăng ký ngay</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

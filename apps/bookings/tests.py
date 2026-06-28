@@ -108,6 +108,13 @@ class BookingTimeRangeValidationTests(SimpleTestCase):
 
 class BookingAuthTests(TestCase):
     def setUp(self):
+        self.redis_client = fakeredis.FakeStrictRedis(decode_responses=True)
+        self.redis_patcher = patch('apps.bookings.services.get_redis_client', return_value=self.redis_client)
+        self.redis_patcher.start()
+        self.addCleanup(self.redis_patcher.stop)
+        self.addCleanup(self.redis_client.flushdb)
+        self.redis_client.flushdb()
+
         User = get_user_model()
         self.customer = User.objects.create_user(
             username='customer-auth',
@@ -800,7 +807,6 @@ class ManagementDashboardTests(TestCase):
             username='admin-owner', email='admin-owner@example.com', password='password',
         )
         UserRole.objects.create(user=self.admin_owner_user, role=self.admin_role)
-        UserRole.objects.create(user=self.admin_owner_user, role=self.owner_role)
         self.admin_owner = OwnerProfile.objects.create(
             user=self.admin_owner_user, business_name='Admin Owner',
         )

@@ -1,0 +1,285 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}Danh sách cơ sở thể thao — GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .venues-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .venues-header__title h1 {
+        font-size: 1.75rem;
+        font-weight: 800;
+        color: var(--text-main);
+    }
+
+    .venues-header__title p {
+        color: var(--text-muted);
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+    }
+
+    .venues-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .venue-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        box-shadow: var(--shadow-sm);
+        transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        position: relative;
+    }
+
+    .venue-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-md);
+    }
+
+    /* Top Accent Line */
+    .venue-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, var(--primary-500), #8b5cf6);
+    }
+
+    .venue-card__body {
+        padding: 1.75rem;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .venue-card__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .venue-card__name {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text-main);
+        line-height: 1.3;
+    }
+
+    .badge--active {
+        background-color: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+    }
+
+    .badge--inactive {
+        background-color: rgba(100, 116, 139, 0.1);
+        color: #64748b;
+    }
+
+    .badge--pending {
+        background-color: rgba(245, 158, 11, 0.1);
+        color: #f59e0b;
+    }
+
+    .venue-card__badge {
+        display: inline-block;
+        padding: 0.125rem 0.5rem;
+        border-radius: var(--radius-full);
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .venue-card__address {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        color: var(--text-muted);
+        font-size: 0.875rem;
+    }
+
+    .venue-card__address svg {
+        width: 1.25rem;
+        height: 1.25rem;
+        color: var(--primary-500);
+        flex-shrink: 0;
+        margin-top: 0.1rem;
+    }
+
+    .venue-card__description {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        line-height: 1.5;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        flex: 1;
+    }
+
+    .venue-card__footer {
+        padding: 1.25rem 1.75rem;
+        border-top: 1px solid var(--border-color);
+        background-color: rgba(0, 0, 0, 0.01);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .venue-card__stats {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        font-weight: 500;
+    }
+
+    .venue-card__stats svg {
+        width: 1.125rem;
+        height: 1.125rem;
+        color: var(--text-muted);
+    }
+
+    .venue-card__link {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--primary-600);
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        transition: transform var(--transition-fast);
+    }
+
+    .venue-card__link:hover {
+        color: var(--primary-700);
+    }
+
+    .venue-card__link:hover svg {
+        transform: translateX(2px);
+    }
+
+    .venue-card__link svg {
+        width: 1rem;
+        height: 1rem;
+        transition: transform var(--transition-fast);
+    }
+
+    /* Empty state */
+    .empty-state {
+        background-color: var(--bg-surface);
+        border: 1px dashed var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 4rem 2rem;
+        text-align: center;
+        color: var(--text-muted);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.25rem;
+        max-width: 500px;
+        margin: 2rem auto;
+    }
+
+    .empty-state__icon {
+        width: 4.5rem;
+        height: 4.5rem;
+        color: var(--border-color);
+    }
+
+    .empty-state h3 {
+        color: var(--text-main);
+        font-size: 1.25rem;
+        font-weight: 700;
+    }
+
+    .empty-state p {
+        font-size: 0.875rem;
+        line-height: 1.5;
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="venues-header">
+    <div class="venues-header__title">
+        <h1>Quản lý cơ sở thể thao</h1>
+        <p>Xem, thêm mới và quản lý thông tin các cơ sở của bạn.</p>
+    </div>
+    <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+        <a href="{% url 'accounts:owner_profile_edit' %}" class="btn btn--secondary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span>Sửa thông tin cơ sở</span>
+        </a>
+        <a href="{% url 'venues:venue_create' %}" class="btn btn--primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px; height:18px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>Thêm cơ sở mới</span>
+        </a>
+    </div>
+</div>
+
+{% if venues %}
+<div class="venues-grid">
+    {% for venue in venues %}
+    <div class="venue-card">
+        <div class="venue-card__body">
+            <div class="venue-card__header">
+                <h2 class="venue-card__name">{{ venue.name }}</h2>
+                <span class="venue-card__badge badge--{{ venue.status|lower }}">{{ venue.status }}</span>
+            </div>
+            <div class="venue-card__address">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"/><circle cx="12" cy="10" r="3"/></svg>
+                <span>{{ venue.address }}</span>
+            </div>
+            {% if venue.description %}
+            <p class="venue-card__description">{{ venue.description }}</p>
+            {% else %}
+            <p class="venue-card__description text-muted"><i>Chưa có mô tả chi tiết cho cơ sở này.</i></p>
+            {% endif %}
+        </div>
+        <div class="venue-card__footer">
+            <div class="venue-card__stats">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
+                <span>{{ venue.fields.count }} Sân con</span>
+            </div>
+            <a href="{% url 'venues:venue_detail' venue.pk %}" class="venue-card__link">
+                <span>Chi tiết</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <div class="empty-state__icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    </div>
+    <h3>Chưa có cơ sở thể thao nào</h3>
+    <p>Bạn chưa thêm cơ sở thể thao nào vào hệ thống. Hãy bắt đầu bằng cách thêm cơ sở đầu tiên của bạn để người dùng có thể tìm kiếm và đặt sân.</p>
+    <a href="{% url 'venues:venue_create' %}" class="btn btn--primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px; height:18px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        <span>Thêm cơ sở đầu tiên</span>
+    </a>
+</div>
+{% endif %}
+{% endblock %}

@@ -5,6 +5,7 @@ from .views import (
     BookingCreateView,
     BookingDetailView,
     BookingFieldServicesView,
+    BookingHistoryListView,
     BookingListView,
     CancelBookingView,
     OwnerBookingFieldOptionsView,
@@ -16,6 +17,7 @@ from .views import (
 app_name = 'bookings'
 
 urlpatterns = [
+    path('lich-su/', BookingHistoryListView.as_view(), name='booking_history'),
     path('', BookingListView.as_view(), name='booking_list'),
     path('create/', BookingCreateView.as_view(), name='booking_create'),
     path('fields/<int:field_id>/create/', BookingCreateView.as_view(), name='booking_create_for_field'),

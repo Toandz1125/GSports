@@ -1,0 +1,147 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}Chỉnh sửa hồ sơ chủ sân — GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/profile.css' %}?v=1.1">
+
+<style>
+    .edit-profile-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 2rem;
+        box-shadow: var(--shadow-sm);
+        margin-bottom: 2rem;
+    }
+
+    .edit-profile-card__title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text-main);
+        margin-bottom: 1.5rem;
+        border-left: 4px solid var(--primary-600);
+        padding-left: 0.75rem;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+
+    @media (min-width: 768px) {
+        .form-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+        .form-grid--full-width {
+            grid-column: span 2;
+        }
+    }
+
+    /* Form control overrides for profile edit */
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .form-group label {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text-muted);
+    }
+
+    .form-group input {
+        padding: 0.75rem 1rem;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-color);
+        background-color: var(--bg-body);
+        color: var(--text-main);
+        font-size: 0.875rem;
+        transition: border-color var(--transition-fast);
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .form-group input:focus {
+        border-color: var(--primary-500);
+        outline: none;
+    }
+
+    .form-group--error input {
+        border-color: #dc2626 !important;
+    }
+
+    .form-error {
+        color: #dc2626;
+        font-size: 0.75rem;
+        margin-top: 0.25rem;
+    }
+
+    .edit-profile-card__actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: flex-end;
+        margin-top: 2rem;
+        border-top: 1px solid var(--border-color);
+        padding-top: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="edit-profile-container">
+    <div class="edit-profile-card">
+        <h3 class="edit-profile-card__title">Chỉnh sửa thông tin cơ sở</h3>
+        
+        <form method="post" novalidate>
+            {% csrf_token %}
+            
+            {% if form.non_field_errors %}
+            <div class="auth-form__errors" style="margin-bottom: 1.5rem;">
+                {% for error in form.non_field_errors %}
+                <p class="auth-form__error-text" style="color: #dc2626; font-size: 0.875rem;">{{ error }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="form-grid">
+                <!-- Tên doanh nghiệp -->
+                <div class="form-group form-grid--full-width {% if form.business_name.errors %}form-group--error{% endif %}">
+                    <label for="{{ form.business_name.id_for_label }}">{{ form.business_name.label }}</label>
+                    {{ form.business_name }}
+                    {% if form.business_name.errors %}
+                    <div class="form-error">{% for e in form.business_name.errors %}{{ e }}{% endfor %}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Tên ngân hàng -->
+                <div class="form-group {% if form.bank_name.errors %}form-group--error{% endif %}">
+                    <label for="{{ form.bank_name.id_for_label }}">{{ form.bank_name.label }}</label>
+                    {{ form.bank_name }}
+                    {% if form.bank_name.errors %}
+                    <div class="form-error">{% for e in form.bank_name.errors %}{{ e }}{% endfor %}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Số tài khoản -->
+                <div class="form-group {% if form.bank_account_number.errors %}form-group--error{% endif %}">
+                    <label for="{{ form.bank_account_number.id_for_label }}">{{ form.bank_account_number.label }}</label>
+                    {{ form.bank_account_number }}
+                    {% if form.bank_account_number.errors %}
+                    <div class="form-error">{% for e in form.bank_account_number.errors %}{{ e }}{% endfor %}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="edit-profile-card__actions">
+                <a href="{% url 'venues:venue_list' %}" class="btn btn--secondary">Hủy bỏ</a>
+                <button type="submit" class="btn btn--primary">Lưu thay đổi</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

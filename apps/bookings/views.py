@@ -8,12 +8,13 @@ from django.db.models import Prefetch, Q
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.template.loader import render_to_string
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views import View
 from django.views.generic import DetailView, FormView, ListView
 
+from apps.accounts.models import UserRole
 from apps.services.models import BookingService, ServiceItem
 from apps.venues.models import Field, Venue
 from .forms import BookingCreateForm
@@ -112,6 +113,61 @@ class BookingListView(LoginRequiredMixin, ListView):
                 ),
             ),
         )
+
+
+class BookingHistoryListView(LoginRequiredMixin, ListView):
+    """History view from main for all booking roles."""
+
+    model = Booking
+    template_name = 'bookings/booking_history.html'
+    context_object_name = 'bookings'
+    login_url = reverse_lazy('accounts:login')
+
+    def get_queryset(self):
+        user = self.request.user
+        roles = UserRole.objects.filter(user=user).values_list('role__name', flat=True)
+        queryset = (
+            Booking.objects
+            .select_related('booking_package__user', 'venue', 'field')
+            .prefetch_related('slots')
+            .order_by('-created_at')
+        )
+
+        if 'ADMIN' in roles:
+            return queryset
+        if 'OWNER' in roles:
+            if hasattr(user, 'owner_profile'):
+                return queryset.filter(venue__owner=user.owner_profile)
+            return queryset.none()
+        if 'STAFF' in roles:
+            if hasattr(user, 'staff_profile') and user.staff_profile.venue:
+                return queryset.filter(venue=user.staff_profile.venue)
+            if hasattr(user, 'staff_profile') and user.staff_profile.owner:
+                return queryset.filter(venue__owner=user.staff_profile.owner)
+            return queryset.none()
+        return queryset.filter(booking_package__user=user)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        roles = UserRole.objects.filter(user=user).values_list('role__name', flat=True)
+
+        if 'ADMIN' in roles:
+            context['filter_venues'] = Venue.objects.filter(is_deleted=False)
+        elif 'OWNER' in roles and hasattr(user, 'owner_profile'):
+            context['filter_venues'] = Venue.objects.filter(owner=user.owner_profile, is_deleted=False)
+        elif 'STAFF' in roles and hasattr(user, 'staff_profile') and user.staff_profile.owner:
+            context['filter_venues'] = Venue.objects.filter(owner=user.staff_profile.owner, is_deleted=False)
+        else:
+            context['filter_venues'] = None
+
+        if 'ADMIN' in roles:
+            context['page_title'] = 'Lịch sử thuê sân toàn hệ thống'
+        elif 'OWNER' in roles or 'STAFF' in roles:
+            context['page_title'] = 'Lịch sử cho thuê sân'
+        else:
+            context['page_title'] = 'Lịch sử thuê sân'
+        return context
 
 
 class BookingDetailView(LoginRequiredMixin, DetailView):

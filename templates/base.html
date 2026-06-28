@@ -1,56 +1,105 @@
 {% load static %}
 {% load booking_nav %}
-<!doctype html>
+<!DOCTYPE html>
+<!-- Theme applied immediately to avoid flash -->
 <html lang="vi">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}GSports{% endblock %}</title>
-  <link rel="stylesheet" href="{% static 'css/gsports.css' %}">
-  <script src="{% static 'js/gsports.js' %}" defer></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="GSports — Hệ thống quản lý và đặt sân thể thao trực tuyến">
+    <title>{% block title %}GSports{% endblock %}</title>
+
+    <!-- Inline theme bootstrap: runs BEFORE CSS to prevent flash -->
+    <script>
+    (function(){
+        var m = localStorage.getItem('gsports-theme') || 'system';
+        var a = localStorage.getItem('gsports-accent') || 'indigo';
+        var dark = m === 'dark' || (m === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-accent', a);
+    })();
+    </script>
+
+
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Base CSS -->
+    <link rel="stylesheet" href="{% static 'css/base.css' %}">
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
-  <header class="site-header">
-    <div class="topbar">
-      <a class="brand" href="{% url 'bookings:booking_list' %}">
-        <span class="brand-mark">G</span>
-        <span>GSports</span>
-      </a>
+    {% block body %}
 
-      <div class="topbar-actions">
-        {% if user.is_authenticated %}
-          <a class="btn btn-outline" href="{% url 'bookings:booking_list' %}">Booking</a>
-          {% if user|can_manage_all_bookings %}
-            <a class="btn btn-outline" href="{% url 'bookings:staff_booking_list' %}">Quản lý booking hệ thống</a>
-          {% endif %}
-          {% if user|can_manage_owner_bookings %}
-            <a class="btn btn-outline" href="{% url 'bookings:owner_booking_list' %}">Lịch sân của tôi</a>
-          {% endif %}
-          {% if user|can_manage_owner_services %}
-            <a class="btn btn-outline" href="{% url 'services:owner_serviceitem_list' %}">Dịch vụ</a>
-          {% endif %}
-          <form method="post" action="{% url 'logout' %}" class="logout-form">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-outline logout-button">Đăng xuất</button>
-          </form>
-        {% else %}
-          <a class="btn btn-primary" href="{% url 'login' %}">Đăng nhập</a>
-        {% endif %}
-      </div>
-    </div>
-  </header>
+    {% if request.resolver_match.app_name == 'bookings' or request.resolver_match.app_name == 'services' %}
+    <header style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 1.5rem;background:var(--bg-surface);border-bottom:1px solid var(--border-color);">
+        <a href="{% url 'bookings:booking_list' %}" style="font-weight:800;color:var(--text-main);">GSports</a>
+        <nav style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
+            {% if user.is_authenticated %}
+                <a class="btn btn--secondary" href="{% url 'bookings:booking_list' %}">Booking</a>
+                {% if user|can_manage_all_bookings %}
+                    <a class="btn btn--secondary" href="{% url 'bookings:staff_booking_list' %}">Quản lý booking hệ thống</a>
+                {% endif %}
+                {% if user|can_manage_owner_bookings %}
+                    <a class="btn btn--secondary" href="{% url 'bookings:owner_booking_list' %}">Lịch sân của tôi</a>
+                {% endif %}
+                {% if user|can_manage_owner_services %}
+                    <a class="btn btn--secondary" href="{% url 'services:owner_serviceitem_list' %}">Dịch vụ</a>
+                {% endif %}
+                <a class="btn btn--secondary" href="{% url 'accounts:logout' %}">Đăng xuất</a>
+            {% else %}
+                <a class="btn btn--primary" href="{% url 'accounts:login' %}">Đăng nhập</a>
+            {% endif %}
+        </nav>
+    </header>
+    {% endif %}
 
-  <main class="page-shell">
+    <!-- ===== Messages Toast ===== -->
     {% if messages %}
-      <div class="messages">
+    <div class="toast-container" id="toast-container">
         {% for message in messages %}
-          <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
+        <div class="toast toast--{{ message.tags }}" role="alert">
+            <div class="toast__icon">
+                {% if message.tags == 'success' %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+                {% elif message.tags == 'error' %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+                {% elif message.tags == 'warning' %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+                {% else %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+                {% endif %}
+            </div>
+            <span class="toast__text">{{ message }}</span>
+            <button class="toast__close" onclick="this.parentElement.remove()" aria-label="Đóng">&times;</button>
+        </div>
         {% endfor %}
-      </div>
+    </div>
     {% endif %}
 
     {% block content %}{% endblock %}
-  </main>
-  {% block extra_scripts %}{% endblock %}
+
+    {% endblock body %}
+
+    {% block extra_js %}{% endblock %}
+    {% block extra_scripts %}{% endblock %}
+
+    <!-- Auto-dismiss toasts -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var toasts = document.querySelectorAll('.toast');
+            toasts.forEach(function (toast, i) {
+                // Stagger entrance
+                toast.style.animationDelay = (i * 0.1) + 's';
+                // Auto remove after 5s
+                setTimeout(function () {
+                    toast.classList.add('toast--hide');
+                    toast.addEventListener('animationend', function () { toast.remove(); });
+                }, 5000 + i * 500);
+            });
+        });
+    </script>
 </body>
 </html>

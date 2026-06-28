@@ -1,6 +1,9 @@
 from datetime import date, time
 from decimal import Decimal
 
+import fakeredis
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase
@@ -16,6 +19,13 @@ from .services import add_service_to_booking, remove_service_from_booking, updat
 
 class BookingServiceItemTests(TestCase):
     def setUp(self):
+        self.redis_client = fakeredis.FakeStrictRedis(decode_responses=True)
+        self.redis_patcher = patch('apps.bookings.services.get_redis_client', return_value=self.redis_client)
+        self.redis_patcher.start()
+        self.addCleanup(self.redis_patcher.stop)
+        self.addCleanup(self.redis_client.flushdb)
+        self.redis_client.flushdb()
+
         User = get_user_model()
         self.customer = User.objects.create_user(
             username='service-customer',

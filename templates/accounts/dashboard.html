@@ -1,0 +1,441 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard — GSports{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/dashboard.css' %}?v=1.6">
+{% endblock %}
+
+{% block body %}
+<!-- Messages -->
+{% if messages %}
+<div class="toast-container" id="toast-container">
+    {% for message in messages %}
+    <div class="toast toast--{{ message.tags }}" role="alert">
+        <div class="toast__icon">
+            {% if message.tags == 'success' %}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+            {% else %}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+            {% endif %}
+        </div>
+        <span class="toast__text">{{ message }}</span>
+        <button class="toast__close" onclick="this.parentElement.remove()" aria-label="Đóng">&times;</button>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Sidebar Backdrop -->
+<div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+<div class="dashboard">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar__header">
+            <a href="{% url 'accounts:dashboard' %}" class="sidebar__logo">
+                <span class="sidebar__logo-icon">⚽</span>
+                <span class="sidebar__logo-text">GSports</span>
+            </a>
+            <button class="sidebar__close-btn" id="sidebar-close-btn" aria-label="Close menu">&times;</button>
+        </div>
+
+        <nav class="sidebar__nav">
+            <a href="{% url 'accounts:dashboard' %}" class="sidebar__link {% if request.resolver_match.url_name == 'dashboard' %}sidebar__link--active{% endif %}" id="nav-dashboard">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                <span>Dashboard</span>
+            </a>
+            
+            {% if user.owner_profile %}
+            <a href="{% url 'venues:venue_list' %}" class="sidebar__link {% if request.resolver_match.app_name == 'venues' %}sidebar__link--active{% endif %}" id="nav-venues">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                <span>Quản lý cơ sở</span>
+            </a>
+            <a href="{% url 'accounts:staff_list' %}" class="sidebar__link {% if request.resolver_match.url_name in 'staff_list staff_create staff_edit' %}sidebar__link--active{% endif %}" id="nav-staff-list">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                <span>Quản lý nhân viên</span>
+            </a>
+            {% endif %}
+
+            {% if request.user.is_admin %}
+            <a href="{% url 'accounts:admin_user_list' %}" class="sidebar__link {% if request.resolver_match.url_name == 'admin_user_list' %}sidebar__link--active{% endif %}" id="nav-admin-users">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                <span>Quản lý tài khoản</span>
+            </a>
+            {% endif %}
+
+
+            <a href="{% url 'bookings:booking_history' %}" class="sidebar__link {% if request.resolver_match.url_name == 'booking_history' %}sidebar__link--active{% endif %}" id="nav-bookings">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <span>{% if user.owner_profile or user.staff_profile %}Lịch sử cho thuê sân{% else %}Lịch sử thuê sân{% endif %}</span>
+            </a>
+
+            <a href="{% url 'accounts:profile' %}" class="sidebar__link {% if request.resolver_match.url_name == 'profile' %}sidebar__link--active{% endif %}" id="nav-profile">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span>Hồ sơ</span>
+            </a>
+
+        </nav>
+
+        <div class="sidebar__footer">
+            <a href="{% url 'accounts:logout' %}" class="sidebar__link sidebar__link--danger" id="nav-logout">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+                <span>Đăng xuất</span>
+            </a>
+        </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="dashboard__main">
+        <!-- Top bar -->
+        <header class="topbar">
+            <button class="topbar__toggle" id="sidebar-toggle" aria-label="Toggle menu">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+            </button>
+            <h2 class="topbar__title">Dashboard</h2>
+
+            <!-- Right controls -->
+            <div class="topbar__controls">
+
+                <!-- ── Theme panel ── -->
+                <div class="theme-panel-wrap" id="theme-panel-wrap">
+                    <button class="theme-btn" id="theme-toggle-btn" aria-label="Tuỳ chỉnh giao diện" title="Tuỳ chỉnh giao diện">
+                        <!-- Sun icon (shown in dark mode) -->
+                        <svg id="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                        <!-- Moon icon (shown in light mode) -->
+                        <svg id="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
+                    </button>
+
+                    <div class="theme-panel" id="theme-panel">
+                        <!-- Mode -->
+                        <div>
+                            <div class="theme-panel__title">Chế độ giao diện</div>
+                            <div class="theme-mode-group">
+                                <button class="theme-mode-btn" data-mode="light" id="mode-light">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                                    Sáng
+                                </button>
+                                <button class="theme-mode-btn" data-mode="dark" id="mode-dark">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
+                                    Tối
+                                </button>
+                                <button class="theme-mode-btn" data-mode="system" id="mode-system">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                                    Hệ thống
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Accent -->
+                        <div>
+                            <div class="theme-panel__title">Màu chủ đạo</div>
+                            <div class="theme-accent-grid">
+                                <button class="theme-accent-swatch swatch-indigo"  data-accent="indigo"  title="Indigo"></button>
+                                <button class="theme-accent-swatch swatch-violet"  data-accent="violet"  title="Violet"></button>
+                                <button class="theme-accent-swatch swatch-blue"    data-accent="blue"    title="Blue"></button>
+                                <button class="theme-accent-swatch swatch-emerald" data-accent="emerald" title="Emerald"></button>
+                                <button class="theme-accent-swatch swatch-rose"    data-accent="rose"    title="Rose"></button>
+                                <button class="theme-accent-swatch swatch-amber"   data-accent="amber"   title="Amber"></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Avatar / user dropdown ── -->
+                <div class="topbar__user" tabindex="0">
+                    <div class="topbar__avatar">
+                        {% if user.avatar %}
+                        <img src="{{ user.avatar.url }}" alt="Avatar">
+                        {% else %}
+                        <span>{% if user.first_name or user.last_name %}{{ user.first_name|first|upper }}{% else %}{{ user.username|first|upper }}{% endif %}</span>
+                        {% endif %}
+                    </div>
+                    <span class="topbar__username">{% if user.first_name or user.last_name %}{{ user.first_name }} {{ user.last_name }}{% else %}{{ user.username }}{% endif %}</span>
+
+                    <!-- Dropdown Menu -->
+                    <div class="topbar__dropdown">
+                        <a href="{% url 'accounts:profile' %}" class="topbar__dropdown-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            <span>Hồ sơ cài đặt</span>
+                        </a>
+                        <a href="{% url 'accounts:logout' %}" class="topbar__dropdown-item topbar__dropdown-item--danger">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+                            <span>Đăng xuất</span>
+                        </a>
+                    </div>
+                </div>
+            </div><!-- end topbar__controls -->
+        </header>
+
+
+        <!-- Content area -->
+        <div class="dashboard__content">
+            {% block dashboard_content %}
+            <!-- Welcome -->
+            <div class="welcome-banner">
+                <div class="welcome-banner__text">
+                    <h1>Xin chào, <strong>{% if user.first_name or user.last_name %}{{ user.first_name }} {{ user.last_name }}{% else %}{{ user.username }}{% endif %}</strong>! 👋</h1>
+                    <p>Chào mừng bạn đến với hệ thống quản lý sân thể thao GSports.</p>
+                </div>
+            </div>
+
+            <!-- Stats cards -->
+            <div class="stats-grid">
+                <div class="stat-card" id="stat-email">
+                    <div class="stat-card__icon stat-card__icon--blue">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 4l-10 8L2 4"/></svg>
+                    </div>
+                    <div class="stat-card__info">
+                        <span class="stat-card__label">Email</span>
+                        <span class="stat-card__value">{{ user.email }}</span>
+                    </div>
+                </div>
+
+                <div class="stat-card" id="stat-role">
+                    <div class="stat-card__icon stat-card__icon--green">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </div>
+                    <div class="stat-card__info">
+                        <span class="stat-card__label">Vai trò</span>
+                        <span class="stat-card__value">
+                            {% for role in user_roles %}
+                                <span class="role-badge role-badge--{{ role|lower }}">{{ role }}</span>
+                            {% empty %}
+                                <span class="role-badge">Chưa gán</span>
+                            {% endfor %}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="stat-card" id="stat-wallet">
+                    <div class="stat-card__icon stat-card__icon--purple">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
+                    </div>
+                    <div class="stat-card__info">
+                        <span class="stat-card__label">Số dư ví</span>
+                        <span class="stat-card__value">
+                            {% if wallet %}{{ wallet.balance|floatformat:0 }} VNĐ{% else %}—{% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="stat-card" id="stat-joined">
+                    <div class="stat-card__icon stat-card__icon--orange">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                    </div>
+                    <div class="stat-card__info">
+                        <span class="stat-card__label">Ngày tham gia</span>
+                        <span class="stat-card__value">{{ user.date_joined|date:"d/m/Y" }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Placeholder sections -->
+            <div class="placeholder-section">
+                <div class="placeholder-section__icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></svg>
+                </div>
+                <h3>Sắp ra mắt</h3>
+                <p>Các tính năng đặt sân, quản lý lịch, thanh toán sẽ sớm được cập nhật tại đây.</p>
+            </div>
+            {% endblock %}
+        </div>
+    </main>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     THEME ENGINE — applies immediately to avoid flash
+     ═══════════════════════════════════════════════════ -->
+<script>
+(function () {
+    const html = document.documentElement;
+    const savedMode   = localStorage.getItem('gsports-theme') || 'system';
+    const savedAccent = localStorage.getItem('gsports-accent') || 'indigo';
+
+    function applyMode(mode) {
+        if (mode === 'dark') {
+            html.setAttribute('data-theme', 'dark');
+        } else if (mode === 'light') {
+            html.setAttribute('data-theme', 'light');
+        } else {
+            // system
+            if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                html.setAttribute('data-theme', 'dark');
+            } else {
+                html.setAttribute('data-theme', 'light');
+            }
+        }
+    }
+
+    applyMode(savedMode);
+    html.setAttribute('data-accent', savedAccent);
+})();
+</script>
+
+<!-- Sidebar toggle + Theme Panel script -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    /* ── Sidebar ── */
+    const sidebar   = document.getElementById('sidebar');
+    const toggleBtn = document.getElementById('sidebar-toggle');
+    const closeBtn  = document.getElementById('sidebar-close-btn');
+    const backdrop  = document.getElementById('sidebar-backdrop');
+
+    function openSidebar()  { sidebar.classList.add('sidebar--open');    backdrop.classList.add('sidebar-backdrop--show'); }
+    function closeSidebar() { sidebar.classList.remove('sidebar--open'); backdrop.classList.remove('sidebar-backdrop--show'); }
+
+    if (toggleBtn) toggleBtn.addEventListener('click', function (e) { e.stopPropagation(); sidebar.classList.contains('sidebar--open') ? closeSidebar() : openSidebar(); });
+    if (closeBtn)  closeBtn.addEventListener('click', closeSidebar);
+    if (backdrop)  backdrop.addEventListener('click', closeSidebar);
+
+    document.addEventListener('click', function (e) {
+        if (sidebar.classList.contains('sidebar--open')) {
+            if (!sidebar.contains(e.target) && !(toggleBtn && toggleBtn.contains(e.target))) closeSidebar();
+        }
+    });
+
+
+    /* ── Theme Engine ── */
+    const html        = document.documentElement;
+    const themeBtn    = document.getElementById('theme-toggle-btn');
+    const themePanel  = document.getElementById('theme-panel');
+    const panelWrap   = document.getElementById('theme-panel-wrap');
+    const iconSun     = document.getElementById('theme-icon-sun');
+    const iconMoon    = document.getElementById('theme-icon-moon');
+
+    let currentMode   = localStorage.getItem('gsports-theme')  || 'system';
+    let currentAccent = localStorage.getItem('gsports-accent') || 'indigo';
+
+    function effectiveDark() {
+        if (currentMode === 'dark') return true;
+        if (currentMode === 'light') return false;
+        return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+
+    function applyMode(mode) {
+        currentMode = mode;
+        localStorage.setItem('gsports-theme', mode);
+        if (mode === 'dark') {
+            html.setAttribute('data-theme', 'dark');
+        } else if (mode === 'light') {
+            html.setAttribute('data-theme', 'light');
+        } else {
+            html.setAttribute('data-theme', window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        }
+        updateUI();
+    }
+
+    function applyAccent(accent) {
+        currentAccent = accent;
+        localStorage.setItem('gsports-accent', accent);
+        html.setAttribute('data-accent', accent);
+        updateUI();
+    }
+
+    function updateUI() {
+        const dark = effectiveDark();
+        if (iconSun)  iconSun.style.display  = dark ? 'block' : 'none';
+        if (iconMoon) iconMoon.style.display = dark ? 'none'  : 'block';
+
+        // Mode buttons
+        document.querySelectorAll('.theme-mode-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.mode === currentMode);
+        });
+        // Accent swatches
+        document.querySelectorAll('.theme-accent-swatch').forEach(sw => {
+            sw.classList.toggle('active', sw.dataset.accent === currentAccent);
+        });
+    }
+
+    // Toggle panel open/close
+    if (themeBtn) {
+        themeBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            themePanel.classList.toggle('theme-panel--open');
+        });
+    }
+
+    // Quick toggle (click icon): switches light ↔ dark
+    // Mode buttons inside panel
+    document.querySelectorAll('.theme-mode-btn').forEach(btn => {
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            applyMode(btn.dataset.mode);
+        });
+    });
+
+    // Accent swatches
+    document.querySelectorAll('.theme-accent-swatch').forEach(sw => {
+        sw.addEventListener('click', function (e) {
+            e.stopPropagation();
+            applyAccent(sw.dataset.accent);
+        });
+    });
+
+    // Close panel on outside click
+    document.addEventListener('click', function (e) {
+        if (themePanel && themePanel.classList.contains('theme-panel--open')) {
+            if (!panelWrap.contains(e.target)) {
+                themePanel.classList.remove('theme-panel--open');
+            }
+        }
+    });
+
+    // Listen for system preference changes
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
+        if (currentMode === 'system') applyMode('system');
+    });
+
+    /* ── Topbar User Dropdown Hover Delay ── */
+    const userControl = document.querySelector('.topbar__user');
+    const userDropdown = document.querySelector('.topbar__dropdown');
+    let dropdownTimeout = null;
+
+    if (userControl && userDropdown) {
+        userControl.addEventListener('mouseenter', () => {
+            clearTimeout(dropdownTimeout);
+            userDropdown.style.display = 'flex';
+        });
+
+        userControl.addEventListener('mouseleave', () => {
+            dropdownTimeout = setTimeout(() => {
+                if (document.activeElement !== userControl && !userControl.contains(document.activeElement)) {
+                    userDropdown.style.display = '';
+                }
+            }, 300);
+        });
+
+        userControl.addEventListener('focusin', () => {
+            clearTimeout(dropdownTimeout);
+            userDropdown.style.display = 'flex';
+        });
+
+        userControl.addEventListener('focusout', () => {
+            setTimeout(() => {
+                if (!userControl.contains(document.activeElement)) {
+                    userDropdown.style.display = '';
+                }
+            }, 50);
+        });
+    }
+
+    updateUI();
+});
+</script>
+
+
+<!-- Auto-dismiss toasts -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var toasts = document.querySelectorAll('.toast');
+        toasts.forEach(function (toast, i) {
+            toast.style.animationDelay = (i * 0.1) + 's';
+            setTimeout(function () {
+                toast.classList.add('toast--hide');
+                toast.addEventListener('animationend', function () { toast.remove(); });
+            }, 5000 + i * 500);
+        });
+    });
+</script>
+{% endblock %}
