@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }} | GSports{% endblock %}
+
+{% block content %}
+  <section class="page-heading">
+    <div>
+      <p class="eyebrow">Dịch vụ</p>
+      <h1>{{ page_title }}</h1>
+      <p class="muted">{{ booking.field.name }} · {{ booking.booking_date }}</p>
+    </div>
+    <a class="btn btn-outline" href="{% url 'bookings:booking_detail' booking.pk %}">Quay lại</a>
+  </section>
+
+  <section class="form-card">
+    {% if booking.can_modify_services %}
+      <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">{{ submit_label }}</button>
+      </form>
+    {% else %}
+      <p class="muted">{{ booking.get_service_modification_block_message }}</p>
+    {% endif %}
+  </section>
+{% endblock %}

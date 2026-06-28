@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Thanh toán hoá đơn | GSports{% endblock %}
+
+{% block content %}
+  <section class="page-heading">
+    <div>
+      <p class="eyebrow">Thanh toán</p>
+      <h1>Thanh toán hoá đơn</h1>
+      <p class="muted">Mã booking: <code>{{ booking.id }}</code></p>
+    </div>
+    <a class="btn btn-outline" href="{% url 'bookings:booking_detail' booking.pk %}">Quay lại</a>
+  </section>
+
+  <section class="grid detail-grid">
+    <div class="detail-card">
+      <h2>Thông tin booking</h2>
+      <dl>
+        <dt>Địa điểm</dt>
+        <dd>{{ booking.venue.name }}</dd>
+        <dt>Sân</dt>
+        <dd>{{ booking.field.name }}</dd>
+        <dt>Ngày</dt>
+        <dd>{{ booking.booking_date }}</dd>
+        <dt>Trạng thái</dt>
+        <dd><span class="status-badge">{{ booking.get_status_display }}</span></dd>
+        <dt>Tiền sân</dt>
+        <dd>{{ booking.total_amount|floatformat:0 }}đ</dd>
+        <dt>Tiền dịch vụ</dt>
+        <dd>{{ booking.service_total|floatformat:0 }}đ</dd>
+        <dt>Tổng cộng</dt>
+        <dd><strong>{{ booking.grand_total|floatformat:0 }}đ</strong></dd>
+      </dl>
+    </div>
+
+    <div class="detail-card">
+      <h2>Khung giờ</h2>
+      <ul class="slot-list">
+        {% for slot in booking.slots.all %}
+          <li class="time-slot">{{ slot.start_time }} - {{ slot.end_time }} · {{ slot.price|floatformat:0 }}đ</li>
+        {% empty %}
+          <li>Chưa có khung giờ.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+
+  <section class="detail-card">
+    <h2>Dịch vụ kèm theo</h2>
+    <ul class="service-list">
+      {% for service in booking.services_ordered.all %}
+        <li class="service-row">
+          <span class="service-summary">
+            <strong>{{ service.service_item.name }} x{{ service.quantity }}</strong>
+            <span>Đơn giá: {{ service.unit_price|floatformat:0 }}đ</span>
+            <span>Thành tiền: {{ service.total_price|floatformat:0 }}đ</span>
+          </span>
+        </li>
+      {% empty %}
+        <li>Chưa có dịch vụ.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="detail-card">
+    <h2>Tổng thanh toán</h2>
+    <p><strong>{{ booking.grand_total|floatformat:0 }}đ</strong></p>
+    <button type="button" class="btn btn-primary" disabled aria-disabled="true">Thanh toán hoá đơn</button>
+    <p class="muted">Chức năng thanh toán đang được phát triển.</p>
+  </section>
+{% endblock %}

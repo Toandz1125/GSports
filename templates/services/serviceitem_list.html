@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Dịch vụ | GSports{% endblock %}
+
+{% block content %}
+  <section class="page-heading">
+    <div>
+      <p class="eyebrow">Dịch vụ sân</p>
+      <h1>Dịch vụ</h1>
+      <p class="muted">Theo dõi các dịch vụ đang có tại từng địa điểm.</p>
+    </div>
+  </section>
+
+  {% if service_items %}
+    <div class="table-wrap">
+      <table class="data-table service-table">
+        <thead>
+          <tr>
+            <th>Địa điểm</th>
+            <th>Tên</th>
+            <th>Danh mục</th>
+            <th>Giá</th>
+            <th>Tồn kho</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in service_items %}
+            <tr>
+              <td>{{ item.venue.name }}</td>
+              <td>{{ item.name }}</td>
+              <td><span class="badge">{{ item.category }}</span></td>
+              <td>{{ item.price }}</td>
+              <td>{{ item.stock }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <h2>Chưa có dịch vụ</h2>
+      <p>Danh sách dịch vụ sẽ hiển thị tại đây khi được kích hoạt.</p>
+    </div>
+  {% endif %}
+{% endblock %}

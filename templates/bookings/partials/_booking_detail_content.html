@@ -1,0 +1,93 @@
+<section class="grid detail-grid">
+  <div class="detail-card">
+    <h2>Thông tin</h2>
+    <dl>
+      <dt>Địa điểm</dt>
+      <dd>{{ booking.venue.name }}</dd>
+      <dt>Sân</dt>
+      <dd>{{ booking.field.name }}</dd>
+      <dt>Ngày</dt>
+      <dd>{{ booking.booking_date }}</dd>
+      <dt>Trạng thái</dt>
+      <dd><span class="status-badge">{{ booking.status }}</span></dd>
+      <dt>Tiền sân</dt>
+      <dd>{{ booking.court_total|floatformat:0 }}đ</dd>
+      <dt>Tiền dịch vụ</dt>
+      <dd>{{ booking.service_total|floatformat:0 }}đ</dd>
+      <dt>Tổng tiền</dt>
+      <dd>{{ booking.total_amount|floatformat:0 }}đ</dd>
+      <dt>Ghi chú</dt>
+      <dd>{{ booking.note|default:"-" }}</dd>
+    </dl>
+  </div>
+
+  <div class="detail-card">
+    <h2>Khung giờ</h2>
+    <ul class="slot-list">
+      {% for slot in booking.slots.all %}
+        <li class="time-slot">{{ slot.start_time }} - {{ slot.end_time }} · {{ slot.price }}</li>
+      {% empty %}
+        <li>Chưa có khung giờ.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="detail-card">
+  <h2>Dịch vụ</h2>
+  {% if can_edit_booking_services %}
+    <p><a class="btn btn-outline" href="{% url 'services:bookingservice_add' booking.pk %}">Thêm dịch vụ</a></p>
+  {% elif booking_service_lock_message %}
+    <p class="muted">{{ booking_service_lock_message }}</p>
+  {% endif %}
+  <ul class="service-list">
+    {% for service in booking.services_ordered.all %}
+      <li class="service-row">
+        <span class="service-summary">
+          <strong>{{ service.service_item.name }} x{{ service.quantity }}</strong>
+          <span>Đơn giá: {{ service.unit_price|floatformat:0 }}đ</span>
+          <span>Thành tiền: {{ service.total_price|floatformat:0 }}đ</span>
+        </span>
+        {% if can_edit_booking_services %}
+          <span class="service-actions">
+            <a class="btn btn-outline btn-sm" href="{% url 'services:bookingservice_edit' service.pk %}">Chỉnh sửa</a>
+            <form method="post" action="{% url 'services:bookingservice_remove' service.pk %}" class="inline-form">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-outline btn-danger btn-sm">Hủy dịch vụ</button>
+            </form>
+          </span>
+        {% endif %}
+      </li>
+    {% empty %}
+      <li>Chưa có dịch vụ.</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="detail-card">
+  <h2>Thanh toán</h2>
+  <dl class="total-breakdown">
+    <dt>Tổng cộng</dt>
+    <dd><strong>{{ booking.total_amount|floatformat:0 }}đ</strong></dd>
+  </dl>
+  {% if can_pay_booking %}
+    <a class="btn btn-primary" href="/payments/bookings/{{ booking.id }}/">Thanh toán</a>
+  {% else %}
+    <p class="muted">Booking ở trạng thái "{{ booking.get_status_display }}" không khả dụng để thanh toán.</p>
+  {% endif %}
+</section>
+
+{% if can_cancel_booking %}
+  <form
+    method="post"
+    action="{% url 'bookings:booking_cancel' booking.pk %}"
+    data-ajax-form
+    data-refresh-target="#booking-detail"
+    data-confirm-message="Hủy booking này?"
+  >
+    {% csrf_token %}
+    <button type="submit" class="btn btn-outline btn-danger">Hủy booking</button>
+  </form>
+{% elif cancel_block_message %}
+  <p class="muted">{{ cancel_block_message }}</p>
+{% endif %}

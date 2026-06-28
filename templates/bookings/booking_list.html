@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Booking | GSports{% endblock %}
+
+{% block content %}
+  <section class="page-heading">
+    <div>
+      <p class="eyebrow">Sân thể thao</p>
+      <h1>Lịch đặt sân</h1>
+      <p class="muted">Theo dõi các booking hiện tại và tạo lịch chơi mới.</p>
+    </div>
+    <a class="btn btn-primary" href="{% url 'bookings:booking_create' %}">Tạo booking</a>
+  </section>
+
+  {% if bookings %}
+    <div class="table-wrap">
+      <table class="data-table booking-table">
+        <thead>
+          <tr>
+            <th>Ngày</th>
+            <th>Địa điểm</th>
+            <th>Sân</th>
+            <th>Trạng thái</th>
+            <th>Tổng tiền</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for booking in bookings %}
+            <tr>
+              <td><a href="{% url 'bookings:booking_detail' booking.pk %}">{{ booking.booking_date }}</a></td>
+              <td><a href="{% url 'bookings:booking_detail' booking.pk %}">{{ booking.venue.name }}</a></td>
+              <td><a href="{% url 'bookings:booking_detail' booking.pk %}">{{ booking.field.name }}</a></td>
+              <td><span class="status-badge">{{ booking.status }}</span></td>
+              <td>{{ booking.total_amount|floatformat:0 }}đ</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <h2>Chưa có booking</h2>
+      <p>Tạo booking đầu tiên để bắt đầu quản lý lịch chơi của bạn.</p>
+      <a class="btn btn-primary" href="{% url 'bookings:booking_create' %}">Tạo booking</a>
+    </div>
+  {% endif %}
+{% endblock %}

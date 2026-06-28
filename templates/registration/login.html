@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Đăng nhập | GSports{% endblock %}
+
+{% block content %}
+  <section class="auth-shell">
+    <div class="card auth-card">
+      <p class="eyebrow">GSports</p>
+      <h1>Đăng nhập</h1>
+
+      {% if form.errors %}
+        <div class="alert alert-error">Email hoặc mật khẩu không đúng.</div>
+      {% endif %}
+
+      <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">Đăng nhập</button>
+      </form>
+    </div>
+  </section>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Dịch vụ của cơ sở | GSports{% endblock %}
+
+{% block content %}
+  <section class="page-heading">
+    <div>
+      <p class="eyebrow">Chủ sân</p>
+      <h1>Dịch vụ của cơ sở</h1>
+      <p class="muted">Quản lý dịch vụ có thể bán kèm khi khách tạo booking.</p>
+    </div>
+    <a class="btn btn-primary" href="{% url 'services:owner_serviceitem_create' %}">Tạo dịch vụ</a>
+  </section>
+
+  <div id="owner-service-item-list" data-refresh-url="{% url 'services:owner_serviceitem_list' %}">
+    {% include "services/partials/_owner_serviceitem_list.html" %}
+  </div>
+{% endblock %}

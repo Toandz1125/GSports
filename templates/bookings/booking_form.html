@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Tạo booking | GSports{% endblock %}
+
+{% block content %}
+  <section class="page-heading">
+    <div>
+      <p class="eyebrow">Booking</p>
+      <h1>Tạo booking</h1>
+      <p class="muted">Chọn sân, ngày và khung giờ phù hợp.</p>
+    </div>
+    <a class="btn btn-outline" href="{% url 'bookings:booking_list' %}">Quay lại</a>
+  </section>
+
+  <section class="form-card">
+    <form method="post" data-booking-time-form data-availability-url="{% url 'bookings:booking_availability' %}">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+
+      <p>
+        {{ form.field.label_tag }}
+        {{ form.field }}
+        {{ form.field.errors }}
+      </p>
+
+      <p>
+        {{ form.booking_date.label_tag }}
+        {{ form.booking_date }}
+        {{ form.booking_date.errors }}
+      </p>
+
+      {{ form.start_time }}
+      {{ form.end_time }}
+
+      <div class="time-block-field">
+        <label>Khung giờ</label>
+        <div class="time-block-errors">
+          {{ form.start_time.errors }}
+          {{ form.end_time.errors }}
+        </div>
+        <div class="time-block-feedback" data-time-block-error role="alert" aria-live="polite"></div>
+        <div class="time-block-grid" data-time-block-grid data-max-duration-hours="4">
+          {% for block in time_blocks %}
+            <button
+              type="button"
+              class="time-block{% if block in unavailable_blocks %} is-unavailable{% endif %}"
+              data-time="{{ block }}"
+              {% if block in unavailable_blocks %}disabled aria-disabled="true"{% endif %}
+            >
+              {{ block }}
+            </button>
+          {% endfor %}
+        </div>
+      </div>
+
+      <p>
+        {{ form.note.label_tag }}
+        {{ form.note }}
+        {{ form.note.errors }}
+      </p>
+
+      <div class="detail-card" data-service-section data-services-url-template="/bookings/fields/__FIELD_ID__/services/">
+        <h2>Dịch vụ kèm theo</h2>
+        <div class="table-wrap" data-service-table-wrap{% if not form.service_quantity_fields %} hidden{% endif %}>
+          <table class="data-table service-table">
+            <thead>
+              <tr>
+                <th>Dịch vụ</th>
+                <th>Danh mục</th>
+                <th>Giá</th>
+                <th>Còn lại</th>
+                <th>Số lượng</th>
+              </tr>
+            </thead>
+            <tbody data-service-tbody>
+              {% for service_control in form.service_quantity_fields %}
+                <tr>
+                  <td>{{ service_control.item.name }}</td>
+                  <td>{{ service_control.item.get_category_display|default:"-" }}</td>
+                  <td>{{ service_control.item.price|floatformat:0 }}đ</td>
+                  <td>{{ service_control.item.stock }}</td>
+                  <td>
+                    {{ service_control.field }}
+                    {{ service_control.field.errors }}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="muted" data-service-empty{% if form.service_quantity_fields %} hidden{% endif %}>Cơ sở này chưa có dịch vụ đi kèm.</p>
+      </div>
+
+      <button type="submit" class="btn btn-primary">Tạo booking</button>
+    </form>
+  </section>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script src="{% static 'js/booking-time-blocks.js' %}" defer></script>
+{% endblock %}

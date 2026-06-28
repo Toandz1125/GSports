@@ -1,0 +1,56 @@
+{% load static %}
+{% load booking_nav %}
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}GSports{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/gsports.css' %}">
+  <script src="{% static 'js/gsports.js' %}" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="topbar">
+      <a class="brand" href="{% url 'bookings:booking_list' %}">
+        <span class="brand-mark">G</span>
+        <span>GSports</span>
+      </a>
+
+      <div class="topbar-actions">
+        {% if user.is_authenticated %}
+          <a class="btn btn-outline" href="{% url 'bookings:booking_list' %}">Booking</a>
+          {% if user|can_manage_all_bookings %}
+            <a class="btn btn-outline" href="{% url 'bookings:staff_booking_list' %}">Quản lý booking hệ thống</a>
+          {% endif %}
+          {% if user|can_manage_owner_bookings %}
+            <a class="btn btn-outline" href="{% url 'bookings:owner_booking_list' %}">Lịch sân của tôi</a>
+          {% endif %}
+          {% if user|can_manage_owner_services %}
+            <a class="btn btn-outline" href="{% url 'services:owner_serviceitem_list' %}">Dịch vụ</a>
+          {% endif %}
+          <form method="post" action="{% url 'logout' %}" class="logout-form">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline logout-button">Đăng xuất</button>
+          </form>
+        {% else %}
+          <a class="btn btn-primary" href="{% url 'login' %}">Đăng nhập</a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    {% if messages %}
+      <div class="messages">
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+  </main>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

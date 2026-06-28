@@ -1,0 +1,51 @@
+<div class="table-wrap">
+  <table class="data-table service-table">
+    <thead>
+      <tr>
+        <th>Cơ sở</th>
+        <th>Tên</th>
+        <th>Danh mục</th>
+        <th>Giá</th>
+        <th>Tồn kho</th>
+        <th>Trạng thái</th>
+        <th>Thao tác</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in service_items %}
+        <tr>
+          <td>{{ item.venue.name }}</td>
+          <td>{{ item.name }}</td>
+          <td>{{ item.get_category_display|default:"-" }}</td>
+          <td>{{ item.price|floatformat:0 }}đ</td>
+          <td>{{ item.stock }}</td>
+          <td><span class="status-badge">{% if item.is_active %}ACTIVE{% else %}INACTIVE{% endif %}</span></td>
+          <td>
+            <div class="service-actions">
+              <a class="btn btn-outline btn-sm" href="{% url 'services:owner_serviceitem_update' item.pk %}">Sửa</a>
+              <form
+                method="post"
+                action="{% url 'services:owner_serviceitem_toggle' item.pk %}"
+                class="inline-form"
+                data-ajax-form
+                data-refresh-target="#owner-service-item-list"
+                data-refresh-url="{% url 'services:owner_serviceitem_list' %}"
+                data-confirm-message="{% if item.is_active %}Ngừng bán dịch vụ này?{% else %}Bật bán lại dịch vụ này?{% endif %}"
+              >
+                {% csrf_token %}
+                <input type="hidden" name="is_active" value="{% if item.is_active %}0{% else %}1{% endif %}">
+                <button type="submit" class="btn btn-outline btn-sm">
+                  {% if item.is_active %}Ngừng bán{% else %}Bật bán{% endif %}
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="7" class="muted">Chưa có dịch vụ nào.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
