@@ -1,5 +1,4 @@
 {% load static %}
-{% load booking_nav %}
 <!DOCTYPE html>
 <!-- Theme applied immediately to avoid flash -->
 <html lang="vi">
@@ -33,29 +32,6 @@
 <body>
     {% block body %}
 
-    {% if request.resolver_match.app_name == 'bookings' or request.resolver_match.app_name == 'services' %}
-    <header style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 1.5rem;background:var(--bg-surface);border-bottom:1px solid var(--border-color);">
-        <a href="{% url 'bookings:booking_list' %}" style="font-weight:800;color:var(--text-main);">GSports</a>
-        <nav style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
-            {% if user.is_authenticated %}
-                <a class="btn btn--secondary" href="{% url 'bookings:booking_list' %}">Booking</a>
-                {% if user|can_manage_all_bookings %}
-                    <a class="btn btn--secondary" href="{% url 'bookings:staff_booking_list' %}">Quản lý booking hệ thống</a>
-                {% endif %}
-                {% if user|can_manage_owner_bookings %}
-                    <a class="btn btn--secondary" href="{% url 'bookings:owner_booking_list' %}">Lịch sân của tôi</a>
-                {% endif %}
-                {% if user|can_manage_owner_services %}
-                    <a class="btn btn--secondary" href="{% url 'services:owner_serviceitem_list' %}">Dịch vụ</a>
-                {% endif %}
-                <a class="btn btn--secondary" href="{% url 'accounts:logout' %}">Đăng xuất</a>
-            {% else %}
-                <a class="btn btn--primary" href="{% url 'accounts:login' %}">Đăng nhập</a>
-            {% endif %}
-        </nav>
-    </header>
-    {% endif %}
-
     <!-- ===== Messages Toast ===== -->
     {% if messages %}
     <div class="toast-container" id="toast-container">
@@ -84,7 +60,6 @@
     {% endblock body %}
 
     {% block extra_js %}{% endblock %}
-    {% block extra_scripts %}{% endblock %}
 
     <!-- Auto-dismiss toasts -->
     <script>

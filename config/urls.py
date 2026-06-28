@@ -20,20 +20,14 @@ from django.contrib import admin
 from django.urls import include, path
 from django.views.generic import RedirectView
 
-from apps.accounts import views as account_views
-
 urlpatterns = [
     path('admin/', admin.site.urls),
     # Redirect root "/" to login page
     path('', RedirectView.as_view(pattern_name='accounts:login', permanent=False)),
     path('', include('apps.accounts.urls')),
-    path('dang-nhap/', account_views.LoginView.as_view(), name='login'),
-    path('dang-xuat/', account_views.LogoutView.as_view(), name='logout'),
     path('co-so/', include('apps.venues.urls')),
-    path('bookings/', include('apps.bookings.urls')),
-    path('services/', include('apps.services.urls')),
-    path('payments/', include('apps.payments.urls')),
-    path('dat-san/', include(('apps.bookings.urls', 'bookings'), namespace='bookings_dat_san')),
+    path('dat-san/', include('apps.bookings.urls')),
+
 ]
 
 # Phục vụ media files (avatar, uploads) trong chế độ DEBUG
