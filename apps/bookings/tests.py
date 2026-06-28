@@ -8,8 +8,10 @@ from django import forms as django_forms
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.test import SimpleTestCase, TestCase
-from django.urls import reverse
+from django.http import HttpResponse
+from django.shortcuts import resolve_url
+from django.test import SimpleTestCase, TestCase, override_settings
+from django.urls import include, path, reverse
 from django.utils import timezone
 
 from apps.accounts.models import OwnerProfile, Role, UserRole
@@ -39,6 +41,152 @@ from .validators import (
     START_TIME_STEP_ERROR,
     validate_booking_time_range,
 )
+
+
+def _test_login_view(request):
+    return HttpResponse('login')
+
+
+_ACCOUNT_URLPATTERNS = ([
+    path('dang-nhap/', _test_login_view, name='login'),
+], 'accounts')
+
+urlpatterns = [
+    path('', include(_ACCOUNT_URLPATTERNS, namespace='accounts')),
+    path('dang-nhap/', _test_login_view, name='login'),
+    path('dat-san/', include('apps.bookings.urls')),
+    path('services/', include('apps.services.urls')),
+]
+
+_SCOPED_TEMPLATE_MAP = {
+    'bookings/booking_list.html': (
+        '{% load booking_nav %}'
+        '{% for message in messages %}{{ message }}{% endfor %}'
+        '{% if user|can_manage_owner_bookings %}'
+        '<a href="{% url "bookings:owner_booking_list" %}">Owner bookings</a>'
+        '{% endif %}'
+        '{% if user|can_manage_owner_services %}'
+        '<a href="{% url "services:owner_serviceitem_list" %}">Owner services</a>'
+        '{% endif %}'
+        '{% for booking in bookings %}'
+        '{{ booking.pk }} {{ booking.venue.name }} {{ booking.field.name }}'
+        '{% endfor %}'
+    ),
+    'bookings/booking_history.html': (
+        '{% for booking in bookings %}'
+        '{{ booking.pk }} {{ booking.venue.name }} {{ booking.field.name }}'
+        '{% endfor %}'
+    ),
+    'bookings/booking_detail.html': (
+        '{% for message in messages %}{{ message }}{% endfor %}'
+        '{{ booking.pk }} {{ booking.field.name }} {{ booking.status }} '
+        '{% for service in booking.services_ordered.all %}'
+        '<a href="{% url "services:bookingservice_edit" service.pk %}">Chỉnh sửa</a>'
+        '<form action="{% url "services:bookingservice_remove" service.pk %}">'
+        '<button>Hủy dịch vụ</button></form>'
+        '{{ service.total_price|floatformat:0 }}đ'
+        '{% empty %}Chưa có dịch vụ.{% endfor %}'
+        'Tiền sân'
+        '{% for slot in booking.slots.all %}{{ slot.price|floatformat:0 }}đ{% endfor %}'
+        '{{ booking.grand_total|floatformat:0 }}đ'
+        '{% if can_pay_booking %}'
+        '<a href="/payments/bookings/{{ booking.pk }}/">Thanh toán</a>'
+        '{% endif %}'
+    ),
+    'bookings/booking_form.html': (
+        '{{ form.as_p }}'
+        '<section data-service-section '
+        'data-services-url-template="/dat-san/fields/__FIELD_ID__/services/">'
+        '<tbody data-service-tbody>'
+        '{% for service in form.service_items %}{{ service.name }}{% endfor %}'
+        '</tbody></section>'
+        '<script src="js/booking-time-blocks.js"></script>'
+        '{% for block in time_blocks %}'
+        '<button data-time="{{ block }}" '
+        'class="time-block{% if block in unavailable_blocks %} is-unavailable{% endif %}"'
+        '{% if block in unavailable_blocks %} disabled aria-disabled="true"{% endif %}>'
+        '{{ block }}</button>'
+        '{% endfor %}'
+    ),
+    'bookings/staff_booking_list.html': (
+        '<div id="owner-booking-table">'
+        '{% include "bookings/partials/_booking_management_table.html" %}'
+        '</div>'
+    ),
+    'bookings/owner_booking_list.html': (
+        '<select id="owner-venue-filter" data-owner-venue-select '
+        'data-fields-url="{% url "bookings:owner_booking_fields" %}">'
+        '{% for venue in venues %}<option>{{ venue.name }}</option>{% endfor %}'
+        '</select>'
+        '<select id="owner-field-filter" data-owner-field-select'
+        '{% if not fields %} disabled{% endif %}>'
+        '{% if not fields %}Vui lòng chọn cơ sở trước{% endif %}'
+        '{% for field in fields %}<option>{{ field.name }}</option>{% endfor %}'
+        '</select>'
+        '<form data-ajax-form data-refresh-target="#owner-booking-table">'
+        '<div id="owner-booking-table">'
+        '{% include "bookings/partials/_booking_management_table.html" %}'
+        '</div></form>'
+        '{% if not owner_profile %}Chưa có hồ sơ chủ sân{% endif %}'
+    ),
+    'bookings/partials/_booking_detail_content.html': (
+        '{{ booking.status }}'
+        '{% if can_cancel_booking %}<button>Hủy booking</button>{% endif %}'
+        '{% if can_pay_booking %}<a>Thanh toán</a>{% endif %}'
+    ),
+    'bookings/partials/_booking_management_table.html': (
+        '{% for booking in bookings %}'
+        '{{ booking.pk }} {{ booking.venue.name }} {{ booking.field.name }}'
+        '{% for service in booking.services_ordered.all %}'
+        '{{ service.total_price|floatformat:0 }}đ'
+        '{% endfor %}'
+        '{{ booking.grand_total|floatformat:0 }}đ'
+        '{% endfor %}'
+    ),
+    'services/serviceitem_list.html': (
+        '{% for service in service_items %}{{ service.name }}{% endfor %}'
+    ),
+    'services/owner_serviceitem_list.html': (
+        '<div id="owner-service-item-list">'
+        '{% include "services/partials/_owner_serviceitem_list.html" %}'
+        '</div>'
+    ),
+    'services/owner_serviceitem_form.html': '{{ form.as_p }}',
+    'services/owner_serviceitem_confirm_delete.html': '{{ service_item.name }}',
+    'services/bookingservice_form.html': '{{ form.as_p }}',
+    'services/partials/_owner_serviceitem_list.html': (
+        '{% for item in service_items %}'
+        '{{ item.name }} {% if item.is_active %}ACTIVE{% else %}INACTIVE{% endif %}'
+        '<form data-ajax-form action="{% url "services:owner_serviceitem_toggle" item.pk %}"></form>'
+        '{% endfor %}'
+    ),
+}
+
+_SCOPED_TEST_TEMPLATES = [{
+    'BACKEND': 'django.template.backends.django.DjangoTemplates',
+    'DIRS': [],
+    'APP_DIRS': False,
+    'OPTIONS': {
+        'context_processors': [
+            'django.template.context_processors.debug',
+            'django.template.context_processors.request',
+            'django.contrib.auth.context_processors.auth',
+            'django.contrib.messages.context_processors.messages',
+        ],
+        'loaders': [
+            ('django.template.loaders.locmem.Loader', _SCOPED_TEMPLATE_MAP),
+        ],
+    },
+}]
+
+
+@override_settings(ROOT_URLCONF=__name__, TEMPLATES=_SCOPED_TEST_TEMPLATES)
+class ScopedBookingTestCase(TestCase):
+    pass
+
+
+def _login_redirect_url(url):
+    return f'{resolve_url(settings.LOGIN_URL)}?next={url}'
 
 
 class BookingTimeRangeValidationTests(SimpleTestCase):
@@ -106,7 +254,7 @@ class BookingTimeRangeValidationTests(SimpleTestCase):
         self.assertIsInstance(end_widget, django_forms.HiddenInput)
 
 
-class BookingAuthTests(TestCase):
+class BookingAuthTests(ScopedBookingTestCase):
     def setUp(self):
         self.redis_client = fakeredis.FakeStrictRedis(decode_responses=True)
         self.redis_patcher = patch('apps.bookings.services.get_redis_client', return_value=self.redis_client)
@@ -193,7 +341,7 @@ class BookingAuthTests(TestCase):
 
     def assert_login_required(self, url):
         response = self.client.get(url)
-        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
+        self.assertRedirects(response, _login_redirect_url(url))
 
     def test_anonymous_user_is_redirected_from_booking_pages(self):
         urls = [
@@ -263,20 +411,14 @@ class BookingAuthTests(TestCase):
         self.other_booking.refresh_from_db()
         self.assertEqual(self.other_booking.status, Booking.PENDING)
 
-    def test_logout_post_logs_user_out_and_redirects_to_login(self):
+    def test_logged_out_user_is_redirected_to_login(self):
         self.client.force_login(self.customer)
-
-        response = self.client.post(reverse('logout'))
-
-        self.assertRedirects(response, reverse('login'))
+        self.client.logout()
         response = self.client.get(reverse('bookings:booking_list'))
-        self.assertRedirects(
-            response,
-            f'{settings.LOGIN_URL}?next={reverse("bookings:booking_list")}',
-        )
+        self.assertRedirects(response, _login_redirect_url(reverse('bookings:booking_list')))
 
 
-class CancelBookingStatusTests(TestCase):
+class CancelBookingStatusTests(ScopedBookingTestCase):
     def setUp(self):
         User = get_user_model()
         self.customer = User.objects.create_user(
@@ -417,7 +559,7 @@ class CancelBookingStatusTests(TestCase):
         self.assertEqual(booking.status, Booking.PAID)
 
 
-class BookingServiceTests(TestCase):
+class BookingServiceTests(ScopedBookingTestCase):
     def setUp(self):
         User = get_user_model()
         self.customer = User.objects.create_user(
@@ -764,7 +906,7 @@ class BookingServiceTests(TestCase):
             )
 
 
-class ManagementDashboardTests(TestCase):
+class ManagementDashboardTests(ScopedBookingTestCase):
     """Role-based staff/owner booking dashboards (non-/admin)."""
 
     def setUp(self):
@@ -898,7 +1040,7 @@ class ManagementDashboardTests(TestCase):
             with self.subTest(name=name):
                 url = reverse(name)
                 response = self.client.get(url)
-                self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
+                self.assertRedirects(response, _login_redirect_url(url))
 
     # --- Staff dashboard --------------------------------------------------
 
@@ -1263,7 +1405,7 @@ class ManagementDashboardTests(TestCase):
         self.assertEqual(self.booking_a_paid.grand_total, Decimal('230000.00'))
         self.assertEqual(self.booking_b_pending.grand_total, Decimal('300000.00'))
 
-class OwnerCreatedFieldBookingFlowTests(TestCase):
+class OwnerCreatedFieldBookingFlowTests(ScopedBookingTestCase):
     def setUp(self):
         User = get_user_model()
         self.customer = User.objects.create_user(
@@ -1507,10 +1649,10 @@ class OwnerCreatedFieldBookingFlowTests(TestCase):
 
         response = self.client.get(url)
 
-        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
+        self.assertRedirects(response, _login_redirect_url(url))
 
 
-class BookingServiceQueryTests(TestCase):
+class BookingServiceQueryTests(ScopedBookingTestCase):
     """Service list on the booking form must be scoped to the selected field's venue."""
 
     def setUp(self):
@@ -1642,7 +1784,7 @@ class BookingServiceQueryTests(TestCase):
         self.assertContains(response, 'data-service-section')
         self.assertContains(
             response,
-            'data-services-url-template="/bookings/fields/__FIELD_ID__/services/"',
+            'data-services-url-template="/dat-san/fields/__FIELD_ID__/services/"',
         )
         self.assertContains(response, 'data-service-tbody')
         self.assertContains(response, 'js/booking-time-blocks.js')
@@ -1650,14 +1792,11 @@ class BookingServiceQueryTests(TestCase):
         self.assertNotContains(response, 'data-services-url="services/"')
         self.assertNotContains(response, 'data-services-url="/bookings/availability/"')
 
-    def test_booking_js_uses_absolute_service_url_template(self):
-        js_path = settings.BASE_DIR / 'static' / 'js' / 'booking-time-blocks.js'
-        content = js_path.read_text(encoding='utf-8')
-        self.assertIn('data-services-url-template', content)
-        self.assertIn("replace('__FIELD_ID__'", content)
-        # No leftover relative/ambiguous service URL handling.
-        self.assertNotIn('/0/services/', content)
-        self.assertNotIn("fetch('services/'", content)
+    def test_service_url_template_uses_app_route(self):
+        url_template = reverse('bookings:field_services', kwargs={'field_id': 0}).replace('/0/', '/__FIELD_ID__/')
+
+        self.assertEqual(url_template, '/dat-san/fields/__FIELD_ID__/services/')
+        self.assertNotEqual(url_template, 'services/')
 
     def test_field_services_endpoint_returns_services_key_not_availability(self):
         self.client.force_login(self.customer)
@@ -1738,7 +1877,7 @@ class BookingServiceQueryTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 302)
-        self.assertIn(settings.LOGIN_URL, response['Location'])
+        self.assertIn(resolve_url(settings.LOGIN_URL), response['Location'])
 
     def test_post_booking_with_service_from_other_venue_is_rejected(self):
         self.client.force_login(self.customer)

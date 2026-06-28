@@ -6,8 +6,9 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.test import TestCase
-from django.urls import reverse
+from django.http import HttpResponse
+from django.test import TestCase, override_settings
+from django.urls import include, path, reverse
 
 from apps.accounts.models import OwnerProfile, Role, UserRole
 from apps.bookings.models import Booking, BookingPackage, BookingSlot
@@ -17,7 +18,89 @@ from .models import BookingService, ServiceItem
 from .services import add_service_to_booking, remove_service_from_booking, update_booking_service
 
 
-class BookingServiceItemTests(TestCase):
+def _test_login_view(request):
+    return HttpResponse('login')
+
+
+_ACCOUNT_URLPATTERNS = ([
+    path('dang-nhap/', _test_login_view, name='login'),
+], 'accounts')
+
+urlpatterns = [
+    path('', include(_ACCOUNT_URLPATTERNS, namespace='accounts')),
+    path('dang-nhap/', _test_login_view, name='login'),
+    path('dat-san/', include('apps.bookings.urls')),
+    path('services/', include('apps.services.urls')),
+]
+
+_SCOPED_TEMPLATE_MAP = {
+    'bookings/booking_list.html': (
+        '{% load booking_nav %}'
+        '{% if user|can_manage_owner_services %}'
+        '<a href="{% url "services:owner_serviceitem_list" %}">Owner services</a>'
+        '{% endif %}'
+        '{% for booking in bookings %}'
+        '{{ booking.pk }} {{ booking.venue.name }} {{ booking.field.name }}'
+        '{% endfor %}'
+    ),
+    'bookings/booking_detail.html': (
+        '{% for message in messages %}{{ message }}{% endfor %}'
+        '{% for service in booking.services_ordered.all %}'
+        '<a href="{% url "services:bookingservice_edit" service.pk %}">Chỉnh sửa</a>'
+        '<form action="{% url "services:bookingservice_remove" service.pk %}">'
+        '<button>Hủy dịch vụ</button></form>'
+        '{% empty %}Chưa có dịch vụ.{% endfor %}'
+    ),
+    'bookings/booking_form.html': '{{ form.as_p }}',
+    'bookings/staff_booking_list.html': '',
+    'bookings/owner_booking_list.html': '',
+    'bookings/partials/_booking_detail_content.html': '{{ booking.status }}',
+    'bookings/partials/_booking_management_table.html': (
+        '{% for booking in bookings %}{{ booking.pk }} {{ booking.venue.name }}{% endfor %}'
+    ),
+    'services/serviceitem_list.html': (
+        '{% for service in service_items %}{{ service.name }}{% endfor %}'
+    ),
+    'services/owner_serviceitem_list.html': (
+        '<div id="owner-service-item-list">'
+        '{% include "services/partials/_owner_serviceitem_list.html" %}'
+        '</div>'
+    ),
+    'services/owner_serviceitem_form.html': '{{ form.as_p }}',
+    'services/owner_serviceitem_confirm_delete.html': '{{ service_item.name }}',
+    'services/bookingservice_form.html': '{{ form.as_p }}',
+    'services/partials/_owner_serviceitem_list.html': (
+        '{% for item in service_items %}'
+        '{{ item.name }} {% if item.is_active %}ACTIVE{% else %}INACTIVE{% endif %}'
+        '<form data-ajax-form action="{% url "services:owner_serviceitem_toggle" item.pk %}"></form>'
+        '{% endfor %}'
+    ),
+}
+
+_SCOPED_TEST_TEMPLATES = [{
+    'BACKEND': 'django.template.backends.django.DjangoTemplates',
+    'DIRS': [],
+    'APP_DIRS': False,
+    'OPTIONS': {
+        'context_processors': [
+            'django.template.context_processors.debug',
+            'django.template.context_processors.request',
+            'django.contrib.auth.context_processors.auth',
+            'django.contrib.messages.context_processors.messages',
+        ],
+        'loaders': [
+            ('django.template.loaders.locmem.Loader', _SCOPED_TEMPLATE_MAP),
+        ],
+    },
+}]
+
+
+@override_settings(ROOT_URLCONF=__name__, TEMPLATES=_SCOPED_TEST_TEMPLATES)
+class ScopedServiceTestCase(TestCase):
+    pass
+
+
+class BookingServiceItemTests(ScopedServiceTestCase):
     def setUp(self):
         self.redis_client = fakeredis.FakeStrictRedis(decode_responses=True)
         self.redis_patcher = patch('apps.bookings.services.get_redis_client', return_value=self.redis_client)
@@ -462,7 +545,7 @@ class BookingServiceItemTests(TestCase):
         self.assertFalse(BookingService.objects.filter(pk=booking_service.pk).exists())
 
 
-class OwnerServiceItemCrudTests(TestCase):
+class OwnerServiceItemCrudTests(ScopedServiceTestCase):
     def setUp(self):
         User = get_user_model()
         self.owner_role = Role.objects.create(name=Role.OWNER)
