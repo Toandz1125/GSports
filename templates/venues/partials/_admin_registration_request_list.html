@@ -1,0 +1,65 @@
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Loại</th>
+        <th>Sân</th>
+        <th>Owner</th>
+        <th>Địa chỉ</th>
+        <th>Trạng thái</th>
+        <th>Ngày gửi</th>
+        <th>Người duyệt</th>
+        <th>Ngày duyệt</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in venue_requests %}
+        <tr>
+          <td>{{ item.get_request_type_display }}</td>
+          <td>
+            <a href="{% url 'venues:admin_venue_request_detail' item.pk %}">
+              {{ item.venue_name }}
+            </a>
+          </td>
+          <td>
+            {{ item.owner_profile.business_name|default:"-" }}<br>
+            <span class="muted">{{ item.requested_by.email }}</span>
+          </td>
+          <td>{{ item.venue_address }}</td>
+          <td><span class="status-badge">{{ item.get_status_display }}</span></td>
+          <td>{{ item.created_at|date:"d/m/Y H:i" }}</td>
+          <td>{{ item.reviewed_by.email|default:"-" }}</td>
+          <td>{{ item.reviewed_at|date:"d/m/Y H:i"|default:"-" }}</td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="8" class="muted">Không có yêu cầu phù hợp.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if is_paginated %}
+  <nav class="pagination">
+    {% if page_obj.has_previous %}
+      <a
+        class="btn btn--secondary btn-sm"
+        href="?page={{ page_obj.previous_page_number }}"
+        data-ajax-link
+        data-refresh-target="#admin-venue-request-list"
+        data-push-url="true"
+      >Trước</a>
+    {% endif %}
+    <span class="muted">Trang {{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+      <a
+        class="btn btn--secondary btn-sm"
+        href="?page={{ page_obj.next_page_number }}"
+        data-ajax-link
+        data-refresh-target="#admin-venue-request-list"
+        data-push-url="true"
+      >Sau</a>
+    {% endif %}
+  </nav>
+{% endif %}

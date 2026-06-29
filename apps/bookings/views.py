@@ -197,13 +197,64 @@ class BookingDetailView(LoginRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['can_edit_booking_services'] = self.object.can_modify_services()
-        context['booking_service_lock_message'] = self.object.get_service_modification_block_message()
-        context['can_cancel_booking'] = self.object.can_cancel()
-        context['cancel_block_message'] = self.object.get_cancel_block_message()
-        context['can_pay_booking'] = self.object.status == Booking.PENDING
+        booking = self.object
+        context['can_edit_booking_services'] = booking.can_modify_services()
+        context['booking_service_lock_message'] = booking.get_service_modification_block_message()
+        context['can_cancel_booking'] = booking.can_cancel()
+        context['cancel_block_message'] = booking.get_cancel_block_message()
+        context['can_pay_booking'] = booking.status == Booking.PENDING
         context['back_url'] = reverse('bookings:booking_list')
+
+        # Thống kê & Kiểm tra đánh giá
+        from apps.reviews.models import Review
+        # Booking hoàn thành khi đã thanh toán (PAID) và ngày thuê bằng hoặc trước hôm nay
+        context['is_completed'] = (booking.status == Booking.PAID and booking.booking_date <= timezone.localdate())
+        context['existing_review'] = Review.objects.filter(booking=booking).first()
         return context
+
+
+class CreateBookingReviewView(LoginRequiredMixin, View):
+    """Xử lý submit đánh giá cho booking hoàn thành."""
+
+    def post(self, request, *args, **kwargs):
+        from apps.reviews.models import Review
+        booking = get_object_or_404(Booking, pk=kwargs['booking_pk'])
+        
+        # Quyền kiểm tra: Chỉ người đặt booking mới được đánh giá
+        if booking.booking_package.user != request.user:
+            raise PermissionDenied("Bạn không có quyền đánh giá booking này.")
+            
+        # Kiểm tra trạng thái hoàn thành
+        is_completed = (booking.status == Booking.PAID and booking.booking_date <= timezone.localdate())
+        if not is_completed:
+            messages.error(request, "Chỉ có thể đánh giá sau khi hoàn thành lượt thuê sân.")
+            return redirect('bookings:booking_detail', pk=booking.pk)
+            
+        # Kiểm tra xem đã đánh giá chưa
+        if Review.objects.filter(booking=booking).exists():
+            messages.error(request, "Bạn đã đánh giá booking này rồi.")
+            return redirect('bookings:booking_detail', pk=booking.pk)
+
+        try:
+            rating = int(request.POST.get('rating') or 5)
+            comment = (request.POST.get('comment') or '').strip()
+            
+            if not (1 <= rating <= 5):
+                raise ValueError("Điểm đánh giá phải từ 1 đến 5.")
+                
+            Review.objects.create(
+                user=request.user,
+                venue=booking.venue,
+                booking=booking,
+                rating=rating,
+                comment=comment,
+            )
+            messages.success(request, "Cảm ơn bạn đã gửi đánh giá!")
+        except Exception as e:
+            messages.error(request, f"Lỗi gửi đánh giá: {str(e)}")
+            
+        return redirect('bookings:booking_detail', pk=booking.pk)
+
 
 
 class BookingCreateView(LoginRequiredMixin, FormView):
@@ -226,7 +277,25 @@ class BookingCreateView(LoginRequiredMixin, FormView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['field_queryset'] = get_bookable_fields_queryset()
+        user = self.request.user
+        queryset = get_bookable_fields_queryset()
+        
+        # Import lazy để tránh circular imports
+        from apps.accounts.models import Role
+        from apps.bookings.permissions import user_has_role
+        
+        if user_has_role(user, Role.STAFF):
+            if hasattr(user, 'staff_profile') and user.staff_profile.owner:
+                queryset = queryset.filter(venue__owner=user.staff_profile.owner)
+            else:
+                queryset = queryset.none()
+        elif user_has_role(user, Role.OWNER):
+            if hasattr(user, 'owner_profile'):
+                queryset = queryset.filter(venue__owner=user.owner_profile)
+            else:
+                queryset = queryset.none()
+                
+        kwargs['field_queryset'] = queryset
         return kwargs
 
     def _get_context_selection(self, form):
@@ -676,3 +745,234 @@ class OwnerBookingDetailView(OwnerBookingRequiredMixin, DetailView):
         context['can_pay_booking'] = False
         context['back_url'] = reverse('bookings:owner_booking_list')
         return context
+
+
+# ===========================================================================
+# Đăng ký & Huỷ sân (Owner Venue Registration & Removal)
+# ===========================================================================
+from django.db import transaction
+from django.shortcuts import render
+from apps.bookings.permissions import OwnerRequiredMixin
+from apps.venues.forms import (
+    VenueRegistrationRequestForm,
+    VenueFieldFormSet,
+    PriceRuleModeForm,
+    ManualFieldPriceRuleFormSet,
+)
+from apps.venues.models import OwnerVenueRequest
+from apps.venues.pricing import (
+    PRICING_MODE_DEFAULT,
+    PRICING_MODE_MANUAL,
+    get_default_price_rule_payloads,
+)
+from apps.venues.services import notify_admins_about_owner_venue_request
+
+
+def _to_int_or_none(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _build_venue_field_formset(data=None):
+    return VenueFieldFormSet(
+        data=data,
+        prefix='fields',
+        queryset=Field.objects.none(),
+    )
+
+
+def _build_price_rule_mode_form(data=None):
+    return PriceRuleModeForm(data=data, prefix='pricing')
+
+
+def _build_manual_price_rule_formset(data=None):
+    return ManualFieldPriceRuleFormSet(data=data, prefix='price_rules')
+
+
+def _validate_pricing_submission(pricing_form, manual_price_rule_formset):
+    if not pricing_form.is_valid():
+        return False, []
+    pricing_mode = pricing_form.cleaned_data['pricing_mode']
+    if pricing_mode == PRICING_MODE_DEFAULT:
+        return True, get_default_price_rule_payloads()
+    if pricing_mode == PRICING_MODE_MANUAL:
+        if not manual_price_rule_formset.is_valid():
+            return False, []
+        return True, manual_price_rule_formset.to_payload()
+    pricing_form.add_error('pricing_mode', 'Cách nhập bảng giá không hợp lệ.')
+    return False, []
+
+
+class OwnerVenueRegisterView(OwnerRequiredMixin, View):
+    """Owner-only page to request registering a new venue."""
+
+    template_name = 'bookings/owner_venue_register.html'
+
+    def _get_owner_profile_or_403(self, request):
+        owner_profile = get_owner_profile(request.user)
+        if not owner_profile:
+            raise PermissionDenied('Tài khoản chủ sân chưa có hồ sơ OwnerProfile.')
+        return owner_profile
+
+    def get(self, request, *args, **kwargs):
+        owner_profile = self._get_owner_profile_or_403(request)
+        return render(request, self.template_name, {
+            'form': VenueRegistrationRequestForm(),
+            'field_formset': _build_venue_field_formset(),
+            'pricing_form': _build_price_rule_mode_form(),
+            'price_rule_formset': _build_manual_price_rule_formset(),
+            'default_price_rules': get_default_price_rule_payloads(),
+            'owner_profile': owner_profile,
+        })
+
+    def post(self, request, *args, **kwargs):
+        owner_profile = self._get_owner_profile_or_403(request)
+        form = VenueRegistrationRequestForm(request.POST)
+        field_formset = _build_venue_field_formset(request.POST)
+        pricing_form = _build_price_rule_mode_form(request.POST)
+        price_rule_formset = _build_manual_price_rule_formset(request.POST)
+        pricing_is_valid, price_rule_payloads = _validate_pricing_submission(
+            pricing_form,
+            price_rule_formset,
+        )
+        if not form.is_valid() or not field_formset.is_valid() or not pricing_is_valid:
+            return render(request, self.template_name, {
+                'form': form,
+                'field_formset': field_formset,
+                'pricing_form': pricing_form,
+                'price_rule_formset': price_rule_formset,
+                'default_price_rules': get_default_price_rule_payloads(),
+                'owner_profile': owner_profile,
+            })
+
+        payload = form.to_payload()
+        payload['fields'] = field_formset.to_payload()
+        payload['pricing'] = {
+            'mode': pricing_form.cleaned_data['pricing_mode'],
+            'rules': price_rule_payloads,
+        }
+        with transaction.atomic():
+            venue_request = OwnerVenueRequest(
+                requested_by=request.user,
+                request_type=OwnerVenueRequest.CREATE,
+                payload=payload,
+            )
+            venue_request.full_clean()
+            venue_request.save()
+            notify_admins_about_owner_venue_request(venue_request)
+        messages.success(request, 'Yêu cầu tạo sân đã được gửi và đang chờ admin duyệt.')
+        return redirect('bookings:owner_venue_register')
+
+
+class OwnerVenueRemovalRequestView(OwnerRequiredMixin, View):
+    """Owner-only placeholder page to request removing an owned venue.
+
+    Removal is treated as a request only — no venue is deleted from here.
+    """
+
+    template_name = 'bookings/owner_venue_removal.html'
+
+    def _owned_venues(self, request):
+        owner_profile = get_owner_profile(request.user)
+        if not owner_profile:
+            raise PermissionDenied('Tài khoản chủ sân chưa có hồ sơ OwnerProfile.')
+        return owner_profile, Venue.objects.filter(
+            owner=owner_profile,
+            is_deleted=False,
+        ).order_by('name')
+
+    def get(self, request, *args, **kwargs):
+        owner_profile, venues = self._owned_venues(request)
+        return render(request, self.template_name, {
+            'owner_profile': owner_profile,
+            'venues': venues,
+        })
+
+    def post(self, request, *args, **kwargs):
+        owner_profile, venues = self._owned_venues(request)
+        venue_id = _to_int_or_none(request.POST.get('venue'))
+        # Only allow requesting removal of a venue the owner actually owns.
+        venue = venues.filter(pk=venue_id).first() if venue_id is not None else None
+        if venue is None:
+            messages.error(request, 'Vui lòng chọn một sân hợp lệ thuộc sở hữu của bạn.')
+        else:
+            venue_request = OwnerVenueRequest(
+                requested_by=request.user,
+                request_type=OwnerVenueRequest.DELETE,
+                target_venue=venue,
+                reason=(request.POST.get('reason') or '').strip(),
+            )
+            venue_request.full_clean()
+            venue_request.save()
+            notify_admins_about_owner_venue_request(venue_request)
+            messages.success(request, 'Yêu cầu huỷ sân đã được gửi và đang chờ admin duyệt.')
+        return redirect('bookings:owner_venue_removal')
+
+
+class FieldDetailJSONView(LoginRequiredMixin, View):
+    """AJAX: Trả về thông tin chi tiết của sân con cùng các reviews của cơ sở đó."""
+
+    def get(self, request, *args, **kwargs):
+        from django.db.models import Avg
+        from apps.reviews.models import Review
+        
+        field = get_object_or_404(
+            Field.objects.select_related('venue', 'field_type', 'field_type__sport'),
+            pk=kwargs['field_id']
+        )
+        venue = field.venue
+        
+        # Lấy trung bình đánh giá và danh sách reviews
+        reviews_qs = Review.objects.filter(venue=venue).select_related('user').order_by('-created_at')
+        avg_rating = reviews_qs.aggregate(avg=Avg('rating'))['avg'] or 0
+        
+        reviews_list = []
+        for r in reviews_qs[:10]:
+            reviews_list.append({
+                'user': r.user.get_full_name() or r.user.email,
+                'rating': r.rating,
+                'comment': r.comment or '',
+                'created_at': r.created_at.strftime('%d/%m/%Y'),
+            })
+
+        # Lấy bảng giá của sân con này
+        price_rules = []
+        for rule in field.price_rules.all().order_by('day_of_week', 'start_time'):
+            day_label = 'Tất cả các ngày'
+            if rule.day_of_week is not None:
+                days = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật']
+                if 0 <= rule.day_of_week < len(days):
+                    day_label = days[rule.day_of_week]
+            price_rules.append({
+                'day_of_week': day_label,
+                'start_time': rule.start_time.strftime('%H:%M'),
+                'end_time': rule.end_time.strftime('%H:%M'),
+                'price': float(rule.price_per_hour),
+            })
+            
+        payload = {
+            'ok': True,
+            'field': {
+                'id': field.pk,
+                'name': field.name,
+                'sport': field.field_type.sport.name,
+                'capacity': field.capacity or 0,
+                'surface_type': field.surface_type or 'Mặc định',
+                'length': float(field.length) if field.length else 0,
+                'width': float(field.width) if field.width else 0,
+                'status': field.status,
+            },
+            'venue': {
+                'name': venue.name,
+                'address': venue.address,
+                'latitude': float(venue.latitude) if venue.latitude else None,
+                'longitude': float(venue.longitude) if venue.longitude else None,
+                'avg_rating': round(float(avg_rating), 1),
+                'reviews': reviews_list,
+            },
+            'price_rules': price_rules,
+        }
+        return JsonResponse(payload)
+

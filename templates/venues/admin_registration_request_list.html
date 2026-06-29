@@ -1,0 +1,62 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}Yêu cầu sân | GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/gsports.css' %}">
+{% endblock %}
+
+{% block dashboard_content %}
+  <section class="page-heading">
+    <div>
+      <p class="eyebrow">Quản trị</p>
+      <h1>Yêu cầu sân</h1>
+      <p class="muted">Danh sách yêu cầu tạo, cập nhật hoặc hủy sân do owner gửi để admin xem xét.</p>
+    </div>
+  </section>
+
+  <form
+    method="get"
+    class="filter-bar"
+    data-ajax-form
+    data-refresh-target="#admin-venue-request-list"
+    data-push-url="true"
+  >
+    <div class="filter-field">
+      <label for="filter-type">Loại yêu cầu</label>
+      <select id="filter-type" name="request_type">
+        <option value="">Tất cả</option>
+        {% for value, label in request_type_choices %}
+          <option value="{{ value }}" {% if active_request_type == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-field">
+      <label for="filter-status">Trạng thái</label>
+      <select id="filter-status" name="status">
+        <option value="">Tất cả</option>
+        {% for value, label in status_choices %}
+          <option value="{{ value }}" {% if active_status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-actions">
+      <button type="submit" class="btn btn--primary">Lọc</button>
+      <a
+        class="btn btn--secondary"
+        href="{% url 'venues:admin_venue_request_list' %}"
+        data-ajax-link
+        data-refresh-target="#admin-venue-request-list"
+        data-push-url="true"
+        data-reset-form="form.filter-bar"
+      >Xóa lọc</a>
+    </div>
+  </form>
+
+  <div id="admin-venue-request-list" data-refresh-url="{{ request.get_full_path }}">
+    {% include "venues/partials/_admin_registration_request_list.html" %}
+  </div>
+{% endblock %}
+
