@@ -1,0 +1,14 @@
+{% comment %}Panel 3 — menu dịch vụ của cơ sở chứa sân (field.venue). AJAX re-render thay thế nội dung này.{% endcomment %}
+<div class="fm-card" data-services-panel>
+    <h2 class="fm-card__title">Chỉnh services / menu dịch vụ</h2>
+
+    {% if service_items %}
+    <div class="fm-services-grid">
+        {% for item in service_items %}
+        {% include 'venues/partials/_field_service_card.html' with item=item field=field %}
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="fm-empty">Cơ sở này chưa có dịch vụ nào. Hãy thêm dịch vụ trong mục quản lý dịch vụ của chủ sân.</p>
+    {% endif %}
+</div>

@@ -46,6 +46,11 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
                 <span>Dashboard</span>
             </a>
+
+            <a href="{% url 'bookings:booking_create' %}" class="sidebar__link {% if request.resolver_match.app_name == 'bookings' and request.resolver_match.url_name == 'booking_create' %}sidebar__link--active{% endif %}" id="nav-booking-create">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h8M8 18h5"/></svg>
+                <span>Đặt sân</span>
+            </a>
             
             {% if user.owner_profile %}
             <a href="{% url 'venues:venue_list' %}" class="sidebar__link {% if request.resolver_match.app_name == 'venues' %}sidebar__link--active{% endif %}" id="nav-venues">
@@ -55,6 +60,10 @@
             <a href="{% url 'accounts:staff_list' %}" class="sidebar__link {% if request.resolver_match.url_name in 'staff_list staff_create staff_edit' %}sidebar__link--active{% endif %}" id="nav-staff-list">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                 <span>Quản lý nhân viên</span>
+            </a>
+            <a href="{% url 'services:owner_serviceitem_list' %}" class="sidebar__link {% if request.resolver_match.app_name == 'services' %}sidebar__link--active{% endif %}" id="nav-owner-services">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 2l1.5 1.5M21 2l-1.5 1.5"/><path d="M5 7h14l-1 13a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/><path d="M9 11v6M15 11v6M12 11v6"/></svg>
+                <span>Quản lý dịch vụ</span>
             </a>
             {% endif %}
 

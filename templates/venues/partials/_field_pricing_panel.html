@@ -1,0 +1,53 @@
+{% comment %}Panel 2 — bảng giá theo khung giờ 30 phút. AJAX re-render thay thế nội dung này.{% endcomment %}
+<div class="fm-card" data-pricing-panel>
+    <h2 class="fm-card__title">Chỉnh bảng giá</h2>
+
+    <form method="post" action="{% url 'venues:field_pricing_update' field.pk %}" data-pricing-form data-pricing-url="{% url 'venues:field_pricing_update' field.pk %}">
+        {% csrf_token %}
+
+        <div class="fm-pricing-controls">
+            <label class="fm-pricing-select-all">
+                <input type="checkbox" data-pricing-select-all>
+                <span>Chọn tất cả khung giờ</span>
+            </label>
+            <div class="form-group">
+                <label for="fm-new-price">Giá mới (đ/giờ)</label>
+                <input type="number" id="fm-new-price" name="price_per_hour" min="0" step="1000" placeholder="Nhập giá mới" required>
+            </div>
+        </div>
+
+        <div class="fm-pricing-table-wrap">
+            <table class="fm-pricing-table">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">Chọn</th>
+                        <th>Khung giờ</th>
+                        <th>Giá hiện tại</th>
+                        <th>Nguồn giá</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for block in pricing_blocks %}
+                    <tr class="fm-price-row {% if block.is_custom %}fm-price-row--custom{% endif %}">
+                        <td><input type="checkbox" name="blocks" value="{{ block.value }}" data-pricing-block></td>
+                        <td>{{ block.start_label }} - {{ block.end_label }}</td>
+                        <td>{{ block.price_per_hour|floatformat:0 }}đ</td>
+                        <td>
+                            {% if block.is_custom %}
+                            <span class="fm-source fm-source--custom">Tuỳ chỉnh</span>
+                            {% else %}
+                            <span class="fm-source">Mặc định</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="fm-actions">
+            <button type="reset" class="btn btn--secondary" data-pricing-cancel>Huỷ</button>
+            <button type="submit" class="btn btn--primary">Lưu giá</button>
+        </div>
+    </form>
+</div>

@@ -1,0 +1,362 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}Đặt sân — GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .booking-create {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .booking-create__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .booking-create__title h1 {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: var(--text-main);
+        margin: 0;
+    }
+
+    .booking-create__title p {
+        color: var(--text-muted);
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+    }
+
+    .booking-panel {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+        padding: 1.5rem;
+    }
+
+    .booking-filter {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        align-items: end;
+    }
+
+    @media (min-width: 768px) {
+        .booking-filter {
+            grid-template-columns: minmax(240px, 1fr) 180px auto;
+        }
+    }
+
+    .booking-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+    }
+
+    .booking-field label {
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+    }
+
+    .booking-input {
+        width: 100%;
+        border: 1.5px solid var(--border-color);
+        border-radius: var(--radius-md);
+        background: var(--input-bg);
+        color: var(--input-text);
+        padding: 0.7rem 0.85rem;
+        font-size: 0.875rem;
+        outline: none;
+    }
+
+    .booking-input:focus {
+        border-color: var(--primary-500);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+    }
+
+    .booking-errors {
+        border-left: 4px solid var(--error-500);
+        background: rgba(239, 68, 68, 0.08);
+        color: var(--error-500);
+        padding: 0.9rem 1rem;
+        border-radius: var(--radius-md);
+        font-size: 0.875rem;
+    }
+
+    .booking-layout {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+
+    @media (min-width: 1080px) {
+        .booking-layout {
+            grid-template-columns: minmax(0, 1fr) 320px;
+        }
+    }
+
+    .slot-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+    }
+
+    .slot-toolbar h2,
+    .service-panel h2 {
+        font-size: 1rem;
+        color: var(--text-main);
+        margin: 0;
+        font-weight: 800;
+    }
+
+    .slot-toolbar span {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+    }
+
+    .slot-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 0.75rem;
+    }
+
+    .slot-card {
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        background: var(--bg-main);
+        padding: 0.85rem;
+        min-height: 132px;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        justify-content: space-between;
+    }
+
+    .slot-card--available {
+        border-color: rgba(16, 185, 129, 0.35);
+        background: rgba(16, 185, 129, 0.06);
+    }
+
+    .slot-card--disabled {
+        opacity: 0.76;
+    }
+
+    .slot-card__time {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+    }
+
+    .slot-card__time strong {
+        color: var(--text-main);
+        font-size: 0.98rem;
+    }
+
+    .slot-card__time span,
+    .slot-card__price {
+        color: var(--text-muted);
+        font-size: 0.8rem;
+    }
+
+    .slot-card__price {
+        font-weight: 700;
+        color: var(--primary-600);
+    }
+
+    .slot-booking-button {
+        width: 100%;
+        min-height: 38px;
+        border-radius: var(--radius-md);
+        border: 1px solid transparent;
+        font-weight: 700;
+        font-size: 0.83rem;
+        cursor: pointer;
+    }
+
+    .slot-booking-button--disabled {
+        cursor: not-allowed;
+        color: var(--text-muted);
+        background: var(--bg-surface);
+        border-color: var(--border-color);
+    }
+
+    .service-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .service-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+    }
+
+    .service-table th,
+    .service-table td {
+        padding: 0.65rem 0;
+        border-bottom: 1px solid var(--border-color);
+        text-align: left;
+    }
+
+    .service-table th {
+        color: var(--text-muted);
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .service-qty {
+        width: 76px;
+    }
+
+    .booking-empty {
+        padding: 2rem;
+        color: var(--text-muted);
+        text-align: center;
+        border: 1px dashed var(--border-color);
+        border-radius: var(--radius-md);
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="booking-create">
+    <div class="booking-create__header">
+        <div class="booking-create__title">
+            <h1>Đặt sân</h1>
+            <p>Chọn sân, ngày và khung giờ còn trống để tạo booking.</p>
+        </div>
+        <a href="{% url 'bookings:booking_history' %}" class="btn btn--secondary">
+            <span>Lịch sử thuê sân</span>
+        </a>
+    </div>
+
+    <section class="booking-panel">
+        <form method="get" class="booking-filter" data-booking-filter-form>
+            <div class="booking-field">
+                <label for="booking-field">Sân</label>
+                <select id="booking-field" name="field" class="booking-input" data-booking-field-select>
+                    {% for field_option in bookable_fields %}
+                    <option value="{{ field_option.pk }}" {% if selected_field and field_option.pk == selected_field.pk %}selected{% endif %}>
+                        {{ field_option.venue.name }} — {{ field_option.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="booking-field">
+                <label for="booking-date">Ngày</label>
+                <input id="booking-date" type="date" name="booking_date" value="{{ selected_date|date:'Y-m-d' }}" class="booking-input" data-booking-date-input>
+            </div>
+            <button type="submit" class="btn btn--primary">Xem lịch</button>
+        </form>
+    </section>
+
+    {% if form.non_field_errors %}
+    <div class="booking-errors">
+        {% for error in form.non_field_errors %}
+        <div>{{ error }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if selected_field %}
+    <form method="post" class="booking-layout" data-slot-booking-form>
+        {% csrf_token %}
+        <input type="hidden" name="field" value="{{ selected_field.pk }}">
+        <input type="hidden" name="booking_date" value="{{ selected_date|date:'Y-m-d' }}">
+        <input type="hidden" name="start_time" value="">
+        <input type="hidden" name="end_time" value="">
+
+        <section class="booking-panel">
+            <div class="slot-toolbar">
+                <div>
+                    <h2>{{ selected_field.venue.name }} — {{ selected_field.name }}</h2>
+                    <span>{{ selected_date|date:"d/m/Y" }}</span>
+                </div>
+                <span>{{ slot_options|length }} khung giờ</span>
+            </div>
+
+            {% if slot_options %}
+            <div class="slot-grid">
+                {% for slot in slot_options %}
+                <div class="slot-card {% if slot.is_bookable %}slot-card--available{% else %}slot-card--disabled{% endif %}">
+                    <div class="slot-card__time">
+                        <strong>{{ slot.start_label }}-{{ slot.end_label }}</strong>
+                        {% if slot.price %}
+                        <span class="slot-card__price">{{ slot.price|floatformat:0 }} VNĐ</span>
+                        {% else %}
+                        <span>{{ slot.status_label }}</span>
+                        {% endif %}
+                    </div>
+                    {% if slot.is_bookable %}
+                    <button type="submit" name="slot" value="{{ slot.start_label }}|{{ slot.end_label }}" data-time="{{ slot.start_label }}" class="btn btn--primary slot-booking-button time-block">
+                        Đặt sân
+                    </button>
+                    {% else %}
+                    <button type="button" data-time="{{ slot.start_label }}" class="slot-booking-button slot-booking-button--disabled time-block is-unavailable" disabled aria-disabled="true">
+                        {{ slot.status_label }}
+                    </button>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="booking-empty">Không có khung giờ khả dụng cho ngày đã chọn.</div>
+            {% endif %}
+        </section>
+
+        <aside class="booking-panel service-panel" data-service-section data-services-url-template="/dat-san/fields/__FIELD_ID__/services/">
+            <h2>Thông tin thêm</h2>
+            <div class="booking-field">
+                <label for="{{ form.note.id_for_label }}">Ghi chú</label>
+                {{ form.note }}
+            </div>
+
+            {% if form.service_quantity_fields %}
+            <table class="service-table">
+                <thead>
+                    <tr>
+                        <th>Dịch vụ</th>
+                        <th>Giá</th>
+                        <th>SL</th>
+                    </tr>
+                </thead>
+                <tbody data-service-tbody>
+                    {% for service_field in form.service_quantity_fields %}
+                    <tr>
+                        <td>{{ service_field.item.name }}</td>
+                        <td>{{ service_field.item.price|floatformat:0 }}đ</td>
+                        <td class="service-qty">{{ service_field.field }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="booking-empty">Cơ sở này chưa có dịch vụ kèm theo khả dụng.</div>
+            {% endif %}
+        </aside>
+    </form>
+    {% else %}
+    <div class="booking-empty">Chưa có sân khả dụng để đặt.</div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script src="{% static 'js/booking-time-blocks.js' %}"></script>
+{% endblock %}

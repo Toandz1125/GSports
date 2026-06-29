@@ -9,6 +9,8 @@ from .services import (
     generate_time_blocks,
     get_bookable_fields_queryset,
     is_time_range_available,
+    validate_bookable_field,
+    validate_booking_not_in_past,
     DEFAULT_OPEN_TIME,
     DEFAULT_CLOSE_TIME,
 )
@@ -119,15 +121,23 @@ class BookingCreateForm(forms.Form):
         start_time = cleaned_data.get('start_time')
         end_time = cleaned_data.get('end_time')
 
-        time_range_is_valid = True
+        booking_request_is_valid = True
         if start_time and end_time:
             try:
                 validate_booking_time_range(start_time, end_time)
             except ValidationError as exc:
-                time_range_is_valid = False
+                booking_request_is_valid = False
                 self._add_validation_errors(exc)
 
-        if field and booking_date and start_time and end_time and time_range_is_valid:
+        if field and booking_date and start_time and booking_request_is_valid:
+            try:
+                validate_bookable_field(field)
+                validate_booking_not_in_past(booking_date, start_time)
+            except ValidationError as exc:
+                booking_request_is_valid = False
+                self._add_validation_errors(exc)
+
+        if field and booking_date and start_time and end_time and booking_request_is_valid:
             if not is_time_range_available(field, booking_date, start_time, end_time):
                 raise ValidationError(BOOKING_UNAVAILABLE_ERROR)
             try:

@@ -145,6 +145,13 @@ class Booking(models.Model):
     def can_cancel(self):
         return self.status in self.CANCELLABLE_STATUSES
 
+    def can_pay(self):
+        if self.status != self.PENDING:
+            return False
+        if self.payment_deadline and self.payment_deadline <= timezone.now():
+            return False
+        return True
+
     def get_cancel_block_message(self):
         if self.status == self.CANCELLED:
             return 'Booking đã hủy, không thể hủy lại.'

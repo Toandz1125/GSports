@@ -1,0 +1,27 @@
+{% extends 'accounts/dashboard.html' %}
+
+{% block title %}Dịch vụ — GSports{% endblock %}
+
+{% block dashboard_content %}
+<div style="margin-bottom:1.25rem;">
+    <h2 style="font-size:1.5rem;font-weight:800;color:var(--text-main);margin:0;">Dịch vụ</h2>
+    <p style="font-size:0.875rem;color:var(--text-muted);margin:0.25rem 0 0 0;">Danh sách dịch vụ đang được bán.</p>
+</div>
+
+{% if service_items %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;">
+    {% for item in service_items %}
+    <div style="background:var(--bg-surface);border:1px solid var(--border-color);border-radius:var(--radius-lg);padding:1rem;box-shadow:var(--shadow-sm);">
+        <div style="font-weight:700;color:var(--text-main);">{{ item.name }}</div>
+        {% if item.category %}<div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">{{ item.get_category_display }}</div>{% endif %}
+        <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.25rem;">{{ item.venue.name }}</div>
+        <div style="font-size:1.05rem;font-weight:700;color:var(--primary-600);margin-top:0.35rem;">{{ item.price|floatformat:0 }}đ</div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div style="background:var(--bg-surface);border:1px dashed var(--border-color);border-radius:var(--radius-lg);padding:3rem 1.5rem;text-align:center;color:var(--text-muted);">
+    Chưa có dịch vụ nào.
+</div>
+{% endif %}
+{% endblock %}

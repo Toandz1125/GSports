@@ -1,0 +1,18 @@
+{% extends 'accounts/dashboard.html' %}
+
+{% block title %}Xoá dịch vụ — GSports{% endblock %}
+
+{% block dashboard_content %}
+<div style="max-width:560px;margin:0 auto;background:var(--bg-surface);border:1px solid var(--border-color);border-radius:var(--radius-lg);padding:2rem;box-shadow:var(--shadow-sm);">
+    <h2 style="font-size:1.25rem;font-weight:700;color:var(--text-main);margin-top:0;">Tắt dịch vụ</h2>
+    <p style="color:var(--text-muted);">
+        Bạn có chắc muốn tắt dịch vụ <strong style="color:var(--text-main);">{{ service_item.name }}</strong>?
+        Dịch vụ sẽ ngừng bán và không hiển thị khi khách đặt sân.
+    </p>
+    <form method="post" style="display:flex;gap:1rem;justify-content:flex-end;margin-top:1.5rem;">
+        {% csrf_token %}
+        <a href="{% url 'services:owner_serviceitem_list' %}" class="btn btn--secondary" style="background-color:var(--bg-main);border:1px solid var(--border-color);color:var(--text-main);">Hủy bỏ</a>
+        <button type="submit" class="btn btn--danger">Tắt dịch vụ</button>
+    </form>
+</div>
+{% endblock %}

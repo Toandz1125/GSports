@@ -1,0 +1,83 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}{{ page_title|default:"Dịch vụ" }} — GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .svc-form-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 2rem;
+        box-shadow: var(--shadow-sm);
+        max-width: 720px;
+        margin: 0 auto;
+    }
+    .svc-form-card__title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text-main);
+        margin-bottom: 1.5rem;
+        border-left: 4px solid var(--primary-600);
+        padding-left: 0.75rem;
+    }
+    .svc-form-group { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.25rem; }
+    .svc-form-group label { font-size: 0.875rem; font-weight: 600; color: var(--text-muted); }
+    .svc-form-group input, .svc-form-group select, .svc-form-group textarea {
+        padding: 0.7rem 0.9rem;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-color);
+        background-color: var(--bg-main);
+        color: var(--text-main);
+        font-size: 0.875rem;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .svc-form-group input:focus, .svc-form-group select:focus {
+        border-color: var(--primary-500);
+        outline: none;
+        background-color: var(--bg-surface);
+    }
+    .svc-form-error { color: var(--error-500); font-size: 0.78rem; }
+    .svc-form-actions {
+        display: flex; gap: 1rem; justify-content: flex-end;
+        margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.25rem;
+    }
+    .btn--secondary { background-color: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-main); }
+    .btn--secondary:hover { background-color: var(--border-color); }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="svc-form-card">
+    <h2 class="svc-form-card__title">{{ page_title|default:"Dịch vụ" }}</h2>
+
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+        <div class="svc-form-group">
+            {% for error in form.non_field_errors %}
+            <div class="svc-form-error">{{ error }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% for f in form %}
+        <div class="svc-form-group">
+            <label for="{{ f.id_for_label }}">{{ f.label }}</label>
+            {{ f }}
+            {% if f.help_text %}<span style="font-size:0.75rem;color:var(--text-muted);">{{ f.help_text }}</span>{% endif %}
+            {% for error in f.errors %}<span class="svc-form-error">{{ error }}</span>{% endfor %}
+        </div>
+        {% endfor %}
+
+        <div class="svc-form-actions">
+            <a href="{% url 'services:owner_serviceitem_list' %}" class="btn btn--secondary">Hủy bỏ</a>
+            <button type="submit" class="btn btn--primary">{{ submit_label|default:"Lưu" }}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

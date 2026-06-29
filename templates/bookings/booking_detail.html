@@ -1,0 +1,49 @@
+{% extends 'accounts/dashboard.html' %}
+
+{% block title %}Chi tiết booking — GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .booking-detail {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .booking-detail__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .booking-detail__header h1 {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: var(--text-main);
+        margin: 0;
+    }
+
+    .booking-detail__header p {
+        color: var(--text-muted);
+        margin-top: 0.25rem;
+        font-size: 0.875rem;
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="booking-detail">
+    <div class="booking-detail__header">
+        <div>
+            <h1>Chi tiết booking</h1>
+            <p>{{ booking.id }}</p>
+        </div>
+        <a href="{{ back_url }}" class="btn btn--secondary">Quay lại</a>
+    </div>
+
+    {% include 'bookings/partials/_booking_detail_content.html' %}
+</div>
+{% endblock %}

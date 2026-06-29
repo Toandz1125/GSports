@@ -1,0 +1,94 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}Quản lý dịch vụ — GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .svc-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    .svc-header__title h2 {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: var(--text-main);
+        margin: 0;
+    }
+    .svc-header__title p {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        margin: 0.25rem 0 0 0;
+    }
+
+    .svc-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 1.25rem;
+    }
+    .svc-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+        padding: 1.1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+    }
+    .svc-card--off { opacity: 0.6; }
+    .svc-card__img {
+        width: 100%;
+        height: 130px;
+        object-fit: cover;
+        border-radius: var(--radius-md);
+    }
+    .svc-card__name { font-weight: 700; color: var(--text-main); }
+    .svc-card__cat { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .svc-card__price { font-size: 1.1rem; font-weight: 700; color: var(--primary-600); }
+    .svc-card__meta { font-size: 0.8rem; color: var(--text-muted); }
+    .svc-card__venue { font-size: 0.8rem; color: var(--text-muted); }
+    .svc-card__actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: auto; padding-top: 0.5rem; }
+    .svc-card__actions form { margin: 0; }
+    .svc-status { display: inline-block; padding: 0.1rem 0.55rem; border-radius: var(--radius-full); font-size: 0.72rem; font-weight: 700; }
+    .svc-status--on { background: rgba(16,185,129,0.12); color: #10b981; }
+    .svc-status--off { background: rgba(239,68,68,0.12); color: #ef4444; }
+
+    .btn--secondary { background-color: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-main); }
+    .btn--secondary:hover { background-color: var(--border-color); }
+    .btn--danger-outline { background: none; border: 1px solid var(--error-500); color: var(--error-500); }
+    .btn--danger-outline:hover { background-color: rgba(239,68,68,0.08); }
+    .btn--sm { padding: 0.4rem 0.7rem; font-size: 0.78rem; }
+
+    .svc-empty {
+        background: var(--bg-surface);
+        border: 1px dashed var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 3rem 1.5rem;
+        text-align: center;
+        color: var(--text-muted);
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="svc-header">
+    <div class="svc-header__title">
+        <h2>Quản lý dịch vụ</h2>
+        <p>Tạo và quản lý các dịch vụ/menu bán kèm cho cơ sở của bạn.</p>
+    </div>
+    <a href="{% url 'services:owner_serviceitem_create' %}" class="btn btn--primary" id="btn-create-service">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span>Thêm dịch vụ</span>
+    </a>
+</div>
+
+<div id="owner-service-item-list">
+    {% include 'services/partials/_owner_serviceitem_list.html' %}
+</div>
+{% endblock %}

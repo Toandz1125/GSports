@@ -1,0 +1,33 @@
+{% comment %}Panel 1 — chỉnh thông tin sân. POST về field_edit (cùng URL).{% endcomment %}
+<form method="post" action="{% url 'venues:field_edit' field.pk %}" class="fm-card" novalidate>
+    {% csrf_token %}
+    <h2 class="fm-card__title">Chỉnh thông tin sân</h2>
+
+    {% if form.non_field_errors %}
+    <div class="form-group form-group--error" style="margin-bottom: 1.5rem;">
+        {% for error in form.non_field_errors %}
+        <div class="form-error">{{ error }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="form-grid">
+        {% for f in form %}
+        <div class="form-group {% if f.errors %}form-group--error{% endif %} {% if f.name == 'name' or f.name == 'surface_type' %}form-grid--full-width{% endif %}">
+            <label for="{{ f.id_for_label }}">{{ f.label }}</label>
+            {{ f }}
+            {% if f.help_text %}
+            <span style="font-size: 0.75rem; color: var(--text-muted);">{{ f.help_text }}</span>
+            {% endif %}
+            {% for error in f.errors %}
+            <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="fm-actions">
+        <a href="{% url 'venues:venue_detail' venue.pk %}" class="btn btn--secondary">Hủy bỏ</a>
+        <button type="submit" class="btn btn--primary">Lưu lại</button>
+    </div>
+</form>

@@ -18,6 +18,9 @@ from .validators import validate_booking_time_range
 MONEY_QUANTIZER = Decimal('0.01')
 DEFAULT_OPEN_TIME = time(5, 30)
 DEFAULT_CLOSE_TIME = time(23, 30)
+# Pending bookings hold their slots for this long before being auto-cancelled.
+# This is purely a booking-side hold; it does not touch the payments module.
+BOOKING_PAYMENT_TIMEOUT_MINUTES = 10
 TIME_BLOCK_FORMAT = '%H:%M'
 TIME_BLOCK_INTERVAL_MINUTES = 30
 BOOKING_UNAVAILABLE_ERROR = (
@@ -26,19 +29,89 @@ BOOKING_UNAVAILABLE_ERROR = (
 BOOKING_PRICE_RULE_MISSING_ERROR = (
     'Không tìm thấy bảng giá phù hợp cho sân và khung giờ đã chọn.'
 )
+BOOKING_PAST_SLOT_ERROR = 'Không thể đặt khung giờ trong quá khứ.'
+BOOKING_FIELD_UNAVAILABLE_ERROR = 'Sân hoặc cơ sở hiện không khả dụng để đặt.'
 SLOT_CONFLICT_ERROR = 'SLOT_CONFLICT'
+
+ACTIVE_BOOKING_STATUSES = (Booking.PENDING, Booking.PAID, Booking.WAITING)
+SLOT_STATUS_AVAILABLE = 'AVAILABLE'
+SLOT_STATUS_BOOKED = 'BOOKED'
+SLOT_STATUS_LOCKED = 'LOCKED'
+SLOT_STATUS_PAST = 'PAST'
+SLOT_STATUS_NO_PRICE = 'NO_PRICE'
 
 
 def get_redis_client():
-    client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+    redis_url = getattr(settings, 'REDIS_URL', None)
+    if not redis_url:
+        raise ImproperlyConfigured(
+            'REDIS_URL is not configured. Redis slot locks will be skipped; '
+            'database transaction validation is still required before creating bookings.'
+        )
+    client = redis.from_url(redis_url, decode_responses=True)
     try:
         client.ping()
     except redis.exceptions.ConnectionError as e:
         raise ImproperlyConfigured(
-            f"Unable to connect to Redis at {settings.REDIS_URL}. "
+            f"Unable to connect to Redis at {redis_url}. "
             "Please ensure the Redis server is running, as it is required for booking slot locks."
         ) from e
     return client
+
+
+def _get_redis_client_or_none():
+    try:
+        return get_redis_client()
+    except (ImproperlyConfigured, redis.exceptions.RedisError):
+        return None
+
+
+def get_payment_deadline(now=None):
+    """Return the payment hold deadline for a freshly created pending booking."""
+    now = now or timezone.now()
+    return now + timedelta(minutes=BOOKING_PAYMENT_TIMEOUT_MINUTES)
+
+
+def cancel_expired_pending_bookings(now=None):
+    """Cancel every PENDING booking whose payment hold has expired.
+
+    Slots of CANCELLED bookings are excluded from ``ACTIVE_BOOKING_STATUSES`` so
+    they become free again automatically. Booking-only; never touches payments.
+    Returns the number of bookings cancelled.
+    """
+    now = now or timezone.now()
+    expired_ids = list(
+        Booking.objects.filter(
+            status=Booking.PENDING,
+            payment_deadline__isnull=False,
+            payment_deadline__lte=now,
+        ).values_list('pk', flat=True)
+    )
+    if not expired_ids:
+        return 0
+    return Booking.objects.filter(pk__in=expired_ids).update(
+        status=Booking.CANCELLED,
+        updated_at=now,
+    )
+
+
+def cancel_expired_booking_if_needed(booking, now=None):
+    """Cancel a single booking if it is a PENDING booking past its deadline.
+
+    Returns True when the booking was just cancelled, False otherwise.
+    """
+    if booking is None:
+        return False
+    now = now or timezone.now()
+    if (
+        booking.status == Booking.PENDING
+        and booking.payment_deadline
+        and booking.payment_deadline <= now
+    ):
+        booking.status = Booking.CANCELLED
+        booking.save(update_fields=['status', 'updated_at'])
+        return True
+    return False
 
 
 def is_time_overlap(start_1, end_1, start_2, end_2):
@@ -55,6 +128,39 @@ def _add_minutes(value, minutes):
 
 def _format_time(value):
     return value.strftime(TIME_BLOCK_FORMAT)
+
+
+def get_booking_start_datetime(booking_date, start_time):
+    if not booking_date or not start_time:
+        return None
+    naive_value = datetime.combine(booking_date, start_time)
+    return timezone.make_aware(naive_value, timezone.get_current_timezone())
+
+
+def is_booking_time_in_past(booking_date, start_time):
+    start_at = get_booking_start_datetime(booking_date, start_time)
+    return bool(start_at and start_at <= timezone.now())
+
+
+def validate_booking_not_in_past(booking_date, start_time):
+    if is_booking_time_in_past(booking_date, start_time):
+        raise ValidationError(BOOKING_PAST_SLOT_ERROR)
+
+
+def validate_bookable_field(field):
+    if not field:
+        raise ValidationError(BOOKING_FIELD_UNAVAILABLE_ERROR)
+
+    venue = getattr(field, 'venue', None)
+    field_status = (getattr(field, 'status', '') or '').upper()
+    venue_status = (getattr(venue, 'status', '') or '').upper()
+    if (
+        field_status != 'ACTIVE'
+        or not venue
+        or venue_status != 'ACTIVE'
+        or getattr(venue, 'is_deleted', False)
+    ):
+        raise ValidationError(BOOKING_FIELD_UNAVAILABLE_ERROR)
 
 
 def _resolve_operating_hours(field, booking_date):
@@ -124,9 +230,20 @@ def check_booking_slot_conflict(field, booking_date, start_time, end_time):
         booking__booking_date=booking_date,
         start_time__lt=end_time,
         end_time__gt=start_time,
-        booking__status__in=[Booking.PENDING, Booking.PAID, Booking.WAITING]
+        booking__status__in=ACTIVE_BOOKING_STATUSES,
     )
     return overlapping_slots.exists()
+
+
+def check_active_slot_lock_conflict(field, booking_date, start_time, end_time):
+    return SlotLock.objects.filter(
+        field=field,
+        booking_date=booking_date,
+        status=SlotLock.ACTIVE,
+        expires_at__gt=timezone.now(),
+        start_time__lt=end_time,
+        end_time__gt=start_time,
+    ).exists()
 
 
 def get_bookable_fields_queryset():
@@ -197,20 +314,31 @@ def get_unavailable_time_blocks(field, booking_date, time_blocks=None):
         BookingSlot.objects.filter(
             booking__field=field,
             booking__booking_date=booking_date,
-            booking__status__in=[Booking.PENDING, Booking.PAID, Booking.WAITING]
+            booking__status__in=ACTIVE_BOOKING_STATUSES,
         )
     )
 
-    # 2. Check Redis locked blocks
-    redis_client = get_redis_client()
-    pattern = f"booking_lock:field:{field.pk}:date:{booking_date.isoformat()}:block:*"
-    locked_keys = redis_client.keys(pattern)
+    # 2. Check DB-backed slot locks.
+    active_locks = list(
+        SlotLock.objects.filter(
+            field=field,
+            booking_date=booking_date,
+            status=SlotLock.ACTIVE,
+            expires_at__gt=timezone.now(),
+        )
+    )
+
+    # 3. Check Redis locked blocks when Redis is configured and reachable.
     locked_block_times = set()
-    for key in locked_keys:
-        # Extract HH:MM from key
-        # booking_lock:field:5:date:2026-05-29:block:07:30
-        block_time = key.split(':block:')[-1]
-        locked_block_times.add(block_time)
+    redis_client = _get_redis_client_or_none()
+    if redis_client:
+        pattern = f"booking_lock:field:{field.pk}:date:{booking_date.isoformat()}:block:*"
+        locked_keys = redis_client.keys(pattern)
+        for key in locked_keys:
+            # Extract HH:MM from key:
+            # booking_lock:field:5:date:2026-05-29:block:07:30
+            block_time = key.split(':block:')[-1]
+            locked_block_times.add(block_time)
 
     unavailable_blocks = []
     for block in blocks:
@@ -221,9 +349,13 @@ def get_unavailable_time_blocks(field, booking_date, time_blocks=None):
             is_time_overlap(slot.start_time, slot.end_time, block_start, block_end)
             for slot in booked_slots
         )
-        is_locked = block in locked_block_times
+        is_db_locked = any(
+            is_time_overlap(lock.start_time, lock.end_time, block_start, block_end)
+            for lock in active_locks
+        )
+        is_redis_locked = block in locked_block_times
 
-        if is_booked or is_locked:
+        if is_booked or is_db_locked or is_redis_locked:
             unavailable_blocks.append(block)
 
     return unavailable_blocks
@@ -232,13 +364,17 @@ def get_unavailable_time_blocks(field, booking_date, time_blocks=None):
 def is_time_range_available(field, booking_date, start_time, end_time):
     if check_booking_slot_conflict(field, booking_date, start_time, end_time):
         return False
+    if check_active_slot_lock_conflict(field, booking_date, start_time, end_time):
+        return False
         
     try:
         blocks = generate_time_blocks(start_time, end_time, TIME_BLOCK_INTERVAL_MINUTES)
     except ValidationError:
         return False
 
-    redis_client = get_redis_client()
+    redis_client = _get_redis_client_or_none()
+    if not redis_client:
+        return True
     for block in blocks:
         key = f"booking_lock:field:{field.pk}:date:{booking_date.isoformat()}:block:{block}"
         if redis_client.exists(key):
@@ -246,13 +382,69 @@ def is_time_range_available(field, booking_date, start_time, end_time):
     return True
 
 
+def get_booking_slot_options(field, booking_date, time_blocks=None, unavailable_blocks=None):
+    if not field or not booking_date:
+        return []
+
+    blocks = time_blocks or get_time_blocks_for_field_date(field, booking_date)
+    unavailable_set = set(
+        unavailable_blocks
+        if unavailable_blocks is not None
+        else get_unavailable_time_blocks(field, booking_date, blocks)
+    )
+    slot_options = []
+
+    for start_label, end_label in zip(blocks, blocks[1:]):
+        start_time = datetime.strptime(start_label, TIME_BLOCK_FORMAT).time()
+        end_time = datetime.strptime(end_label, TIME_BLOCK_FORMAT).time()
+        status = SLOT_STATUS_AVAILABLE
+        status_label = 'Còn trống'
+        price = None
+
+        if is_booking_time_in_past(booking_date, start_time):
+            status = SLOT_STATUS_PAST
+            status_label = 'Quá hạn'
+        elif check_booking_slot_conflict(field, booking_date, start_time, end_time):
+            status = SLOT_STATUS_BOOKED
+            status_label = 'Đã đặt'
+        elif check_active_slot_lock_conflict(field, booking_date, start_time, end_time):
+            status = SLOT_STATUS_LOCKED
+            status_label = 'Đang giữ'
+        elif start_label in unavailable_set:
+            status = SLOT_STATUS_LOCKED
+            status_label = 'Đang giữ'
+        else:
+            try:
+                price, _ = calculate_booking_price(field, booking_date, start_time, end_time)
+            except ValidationError:
+                status = SLOT_STATUS_NO_PRICE
+                status_label = 'Chưa có giá'
+
+        slot_options.append({
+            'start_label': start_label,
+            'end_label': end_label,
+            'start_time': start_time,
+            'end_time': end_time,
+            'status': status,
+            'status_label': status_label,
+            'is_bookable': status == SLOT_STATUS_AVAILABLE,
+            'price': price,
+        })
+
+    return slot_options
+
+
 def acquire_slot_lock(user, field, booking_date, start_time, end_time):
     """
     Acquire Redis locks for 30-min blocks.
     """
+    validate_bookable_field(field)
+    validate_booking_not_in_past(booking_date, start_time)
     validate_booking_time_range(start_time, end_time)
 
     if check_booking_slot_conflict(field, booking_date, start_time, end_time):
+        raise ValidationError(SLOT_CONFLICT_ERROR)
+    if check_active_slot_lock_conflict(field, booking_date, start_time, end_time):
         raise ValidationError(SLOT_CONFLICT_ERROR)
 
     blocks = generate_time_blocks(start_time, end_time, TIME_BLOCK_INTERVAL_MINUTES)
@@ -304,10 +496,12 @@ def release_slot_lock(lock_session_id):
     redis_client.delete(session_key)
 
 
-@transaction.atomic
-def confirm_booking_from_lock(
+def _normalize_price(price):
+    return Decimal(str(price)).quantize(MONEY_QUANTIZER, rounding=ROUND_HALF_UP)
+
+
+def _create_booking_records(
     user,
-    lock_session_id,
     field,
     booking_date,
     start_time,
@@ -316,24 +510,17 @@ def confirm_booking_from_lock(
     note='',
     service_quantities=None,
 ):
-    """
-    Confirm booking from a valid lock.
-    """
-    redis_client = get_redis_client()
-    session_key = f"lock_session:{lock_session_id}:keys"
-    keys = redis_client.smembers(session_key)
-    
-    if not keys:
-        raise ValidationError('Khung giờ giữ chỗ đã hết hạn hoặc không tồn tại. Vui lòng chọn lại.')
-    
-    # Re-check DB conflicts within transaction
     field = Field.objects.select_related('venue').select_for_update().get(pk=field.pk)
-    
+    validate_bookable_field(field)
+    validate_booking_not_in_past(booking_date, start_time)
+    validate_booking_time_range(start_time, end_time)
+
     if check_booking_slot_conflict(field, booking_date, start_time, end_time):
-        release_slot_lock(lock_session_id)
+        raise ValidationError(SLOT_CONFLICT_ERROR)
+    if check_active_slot_lock_conflict(field, booking_date, start_time, end_time):
         raise ValidationError(SLOT_CONFLICT_ERROR)
 
-    price = Decimal(str(price)).quantize(MONEY_QUANTIZER, rounding=ROUND_HALF_UP)
+    price = _normalize_price(price)
 
     package = BookingPackage(
         user=user,
@@ -352,6 +539,7 @@ def confirm_booking_from_lock(
         booking_channel=Booking.WEB,
         total_amount=price,
         note=note or '',
+        payment_deadline=get_payment_deadline(),
     )
     booking.full_clean()
     booking.save()
@@ -369,16 +557,100 @@ def confirm_booking_from_lock(
         from apps.services.services import add_services_to_booking
         add_services_to_booking(booking, service_quantities)
 
+    return booking
+
+
+@transaction.atomic
+def confirm_booking_from_lock(
+    user,
+    lock_session_id,
+    field,
+    booking_date,
+    start_time,
+    end_time,
+    price,
+    note='',
+    service_quantities=None,
+):
+    """
+    Confirm booking from a valid lock.
+    """
+    redis_client = get_redis_client()
+    session_key = f"lock_session:{lock_session_id}:keys"
+    keys = redis_client.smembers(session_key)
+
+    if not keys:
+        raise ValidationError('Khung giờ giữ chỗ đã hết hạn hoặc không tồn tại. Vui lòng chọn lại.')
+
+    # Re-check DB conflicts within transaction
+    field = Field.objects.select_related('venue').select_for_update().get(pk=field.pk)
+    validate_bookable_field(field)
+    validate_booking_not_in_past(booking_date, start_time)
+
+    if check_booking_slot_conflict(field, booking_date, start_time, end_time):
+        release_slot_lock(lock_session_id)
+        raise ValidationError(SLOT_CONFLICT_ERROR)
+    if check_active_slot_lock_conflict(field, booking_date, start_time, end_time):
+        release_slot_lock(lock_session_id)
+        raise ValidationError(SLOT_CONFLICT_ERROR)
+
+    booking = _create_booking_records(
+        user=user,
+        field=field,
+        booking_date=booking_date,
+        start_time=start_time,
+        end_time=end_time,
+        price=price,
+        note=note,
+        service_quantities=service_quantities,
+    )
+
     # Release lock
     release_slot_lock(lock_session_id)
 
     return booking
 
 
+@transaction.atomic
+def _create_booking_without_redis_lock(
+    user,
+    field,
+    booking_date,
+    start_time,
+    end_time,
+    price,
+    note='',
+    service_quantities=None,
+):
+    return _create_booking_records(
+        user=user,
+        field=field,
+        booking_date=booking_date,
+        start_time=start_time,
+        end_time=end_time,
+        price=price,
+        note=note,
+        service_quantities=service_quantities,
+    )
+
+
 # Keep create_booking to not break other things, but make it use the new flow
 @transaction.atomic
 def create_booking(user, field, booking_date, start_time, end_time, price, note='', service_quantities=None):
-    lock_session_id, _ = acquire_slot_lock(user, field, booking_date, start_time, end_time)
+    try:
+        lock_session_id, _ = acquire_slot_lock(user, field, booking_date, start_time, end_time)
+    except (ImproperlyConfigured, redis.exceptions.RedisError):
+        return _create_booking_without_redis_lock(
+            user,
+            field,
+            booking_date,
+            start_time,
+            end_time,
+            price,
+            note,
+            service_quantities=service_quantities,
+        )
+
     try:
         return confirm_booking_from_lock(
             user,

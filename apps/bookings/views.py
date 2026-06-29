@@ -20,7 +20,6 @@ from apps.venues.models import Field, Venue
 from .forms import BookingCreateForm
 from .models import Booking
 from .permissions import (
-    BOOKING_ACCESS_DENIED_MESSAGE,
     BOOKING_MANAGE_DENIED_MESSAGE,
     OwnerBookingRequiredMixin,
     StaffRequiredMixin,
@@ -30,7 +29,10 @@ from .permissions import (
 )
 from .services import (
     calculate_booking_price,
+    cancel_expired_booking_if_needed,
+    cancel_expired_pending_bookings,
     create_booking,
+    get_booking_slot_options,
     get_bookable_fields_queryset,
     get_time_blocks_for_field_date,
     get_unavailable_time_blocks,
@@ -38,6 +40,7 @@ from .services import (
 
 
 FIELD_ACTIVE_STATUS = getattr(Field, 'ACTIVE', 'ACTIVE')
+BOOKING_EXPIRED_MESSAGE = 'Đơn đặt sân đã quá hạn thanh toán và đã bị hủy.'
 
 
 def _is_ajax(request):
@@ -51,7 +54,7 @@ def _booking_detail_partial_context(booking, back_url=None):
         'booking_service_lock_message': booking.get_service_modification_block_message(),
         'can_cancel_booking': booking.can_cancel(),
         'cancel_block_message': booking.get_cancel_block_message(),
-        'can_pay_booking': booking.status == Booking.PENDING,
+        'can_pay_booking': booking.can_pay(),
         'back_url': back_url or reverse('bookings:booking_list'),
     }
 
@@ -103,6 +106,8 @@ class BookingListView(LoginRequiredMixin, ListView):
     context_object_name = 'bookings'
 
     def get_queryset(self):
+        # Auto-cancel expired pending holds before listing so statuses are fresh.
+        cancel_expired_pending_bookings()
         return get_booking_queryset_for_user(
             self.request.user,
             Booking.objects.select_related('venue', 'field', 'booking_package').prefetch_related(
@@ -123,9 +128,22 @@ class BookingHistoryListView(LoginRequiredMixin, ListView):
     context_object_name = 'bookings'
     login_url = reverse_lazy('accounts:login')
 
+    def _role_names(self):
+        if not hasattr(self, '_cached_role_names'):
+            self._cached_role_names = set(
+                UserRole.objects.filter(user=self.request.user).values_list('role__name', flat=True)
+            )
+        return self._cached_role_names
+
+    def _is_customer_scope(self):
+        privileged_roles = {'ADMIN', 'OWNER', 'STAFF'}
+        return not bool(self._role_names() & privileged_roles)
+
     def get_queryset(self):
+        # Auto-cancel expired pending holds so history shows the real status.
+        cancel_expired_pending_bookings()
         user = self.request.user
-        roles = UserRole.objects.filter(user=user).values_list('role__name', flat=True)
+        roles = self._role_names()
         queryset = (
             Booking.objects
             .select_related('booking_package__user', 'venue', 'field')
@@ -150,7 +168,7 @@ class BookingHistoryListView(LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
-        roles = UserRole.objects.filter(user=user).values_list('role__name', flat=True)
+        roles = self._role_names()
 
         if 'ADMIN' in roles:
             context['filter_venues'] = Venue.objects.filter(is_deleted=False)
@@ -167,6 +185,7 @@ class BookingHistoryListView(LoginRequiredMixin, ListView):
             context['page_title'] = 'Lịch sử cho thuê sân'
         else:
             context['page_title'] = 'Lịch sử thuê sân'
+        context['show_customer_booking_actions'] = self._is_customer_scope()
         return context
 
 
@@ -187,21 +206,18 @@ class BookingDetailView(LoginRequiredMixin, DetailView):
                 'services_ordered',
                 queryset=BookingService.objects.select_related('service_item'),
             ),
-        )
-
-    def get_object(self, queryset=None):
-        booking = get_object_or_404(queryset or self.get_queryset(), pk=self.kwargs[self.pk_url_kwarg])
-        if not can_manage_booking(self.request.user, booking):
-            raise PermissionDenied(BOOKING_ACCESS_DENIED_MESSAGE)
-        return booking
+        ).filter(booking_package__user=self.request.user)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        # Flip the booking to CANCELLED if its 10-minute hold has expired.
+        if cancel_expired_booking_if_needed(self.object):
+            messages.warning(self.request, BOOKING_EXPIRED_MESSAGE)
         context['can_edit_booking_services'] = self.object.can_modify_services()
         context['booking_service_lock_message'] = self.object.get_service_modification_block_message()
         context['can_cancel_booking'] = self.object.can_cancel()
         context['cancel_block_message'] = self.object.get_cancel_block_message()
-        context['can_pay_booking'] = self.object.status == Booking.PENDING
+        context['can_pay_booking'] = self.object.can_pay()
         context['back_url'] = reverse('bookings:booking_list')
         return context
 
@@ -226,6 +242,18 @@ class BookingCreateView(LoginRequiredMixin, FormView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
+        if self.request.method in ('POST', 'PUT'):
+            data = kwargs.get('data')
+            slot_value = data.get('slot') if data else None
+            if slot_value and (not data.get('start_time') or not data.get('end_time')):
+                try:
+                    start_time_value, end_time_value = slot_value.split('|', 1)
+                except ValueError:
+                    start_time_value, end_time_value = '', ''
+                mutable_data = data.copy()
+                mutable_data['start_time'] = start_time_value
+                mutable_data['end_time'] = end_time_value
+                kwargs['data'] = mutable_data
         kwargs['field_queryset'] = get_bookable_fields_queryset()
         return kwargs
 
@@ -258,6 +286,8 @@ class BookingCreateView(LoginRequiredMixin, FormView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        # Free up slots held by expired pending bookings before drawing the picker.
+        cancel_expired_pending_bookings()
         form = context['form']
         selected_field, selected_date = self._get_context_selection(form)
         time_blocks = get_time_blocks_for_field_date(selected_field, selected_date)
@@ -266,9 +296,17 @@ class BookingCreateView(LoginRequiredMixin, FormView):
             selected_date,
             time_blocks,
         )
+        slot_options = get_booking_slot_options(
+            selected_field,
+            selected_date,
+            time_blocks,
+            unavailable_blocks,
+        )
         context.update({
+            'bookable_fields': form.fields['field'].queryset,
             'time_blocks': time_blocks,
             'unavailable_blocks': unavailable_blocks,
+            'slot_options': slot_options,
             'selected_field': selected_field,
             'selected_date': selected_date,
         })
@@ -309,7 +347,7 @@ class BookingCreateView(LoginRequiredMixin, FormView):
                 form.add_error(None, message)
             return self.form_invalid(form)
 
-        messages.success(self.request, 'Booking created.')
+        messages.success(self.request, 'Đặt sân thành công. Vui lòng kiểm tra lịch sử đặt sân của bạn.')
         if self.request.headers.get('Accept') == 'application/json':
             return JsonResponse({'redirect_url': self.get_success_url()}, status=201)
         return redirect(self.get_success_url())
@@ -365,6 +403,8 @@ class BookingFieldServicesView(LoginRequiredMixin, View):
 
 class BookingAvailabilityView(LoginRequiredMixin, View):
     def get(self, request, *args, **kwargs):
+        # Cleanup expired pending holds so freed slots are reported as available.
+        cancel_expired_pending_bookings()
         selected_field = _get_field_from_value(
             request.GET.get('field_id') or request.GET.get('field'),
         )
@@ -676,3 +716,29 @@ class OwnerBookingDetailView(OwnerBookingRequiredMixin, DetailView):
         context['can_pay_booking'] = False
         context['back_url'] = reverse('bookings:owner_booking_list')
         return context
+
+
+class BookingCheckoutView(LoginRequiredMixin, DetailView):
+    model = Booking
+    template_name = 'bookings/booking_checkout.html'
+    context_object_name = 'booking'
+    pk_url_kwarg = 'booking_pk'
+
+    def get_queryset(self):
+        return Booking.objects.filter(booking_package__user=self.request.user)
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+
+        # Booking-side guard only: if the 10-minute hold expired, cancel the
+        # booking here and do NOT hand off to payments. The payments module is
+        # never modified or consulted for this check.
+        if cancel_expired_booking_if_needed(self.object):
+            messages.warning(request, BOOKING_EXPIRED_MESSAGE)
+            return redirect('bookings:booking_detail', pk=self.object.pk)
+
+        if not self.object.can_pay():
+            return redirect('bookings:booking_detail', pk=self.object.pk)
+
+        context = self.get_context_data(object=self.object)
+        return self.render_to_response(context)
