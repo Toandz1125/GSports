@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Thanh toán đặt sân{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="checkout-container" 
+         data-booking-id="{{ booking.id }}" 
+         data-total-amount="{{ booking.total_amount }}">
+        
+        <div class="checkout-header">
+            <h2><i class="fas fa-credit-card"></i> Thanh toán</h2>
+            <p>Mã đặt sân: {{ booking.id|slice:":8" }}</p>
+        </div>
+
+        <!-- Thông tin booking -->
+        <div class="booking-info">
+            <div class="info-row">
+                <span><i class="fas fa-map-marker-alt"></i> Sân</span>
+                <span>{{ booking.venue_name }}</span>
+            </div>
+            <div class="info-row">
+                <span><i class="fas fa-calendar"></i> Ngày đặt</span>
+                <span>{{ booking.booking_date|date:"d/m/Y" }}</span>
+            </div>
+            <div class="info-row">
+                <span><i class="fas fa-money-bill"></i> Tổng tiền</span>
+                <span>{{ booking.total_amount|floatformat:0 }}đ</span>
+            </div>
+            <div class="info-row">
+                <span><i class="fas fa-hand-holding"></i> Tiền cọc (30%)</span>
+                <span>{{ booking.deposit_amount|floatformat:0 }}đ</span>
+            </div>
+        </div>
+
+        <!-- Mã giảm giá -->
+        <div class="promo-section">
+            <div class="promo-input">
+                <input type="text" id="promoCode" placeholder="Nhập mã giảm giá">
+                <button onclick="applyPromo()" class="btn-apply">Áp dụng</button>
+            </div>
+            <div id="promoResult"></div>
+        </div>
+
+        <!-- Tổng cộng -->
+        <div class="total-section">
+            <div class="total-row">
+                <span>Tổng thanh toán</span>
+                <span id="finalAmount" class="total-amount">{{ booking.total_amount|floatformat:0 }}đ</span>
+            </div>
+            <div class="wallet-balance">
+                <i class="fas fa-wallet"></i>
+                Số dư ví: <strong>{{ wallet_balance|floatformat:0 }}đ</strong>
+                {% if wallet_balance >= booking.total_amount %}
+                <span class="badge-success">Đủ điều kiện</span>
+                {% else %}
+                <span class="badge-danger">Không đủ số dư</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Phương thức thanh toán -->
+        <div class="payment-methods">
+            <h4>Chọn phương thức thanh toán</h4>
+            
+            <div class="method-option" onclick="selectMethod(event, 'WALLET')">
+                <input type="radio" name="method" value="WALLET" id="methodWallet">
+                <label for="methodWallet">
+                    <i class="fas fa-wallet"></i>
+                    <div>
+                        <strong>Ví GSports</strong>
+                        <p>Thanh toán nhanh bằng số dư ví</p>
+                    </div>
+                </label>
+                {% if wallet_balance >= booking.total_amount %}
+                <span class="check-badge"><i class="fas fa-check-circle"></i> Khả dụng</span>
+                {% else %}
+                <span class="warning-badge">Số dư: {{ wallet_balance|floatformat:0 }}đ</span>
+                {% endif %}
+            </div>
+
+            <div class="method-option" onclick="selectMethod(event, 'VIETQR')">
+                <input type="radio" name="method" value="VIETQR" id="methodVietQR">
+                <label for="methodVietQR">
+                    <i class="fas fa-qrcode"></i>
+                    <div>
+                        <strong>VietQR</strong>
+                        <p>Quét mã QR để thanh toán</p>
+                    </div>
+                </label>
+            </div>
+
+            <div class="method-option" onclick="selectMethod(event, 'CASH')">
+                <input type="radio" name="method" value="CASH" id="methodCash">
+                <label for="methodCash">
+                    <i class="fas fa-money-bill-wave"></i>
+                    <div>
+                        <strong>Tiền mặt</strong>
+                        <p>Thanh toán tại sân</p>
+                    </div>
+                </label>
+            </div>
+        </div>
+
+        <!-- Nút thanh toán -->
+        <div class="checkout-actions">
+            <a href="/" class="btn-cancel">Hủy</a>
+            <button onclick="processPayment()" class="btn-confirm" id="confirmBtn">
+                <i class="fas fa-check"></i> Xác nhận thanh toán
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- CSRF Token -->
+<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+
+<!-- Load JavaScript -->
+<script src="{% static 'js/checkout.js' %}"></script>
+
+<script>
+    console.log('Trang checkout đã load!');
+    var container = document.querySelector('.checkout-container');
+    if (container) {
+        console.log('Booking ID:', container.getAttribute('data-booking-id'));
+        console.log('Total amount:', container.getAttribute('data-total-amount'));
+    } else {
+        console.log('Không tìm thấy container!');
+    }
+</script>
+{% endblock %}
