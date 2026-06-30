@@ -41,6 +41,28 @@ class Venue(models.Model):
     def __str__(self):
         return self.name
 
+    @property
+    def rating_avg(self):
+        avg_rating = self.reviews.aggregate(models.Avg('rating'))['rating__avg']
+        return round(avg_rating, 1) if avg_rating is not None else 0.0
+
+    @property
+    def reviews_count(self):
+        return self.reviews.count()
+
+    @property
+    def stars_list(self):
+        avg = self.rating_avg
+        stars = []
+        for i in range(1, 6):
+            if avg >= i:
+                stars.append('full')
+            elif avg >= i - 0.5:
+                stars.append('half')
+            else:
+                stars.append('empty')
+        return stars
+
 
 class VenueOperatingHour(models.Model):
     """Giờ hoạt động theo ngày trong tuần."""
