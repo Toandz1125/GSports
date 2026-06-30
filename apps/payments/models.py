@@ -7,7 +7,7 @@ class Wallet(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name='wallet'
+        related_name='payments_wallet'
     )
     balance = models.DecimalField(max_digits=12, decimal_places=0, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -72,7 +72,7 @@ class Payment(models.Model):
         CANCELLED = 'CANCELLED', 'Đã hủy'
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    booking = models.ForeignKey('core.MockBooking', on_delete=models.CASCADE, related_name='payments')
+    booking = models.ForeignKey('bookings.Booking', on_delete=models.CASCADE, related_name='payments')
     method = models.CharField(max_length=20, choices=Method.choices)
     payment_type = models.CharField(max_length=20, choices=PaymentType.choices)
     amount = models.DecimalField(max_digits=12, decimal_places=0)

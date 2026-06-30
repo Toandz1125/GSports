@@ -1,0 +1,60 @@
+{% load static %}
+
+<!-- ===== Chat Widget Container ===== -->
+<div id="chat-widget-container">
+
+    <!-- Chat Bubble (nút mở/đóng) -->
+    <button id="chat-bubble" type="button" aria-label="Mở chat">
+        <svg class="chat-bubble__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+        </svg>
+        <span id="chat-badge" class="chat-bubble__badge" style="display:none;">0</span>
+    </button>
+
+    <!-- Chat Panel -->
+    <div id="chat-panel" class="chat-panel chat-panel--hidden">
+
+        <!-- ── Panel Header ── -->
+        <div class="chat-header">
+            <button id="chat-back-btn" class="chat-header__back" style="display:none;" aria-label="Quay lại">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <h3 id="chat-header-title" class="chat-header__title">Tin nhắn</h3>
+            <button id="chat-close-btn" class="chat-header__close" aria-label="Đóng">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <!-- ── Room List View ── -->
+        <div id="chat-room-list" class="chat-room-list">
+            <div id="chat-room-list-content" class="chat-room-list__content">
+                <!-- Rooms sẽ được render bằng JS -->
+            </div>
+            <div id="chat-room-list-empty" class="chat-room-list__empty" style="display:none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="chat-room-list__empty-icon">
+                    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                </svg>
+                <p>Chưa có cuộc hội thoại nào</p>
+            </div>
+        </div>
+
+        <!-- ── Room View (chi tiết phòng chat) ── -->
+        <div id="chat-room-view" class="chat-room-view" style="display:none;">
+            <div id="chat-messages" class="chat-messages">
+                <!-- Tin nhắn sẽ được render bằng JS -->
+            </div>
+            <div class="chat-input">
+                <textarea id="chat-input-text" class="chat-input__textarea" placeholder="Nhập tin nhắn..." rows="1"></textarea>
+                <button id="chat-send-btn" class="chat-input__send" type="button" aria-label="Gửi">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                </button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Truyền user ID cho JS -->
+<script>
+    window.CHAT_USER_ID = {{ user.id }};
+</script>
