@@ -69,6 +69,13 @@
 
     {% endblock body %}
 
+    {% comment %} Chat Widget — chỉ hiện khi đã đăng nhập, đặt ngoài block body {% endcomment %}
+    {% if user.is_authenticated %}
+        <link rel="stylesheet" href="{% static 'css/chat_widget.css' %}">
+        {% include "chat/chat_widget.html" %}
+        <script src="{% static 'js/chat_widget.js' %}"></script>
+    {% endif %}
+
     {% block extra_js %}{% endblock %}
 
     <!-- Auto-dismiss toasts -->

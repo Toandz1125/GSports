@@ -27,6 +27,8 @@ urlpatterns = [
     path('', include('apps.accounts.urls')),
     path('co-so/', include('apps.venues.urls')),
     path('dat-san/', include('apps.bookings.urls')),
+    path('api/chat/', include('apps.chat.urls')),
+
     path('danh-gia/', include('apps.reviews.urls')),
 ]
 
