@@ -1,0 +1,65 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}Đăng ký sân mới | GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/gsports.css' %}">
+{% endblock %}
+
+{% block dashboard_content %}
+  <section class="page-heading">
+    <div>
+      <p class="eyebrow">Chủ sân</p>
+      <h1>Đăng ký sân mới</h1>
+      <p class="muted">Gửi yêu cầu đăng ký một cơ sở/sân mới. Yêu cầu sẽ được quản trị viên xem xét.</p>
+    </div>
+    <a class="btn btn--secondary" href="{% url 'bookings:owner_booking_list' %}">Quay lại</a>
+  </section>
+
+  <section class="edit-profile-card">
+    <h3 class="edit-profile-card__title">Đăng ký cơ sở mới</h3>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      
+      <div class="form-grid" style="margin-bottom: 1.5rem;">
+        <!-- Tên cơ sở -->
+        <div class="form-group {% if form.venue_name.errors %}form-group--error{% endif %}">
+          <label for="{{ form.venue_name.id_for_label }}">{{ form.venue_name.label }}</label>
+          {{ form.venue_name }}
+          {% if form.venue_name.errors %}
+            <div class="form-error">{% for e in form.venue_name.errors %}{{ e }}{% endfor %}</div>
+          {% endif %}
+        </div>
+
+        <!-- Địa chỉ -->
+        <div class="form-group {% if form.venue_address.errors %}form-group--error{% endif %}">
+          <label for="{{ form.venue_address.id_for_label }}">{{ form.venue_address.label }}</label>
+          {{ form.venue_address }}
+          {% if form.venue_address.errors %}
+            <div class="form-error">{% for e in form.venue_address.errors %}{{ e }}{% endfor %}</div>
+          {% endif %}
+        </div>
+
+        <!-- Ghi chú -->
+        <div class="form-group form-grid--full-width {% if form.venue_note.errors %}form-group--error{% endif %}">
+          <label for="{{ form.venue_note.id_for_label }}">{{ form.venue_note.label }}</label>
+          {{ form.venue_note }}
+          {% if form.venue_note.errors %}
+            <div class="form-error">{% for e in form.venue_note.errors %}{{ e }}{% endfor %}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      {% include "venues/_field_formset.html" %}
+      {% include "venues/_price_rule_formset.html" %}
+
+      <div class="edit-profile-card__actions">
+        <button type="submit" class="btn btn--primary">Gửi yêu cầu đăng ký</button>
+      </div>
+    </form>
+  </section>
+{% endblock %}
+

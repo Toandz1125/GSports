@@ -1,0 +1,315 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}Duyệt yêu cầu — GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .request-page {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+    }
+
+    .request-page__head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .request-page__head h1 {
+        color: var(--text-main);
+        font-size: 1.75rem;
+        font-weight: 800;
+        margin: 0;
+    }
+
+    .request-page__head p {
+        color: var(--text-muted);
+        margin-top: 0.35rem;
+        font-size: 0.9rem;
+    }
+
+    .request-filter,
+    .request-section {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 1.25rem;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .request-filter {
+        display: flex;
+        gap: 0.8rem;
+        align-items: flex-end;
+        flex-wrap: wrap;
+    }
+
+    .filter-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        min-width: 220px;
+    }
+
+    .filter-field label {
+        color: var(--text-muted);
+        font-size: 0.82rem;
+        font-weight: 700;
+    }
+
+    .filter-field select,
+    .reject-input {
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        background: var(--bg-main);
+        color: var(--text-main);
+        padding: 0.65rem 0.8rem;
+    }
+
+    .request-section__head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+    }
+
+    .request-section__head h2 {
+        color: var(--text-main);
+        font-size: 1.1rem;
+        font-weight: 800;
+        margin: 0;
+    }
+
+    .request-table-wrap {
+        overflow-x: auto;
+    }
+
+    .request-table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 960px;
+        font-size: 0.88rem;
+    }
+
+    .request-table th {
+        color: var(--text-muted);
+        text-transform: uppercase;
+        font-size: 0.72rem;
+        letter-spacing: 0.05em;
+        text-align: left;
+        padding: 0.75rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .request-table td {
+        color: var(--text-main);
+        padding: 0.8rem 0.75rem;
+        border-bottom: 1px solid var(--border-color);
+        vertical-align: top;
+    }
+
+    .request-table tr:last-child td {
+        border-bottom: 0;
+    }
+
+    .status-pill {
+        display: inline-flex;
+        border-radius: var(--radius-full);
+        padding: 0.18rem 0.55rem;
+        font-weight: 800;
+        font-size: 0.72rem;
+        background: rgba(148, 163, 184, 0.14);
+        color: var(--text-muted);
+    }
+
+    .status-pill--pending {
+        background: rgba(245, 158, 11, 0.15);
+        color: #f59e0b;
+    }
+
+    .status-pill--approved {
+        background: rgba(16, 185, 129, 0.15);
+        color: #10b981;
+    }
+
+    .status-pill--rejected {
+        background: rgba(239, 68, 68, 0.15);
+        color: #ef4444;
+    }
+
+    .request-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        min-width: 220px;
+    }
+
+    .reject-form {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.45rem;
+    }
+
+    .btn--secondary {
+        background: var(--bg-main);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+    }
+
+    .btn--danger {
+        background: #dc2626;
+        color: #fff;
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="request-page">
+    <section class="request-page__head">
+        <div>
+            <p class="eyebrow">Quản trị</p>
+            <h1>Duyệt yêu cầu</h1>
+            <p>Duyệt hoặc từ chối yêu cầu tạo cơ sở và tạo sân do owner gửi.</p>
+        </div>
+    </section>
+
+    <form method="get" class="request-filter">
+        <div class="filter-field">
+            <label for="status-filter">Trạng thái</label>
+            <select id="status-filter" name="status">
+                <option value="">Tất cả</option>
+                {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if active_status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn--primary">Lọc</button>
+        <a href="{% url 'venues:admin_request_list' %}" class="btn btn--secondary">Xóa lọc</a>
+    </form>
+
+    <section class="request-section">
+        <div class="request-section__head">
+            <h2>Yêu cầu tạo cơ sở</h2>
+            <span class="muted">{{ venue_requests|length }} yêu cầu</span>
+        </div>
+        <div class="request-table-wrap">
+            <table class="request-table">
+                <thead>
+                    <tr>
+                        <th>Người gửi</th>
+                        <th>Cơ sở</th>
+                        <th>Địa chỉ</th>
+                        <th>Ngày gửi</th>
+                        <th>Trạng thái</th>
+                        <th>Người duyệt</th>
+                        <th>Hành động</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in venue_requests %}
+                        <tr>
+                            <td>
+                                {{ item.owner_profile.business_name|default:"-" }}<br>
+                                <span class="muted">{{ item.requested_by.email }}</span>
+                            </td>
+                            <td>{{ item.venue_name }}</td>
+                            <td>{{ item.venue_address }}</td>
+                            <td>{{ item.created_at|date:"d/m/Y H:i" }}</td>
+                            <td><span class="status-pill status-pill--{{ item.status|lower }}">{{ item.get_status_display }}</span></td>
+                            <td>
+                                {{ item.reviewed_by.email|default:"-" }}<br>
+                                <span class="muted">{{ item.reviewed_at|date:"d/m/Y H:i"|default:"" }}</span>
+                            </td>
+                            <td>
+                                {% if item.status == 'PENDING' %}
+                                    <div class="request-actions">
+                                        <form method="post" action="{% url 'venues:admin_request_venue_approve' item.pk %}">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn--primary">Duyệt</button>
+                                        </form>
+                                        <form method="post" action="{% url 'venues:admin_request_venue_reject' item.pk %}" class="reject-form">
+                                            {% csrf_token %}
+                                            <input class="reject-input" type="text" name="admin_note" placeholder="Lý do từ chối" required>
+                                            <button type="submit" class="btn btn--danger">Từ chối</button>
+                                        </form>
+                                    </div>
+                                {% else %}
+                                    <span class="muted">Đã xử lý</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="7" class="muted">Không có yêu cầu tạo cơ sở.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="request-section">
+        <div class="request-section__head">
+            <h2>Yêu cầu tạo sân</h2>
+            <span class="muted">{{ field_requests|length }} yêu cầu</span>
+        </div>
+        <div class="request-table-wrap">
+            <table class="request-table">
+                <thead>
+                    <tr>
+                        <th>Người gửi</th>
+                        <th>Cơ sở</th>
+                        <th>Sân</th>
+                        <th>Loại sân</th>
+                        <th>Ngày gửi</th>
+                        <th>Trạng thái</th>
+                        <th>Hành động</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in field_requests %}
+                        <tr>
+                            <td>
+                                {{ item.owner.business_name }}<br>
+                                <span class="muted">{{ item.owner.user.email }}</span>
+                            </td>
+                            <td>{{ item.venue.name }}</td>
+                            <td>
+                                {{ item.name }}<br>
+                                <span class="muted">{{ item.surface_type|default:"-" }}</span>
+                            </td>
+                            <td>{{ item.field_type }}</td>
+                            <td>{{ item.created_at|date:"d/m/Y H:i" }}</td>
+                            <td><span class="status-pill status-pill--{{ item.status|lower }}">{{ item.get_status_display }}</span></td>
+                            <td>
+                                {% if item.status == 'PENDING' %}
+                                    <div class="request-actions">
+                                        <form method="post" action="{% url 'venues:admin_request_field_approve' item.pk %}">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn--primary">Duyệt</button>
+                                        </form>
+                                        <form method="post" action="{% url 'venues:admin_request_field_reject' item.pk %}" class="reject-form">
+                                            {% csrf_token %}
+                                            <input class="reject-input" type="text" name="reject_reason" placeholder="Lý do từ chối" required>
+                                            <button type="submit" class="btn btn--danger">Từ chối</button>
+                                        </form>
+                                    </div>
+                                {% else %}
+                                    <span class="muted">Đã xử lý</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="7" class="muted">Không có yêu cầu tạo sân.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}

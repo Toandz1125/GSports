@@ -35,8 +35,8 @@
             <div class="transaction-list">
                 {% for tx in transactions %}
                 <div class="transaction-item">
-                    <div class="tx-icon {% if tx.amount > 0 %}income{% else %}expense{% endif %}">
-                        <i class="fas {% if tx.transaction_type == 'DEPOSIT' %}fa-arrow-down{% elif tx.transaction_type == 'PAYMENT' %}fa-shopping-cart{% else %}fa-arrow-up{% endif %}"></i>
+                    <div class="tx-icon {% if tx.transaction_type == 'CREDIT' %}income{% else %}expense{% endif %}">
+                        <i class="fas {% if tx.transaction_type == 'CREDIT' %}fa-arrow-down{% else %}fa-shopping-cart{% endif %}"></i>
                     </div>
                     <div class="tx-info">
                         <div class="tx-title">{{ tx.description|default:tx.get_transaction_type_display }}</div>
@@ -45,8 +45,8 @@
                         <div class="tx-ref">Mã: {{ tx.reference_id|slice:":8" }}</div>
                         {% endif %}
                     </div>
-                    <div class="tx-amount {% if tx.amount > 0 %}text-success{% else %}text-danger{% endif %}">
-                        {{ tx.amount|floatformat:0 }}đ
+                    <div class="tx-amount {% if tx.transaction_type == 'CREDIT' %}text-success{% else %}text-danger{% endif %}">
+                        {% if tx.transaction_type == 'CREDIT' %}+{% else %}-{% endif %}{{ tx.final_amount|floatformat:0 }}đ
                     </div>
                     <div class="tx-status">
                         <span class="badge badge-{{ tx.status|lower }}">

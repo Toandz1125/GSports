@@ -1,7 +1,58 @@
-from datetime import date, time
+from datetime import date, time, timedelta
 from decimal import Decimal
 
-import fakeredis
+try:
+    import fakeredis
+except ModuleNotFoundError:
+    import fnmatch
+
+    class _FakeStrictRedis:
+        def __init__(self, *args, **kwargs):
+            self._values = {}
+            self._sets = {}
+
+        def set(self, key, value, nx=False, ex=None):
+            if nx and (key in self._values or key in self._sets):
+                return False
+            self._values[key] = value
+            return True
+
+        def keys(self, pattern):
+            keys = list(self._values.keys()) + list(self._sets.keys())
+            return [key for key in keys if fnmatch.fnmatch(key, pattern)]
+
+        def sadd(self, key, *values):
+            current = self._sets.setdefault(key, set())
+            before = len(current)
+            current.update(values)
+            return len(current) - before
+
+        def expire(self, key, seconds):
+            return key in self._values or key in self._sets
+
+        def smembers(self, key):
+            return set(self._sets.get(key, set()))
+
+        def delete(self, *keys):
+            deleted = 0
+            for key in keys:
+                if key in self._values:
+                    del self._values[key]
+                    deleted += 1
+                if key in self._sets:
+                    del self._sets[key]
+                    deleted += 1
+            return deleted
+
+        def exists(self, key):
+            return key in self._values or key in self._sets
+
+        def flushdb(self):
+            self._values.clear()
+            self._sets.clear()
+
+    class fakeredis:
+        FakeStrictRedis = _FakeStrictRedis
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -9,6 +60,7 @@ from django.core.exceptions import ValidationError
 from django.http import HttpResponse
 from django.test import TestCase, override_settings
 from django.urls import include, path, reverse
+from django.utils import timezone
 
 from apps.accounts.models import OwnerProfile, Role, UserRole
 from apps.bookings.models import Booking, BookingPackage, BookingSlot
@@ -100,6 +152,10 @@ class ScopedServiceTestCase(TestCase):
     pass
 
 
+def future_date(days=30):
+    return timezone.localdate() + timedelta(days=days)
+
+
 class BookingServiceItemTests(ScopedServiceTestCase):
     def setUp(self):
         self.redis_client = fakeredis.FakeStrictRedis(decode_responses=True)
@@ -149,7 +205,7 @@ class BookingServiceItemTests(ScopedServiceTestCase):
         self.booking = create_booking(
             user=self.customer,
             field=self.field,
-            booking_date=date(2026, 6, 2),
+            booking_date=future_date(30),
             start_time=time(9, 0),
             end_time=time(10, 0),
             price=Decimal('100000.00'),
@@ -157,13 +213,13 @@ class BookingServiceItemTests(ScopedServiceTestCase):
         other_package = BookingPackage.objects.create(
             user=self.other_customer,
             package_type=BookingPackage.SINGLE,
-            start_date=date(2026, 6, 3),
+            start_date=future_date(31),
         )
         self.other_booking = Booking.objects.create(
             booking_package=other_package,
             venue=self.venue,
             field=self.field,
-            booking_date=date(2026, 6, 3),
+            booking_date=future_date(31),
             status=Booking.PENDING,
             booking_channel=Booking.WEB,
             total_amount=Decimal('100000.00'),
@@ -817,3 +873,101 @@ class OwnerServiceItemCrudTests(ScopedServiceTestCase):
         self.assertFalse(payload['ok'])
         self.assertIn('errors', payload)
         self.assertFalse(ServiceItem.objects.exists())
+
+
+class OwnerServiceCreateRealTemplateTests(TestCase):
+    """Feature #6 — owner service management with the real templates/URLs.
+
+    Uses the project's real settings (no stub templates / scoped urlconf) so the
+    create button, list page and create form are exercised end to end through
+    ``config.urls`` (which now includes ``apps.services.urls``).
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.owner_role = Role.objects.create(name=Role.OWNER)
+        self.customer_role = Role.objects.create(name=Role.CUSTOMER)
+
+        self.owner_user = User.objects.create_user(
+            username='svc-real-owner', email='svc-real-owner@example.com', password='password',
+        )
+        UserRole.objects.create(user=self.owner_user, role=self.owner_role)
+        self.owner = OwnerProfile.objects.create(
+            user=self.owner_user, business_name='Real Owner', is_verified=True,
+        )
+
+        self.other_owner_user = User.objects.create_user(
+            username='svc-real-owner-b', email='svc-real-owner-b@example.com', password='password',
+        )
+        UserRole.objects.create(user=self.other_owner_user, role=self.owner_role)
+        self.other_owner = OwnerProfile.objects.create(
+            user=self.other_owner_user, business_name='Other Real Owner', is_verified=True,
+        )
+
+        self.customer = User.objects.create_user(
+            username='svc-real-customer', email='svc-real-customer@example.com', password='password',
+        )
+        UserRole.objects.create(user=self.customer, role=self.customer_role)
+
+        self.venue = Venue.objects.create(owner=self.owner, name='Real Venue', address='1 Real Street')
+        self.other_venue = Venue.objects.create(owner=self.other_owner, name='Other Real Venue', address='2 Real Street')
+
+    def _payload(self, **overrides):
+        payload = {
+            'venue': self.venue.pk,
+            'name': 'Fresh Juice',
+            'category': ServiceItem.DRINK,
+            'price': '15000',
+            'stock': '8',
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_owner_sees_create_button_on_list(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(reverse('services:owner_serviceitem_list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Thêm dịch vụ')
+        self.assertContains(response, f'href="{reverse("services:owner_serviceitem_create")}"')
+
+    def test_owner_create_form_page_renders(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(reverse('services:owner_serviceitem_create'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="name"')
+        self.assertContains(response, 'name="price"')
+
+    def test_owner_creates_service_for_own_venue(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.post(reverse('services:owner_serviceitem_create'), self._payload())
+        self.assertRedirects(response, reverse('services:owner_serviceitem_list'))
+        item = ServiceItem.objects.get(name='Fresh Juice')
+        self.assertEqual(item.venue, self.venue)
+        self.assertEqual(item.price, Decimal('15000'))
+
+    def test_owner_cannot_create_for_other_owner_venue(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.post(
+            reverse('services:owner_serviceitem_create'),
+            self._payload(venue=self.other_venue.pk),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(ServiceItem.objects.filter(name='Fresh Juice').exists())
+
+    def test_non_owner_cannot_access_owner_service_pages(self):
+        self.client.force_login(self.customer)
+        list_response = self.client.get(reverse('services:owner_serviceitem_list'))
+        create_response = self.client.post(reverse('services:owner_serviceitem_create'), self._payload())
+        self.assertEqual(list_response.status_code, 403)
+        self.assertEqual(create_response.status_code, 403)
+        self.assertFalse(ServiceItem.objects.exists())
+
+    def test_owner_list_shows_created_item(self):
+        ServiceItem.objects.create(
+            venue=self.venue, name='Sting', category=ServiceItem.DRINK,
+            price=Decimal('12000'), stock=5, is_active=True,
+        )
+        self.client.force_login(self.owner_user)
+        response = self.client.get(reverse('services:owner_serviceitem_list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Sting')

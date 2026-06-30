@@ -127,6 +127,13 @@ class LoginView(FormView):
     def form_valid(self, form):
         user = form.get_user()
         login(self.request, user)
+
+        # Xử lý Ghi nhớ đăng nhập
+        if form.cleaned_data.get('remember_me'):
+            self.request.session.set_expiry(1209600)  # 14 ngày
+        else:
+            self.request.session.set_expiry(0)  # Hết khi đóng trình duyệt
+
         messages.success(self.request, f'Chào mừng {user.username}!')
 
         # Redirect đến trang trước đó nếu có, ngược lại về dashboard
@@ -173,9 +180,10 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         context['page_title'] = 'Dashboard'
 
         # Lấy danh sách vai trò của user
-        context['user_roles'] = UserRole.objects.filter(
+        user_roles = list(UserRole.objects.filter(
             user=user,
-        ).select_related('role').values_list('role__name', flat=True)
+        ).select_related('role').values_list('role__name', flat=True))
+        context['user_roles'] = user_roles
 
         # Lấy thông tin ví
         try:
@@ -183,7 +191,139 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         except Wallet.DoesNotExist:
             context['wallet'] = None
 
+        # Import lazy để tránh circular imports
+        from apps.venues.models import Venue, Field
+        from apps.bookings.models import Booking
+        from django.db.models import Sum, Count
+        from django.utils import timezone
+        import datetime
+
+        today = timezone.localdate()
+
+        # ── ADMIN DASHBOARD ──────────────────────────────────────────
+        if 'ADMIN' in user_roles or user.is_superuser:
+            from .models import OwnerProfile, StaffProfile
+            context['admin_stats'] = {
+                'total_venues': Venue._base_manager.filter(is_deleted=False).count(),
+                'total_fields': Field.objects.filter(venue__is_deleted=False).count(),
+                'total_owners': OwnerProfile.objects.count(),
+                'total_staff': StaffProfile.objects.count(),
+                'total_customers': CustomerProfile.objects.count(),
+                'total_bookings': Booking.objects.count(),
+                'total_revenue': Booking.objects.filter(
+                    status=Booking.PAID
+                ).aggregate(total=Sum('total_amount'))['total'] or 0,
+                'active_fields': Field.objects.filter(
+                    venue__is_deleted=False, status='ACTIVE'
+                ).count(),
+                'maintenance_fields': Field.objects.filter(
+                    venue__is_deleted=False, status='MAINTENANCE'
+                ).count(),
+            }
+            # Dữ liệu đặt sân 30 ngày gần nhất cho biểu đồ
+            from datetime import timedelta
+            last_30_days = [today - timedelta(days=i) for i in range(29, -1, -1)]
+            bookings_by_day = {
+                str(b['booking_date']): b['count']
+                for b in Booking.objects.filter(
+                    booking_date__gte=last_30_days[0]
+                ).values('booking_date').annotate(count=Count('id'))
+            }
+            context['admin_chart_labels'] = [d.strftime('%d/%m') for d in last_30_days]
+            context['admin_chart_data'] = [bookings_by_day.get(str(d), 0) for d in last_30_days]
+
+        # ── OWNER DASHBOARD ──────────────────────────────────────────
+        elif 'OWNER' in user_roles:
+            try:
+                owner_profile = user.owner_profile
+                owner_venues = Venue.objects.filter(owner=owner_profile, is_deleted=False)
+                owner_venue_ids = list(owner_venues.values_list('id', flat=True))
+                owner_bookings = Booking.objects.filter(venue_id__in=owner_venue_ids)
+
+                from apps.services.models import BookingService
+                from django.db.models import Sum, Count
+                from datetime import timedelta
+
+                context['owner_stats'] = {
+                    'total_fields': Field.objects.filter(venue_id__in=owner_venue_ids).count(),
+                    'total_bookings': owner_bookings.count(),
+                    'total_revenue': owner_bookings.filter(
+                        status=Booking.PAID
+                    ).aggregate(total=Sum('total_amount'))['total'] or 0,
+                    'service_revenue': BookingService.objects.filter(
+                        booking__venue_id__in=owner_venue_ids
+                    ).aggregate(total=Sum('total_price'))['total'] or 0,
+                    'pending_bookings': owner_bookings.filter(status=Booking.PENDING).count(),
+                }
+                # Biểu đồ 30 ngày
+                last_30_days = [today - timedelta(days=i) for i in range(29, -1, -1)]
+                bookings_by_day = {
+                    str(b['booking_date']): b['count']
+                    for b in owner_bookings.filter(
+                        booking_date__gte=last_30_days[0]
+                    ).values('booking_date').annotate(count=Count('id'))
+                }
+                context['owner_chart_labels'] = [d.strftime('%d/%m') for d in last_30_days]
+                context['owner_chart_data'] = [bookings_by_day.get(str(d), 0) for d in last_30_days]
+                # Sân thuê nhiều nhất
+                context['top_fields'] = (
+                    Field.objects.filter(venue_id__in=owner_venue_ids)
+                    .annotate(booking_count=Count('bookings'))
+                    .order_by('-booking_count')[:5]
+                )
+            except Exception:
+                context['owner_stats'] = None
+
+        # ── STAFF DASHBOARD ──────────────────────────────────────────
+        elif 'STAFF' in user_roles:
+            try:
+                staff_profile = user.staff_profile
+                if staff_profile and staff_profile.owner:
+                    staff_venues = Venue.objects.filter(
+                        owner=staff_profile.owner, is_deleted=False
+                    )
+                    staff_venue_ids = list(staff_venues.values_list('id', flat=True))
+                    today_bookings = Booking.objects.filter(
+                        venue_id__in=staff_venue_ids, booking_date=today
+                    ).select_related('field', 'booking_package__user').order_by('field__name')
+                    context['staff_stats'] = {
+                        'today_bookings': today_bookings.count(),
+                        'active_fields': Field.objects.filter(
+                            venue_id__in=staff_venue_ids, status='ACTIVE'
+                        ).count(),
+                        'total_fields': Field.objects.filter(
+                            venue_id__in=staff_venue_ids
+                        ).count(),
+                    }
+                    context['staff_today_bookings'] = today_bookings[:10]
+            except Exception:
+                context['staff_stats'] = None
+
+        # ── CUSTOMER DASHBOARD ───────────────────────────────────────
+        elif 'CUSTOMER' in user_roles:
+            from apps.bookings.models import BookingPackage
+            customer_bookings = Booking.objects.filter(
+                booking_package__user=user
+            ).select_related('field', 'venue', 'booking_package')
+            upcoming = customer_bookings.filter(
+                booking_date__gte=today, status__in=[Booking.PENDING, Booking.PAID, Booking.WAITING]
+            ).order_by('booking_date')[:5]
+            recent = customer_bookings.order_by('-booking_date')[:5]
+
+            total_paid = customer_bookings.filter(
+                status=Booking.PAID
+            ).aggregate(total=Sum('total_amount'))['total'] or 0
+
+            context['customer_stats'] = {
+                'total_bookings': customer_bookings.count(),
+                'total_paid': total_paid,
+                'upcoming_count': upcoming.count(),
+            }
+            context['customer_upcoming_bookings'] = upcoming
+            context['customer_recent_bookings'] = recent
+
         return context
+
 
 
 # ---------------------------------------------------------------------------
@@ -868,4 +1008,33 @@ class AdminUserDeleteView(AdminRequiredMixin, View):
 
         messages.success(request, f'Đã xóa tài khoản {email} vĩnh viễn.')
         return redirect('accounts:admin_user_list')
+
+
+from django.template.loader import render_to_string
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST, require_GET
+from .models import Notification
+
+@login_required
+@require_GET
+def notification_summary(request):
+    notifications = request.user.notifications.all().order_by('-created_at')[:10]
+    unread_count = request.user.notifications.filter(is_read=False).count()
+    html = render_to_string('accounts/partials/_notification_list.html', {
+        'notifications': notifications
+    }, request=request)
+    return JsonResponse({
+        'unread_count': unread_count,
+        'html': html,
+    })
+
+@login_required
+@require_POST
+def notification_mark_read(request):
+    request.user.notifications.filter(is_read=False).update(is_read=True)
+    return JsonResponse({
+        'unread_count': 0
+    })
+
 

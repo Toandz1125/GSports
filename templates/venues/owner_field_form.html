@@ -1,0 +1,238 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }} — GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .field-request {
+        max-width: 980px;
+        margin: 0 auto;
+    }
+
+    .field-request__head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 1.5rem;
+    }
+
+    .field-request__head h1 {
+        margin: 0;
+        color: var(--text-main);
+        font-size: 1.75rem;
+        font-weight: 800;
+    }
+
+    .field-request__head p {
+        color: var(--text-muted);
+        margin-top: 0.35rem;
+        font-size: 0.9rem;
+    }
+
+    .field-request__card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 1.75rem;
+        box-shadow: var(--shadow-sm);
+        margin-bottom: 1rem;
+    }
+
+    .field-request__card h2 {
+        color: var(--text-main);
+        font-size: 1.05rem;
+        margin: 0 0 1rem;
+        font-weight: 800;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    @media (min-width: 760px) {
+        .form-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .form-grid--wide {
+            grid-column: 1 / -1;
+        }
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+    }
+
+    .form-group label {
+        color: var(--text-muted);
+        font-size: 0.84rem;
+        font-weight: 700;
+    }
+
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        background: var(--bg-main);
+        color: var(--text-main);
+        padding: 0.75rem 0.9rem;
+        font-size: 0.9rem;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: var(--primary-500);
+    }
+
+    .form-error {
+        color: var(--error-500);
+        font-size: 0.78rem;
+    }
+
+    .pricing-mode {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .pricing-mode label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        color: var(--text-main);
+        border: 1px solid var(--border-color);
+        background: var(--bg-main);
+        border-radius: var(--radius-md);
+        padding: 0.65rem 0.85rem;
+    }
+
+    .price-rule-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.8rem;
+    }
+
+    @media (min-width: 900px) {
+        .price-rule-grid {
+            grid-template-columns: 0.9fr 0.8fr 0.8fr 1fr 0.7fr;
+        }
+    }
+
+    .price-rule-row {
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 1rem;
+        background: var(--bg-main);
+        margin-bottom: 0.75rem;
+    }
+
+    .field-request__actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .btn--secondary {
+        background: var(--bg-main);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="field-request">
+    <div class="field-request__head">
+        <div>
+            <p class="eyebrow">{{ eyebrow }}</p>
+            <h1>{{ page_title }}</h1>
+            <p>{{ venue.name }} · {{ venue.address }}</p>
+        </div>
+        <a href="{{ back_url }}" class="btn btn--secondary">Quay lại</a>
+    </div>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+
+        <div class="field-request__card">
+            <h2>Thông tin sân</h2>
+            {% if form.non_field_errors %}
+                <div class="form-group">
+                    {% for error in form.non_field_errors %}
+                        <span class="form-error">{{ error }}</span>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            <div class="form-grid">
+                {% for field in form %}
+                    <div class="form-group {% if field.name == 'name' or field.name == 'surface_type' %}form-grid--wide{% endif %}">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% for error in field.errors %}
+                            <span class="form-error">{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="field-request__card">
+            <h2>Bảng giá gửi kèm</h2>
+            {% if pricing_form.non_field_errors %}
+                {% for error in pricing_form.non_field_errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            {% endif %}
+            <div class="form-group">
+                <label>{{ pricing_form.pricing_mode.label }}</label>
+                <div class="pricing-mode">{{ pricing_form.pricing_mode }}</div>
+                {% for error in pricing_form.pricing_mode.errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            </div>
+
+            {{ price_rule_formset.management_form }}
+            {% if price_rule_formset.non_form_errors %}
+                {% for error in price_rule_formset.non_form_errors %}
+                    <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            {% endif %}
+
+            {% for rule_form in price_rule_formset %}
+                <div class="price-rule-row">
+                    {{ rule_form.id }}
+                    <div class="price-rule-grid">
+                        {% for field in rule_form.visible_fields %}
+                            <div class="form-group">
+                                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                {{ field }}
+                                {% for error in field.errors %}
+                                    <span class="form-error">{{ error }}</span>
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="field-request__actions">
+            <a href="{{ back_url }}" class="btn btn--secondary">Hủy</a>
+            <button type="submit" class="btn btn--primary">{{ submit_label }}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

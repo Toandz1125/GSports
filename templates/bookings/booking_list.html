@@ -1,0 +1,107 @@
+{% extends 'accounts/dashboard.html' %}
+
+{% block title %}Booking của tôi — GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .booking-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .booking-list__header {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .booking-list__header h1 {
+        font-size: 1.5rem;
+        font-weight: 800;
+        margin: 0;
+    }
+
+    .booking-table-wrap {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        overflow-x: auto;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .booking-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+    }
+
+    .booking-table th,
+    .booking-table td {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        text-align: left;
+        vertical-align: middle;
+    }
+
+    .booking-table th {
+        color: var(--text-muted);
+        background: var(--bg-main);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="booking-list">
+    <div class="booking-list__header">
+        <div>
+            <h1>Booking của tôi</h1>
+            <p class="text-muted">Theo dõi các lượt đặt sân đã tạo.</p>
+        </div>
+        <a href="{% url 'bookings:booking_create' %}" class="btn btn--primary">Đặt sân</a>
+    </div>
+
+    <div class="booking-table-wrap">
+        <table class="booking-table">
+            <thead>
+                <tr>
+                    <th>Cơ sở</th>
+                    <th>Sân</th>
+                    <th>Ngày</th>
+                    <th>Giờ</th>
+                    <th>Tổng tiền</th>
+                    <th>Trạng thái</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for booking in bookings %}
+                <tr>
+                    <td>{{ booking.venue.name }}</td>
+                    <td>{{ booking.field.name }}</td>
+                    <td>{{ booking.booking_date|date:"d/m/Y" }}</td>
+                    <td>
+                        {% for slot in booking.slots.all %}
+                        <span>{{ slot.start_time|time:"H:i" }}-{{ slot.end_time|time:"H:i" }}</span>{% if not forloop.last %}, {% endif %}
+                        {% empty %}—{% endfor %}
+                    </td>
+                    <td>{{ booking.total_amount|floatformat:0 }}đ</td>
+                    <td>{{ booking.get_status_display }}</td>
+                    <td><a href="{% url 'bookings:booking_detail' booking.pk %}">Chi tiết</a></td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" style="text-align:center;padding:2rem;color:var(--text-muted);">Bạn chưa có booking nào.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

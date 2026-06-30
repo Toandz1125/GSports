@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('core', '0001_initial'),
+        ('bookings', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
@@ -31,6 +31,9 @@ class Migration(migrations.Migration):
                 ('used_quantity', models.PositiveIntegerField(default=0)),
                 ('is_active', models.BooleanField(default=True)),
             ],
+            options={
+                'db_table': 'promotion',
+            },
         ),
         migrations.CreateModel(
             name='Payment',
@@ -38,14 +41,34 @@ class Migration(migrations.Migration):
                 ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
                 ('method', models.CharField(choices=[('WALLET', 'Ví điện tử'), ('CASH', 'Tiền mặt'), ('VIETQR', 'VietQR')], max_length=20)),
                 ('payment_type', models.CharField(choices=[('DEPOSIT', 'Đặt cọc'), ('FINAL', 'Thanh toán cuối'), ('REFUND', 'Hoàn tiền')], max_length=20)),
-                ('amount', models.DecimalField(decimal_places=0, max_digits=12)),
-                ('status', models.CharField(choices=[('PENDING', 'Chờ xử lý'), ('PAID', 'Đã thanh toán'), ('FAILED', 'Thất bại'), ('CANCELLED', 'Đã hủy')], default='PENDING', max_length=20)),
+                ('amount', models.DecimalField(decimal_places=2, max_digits=12)),
+                ('status', models.CharField(choices=[('PENDING', 'Chờ xử lý'), ('PAID', 'Đã thanh toán'), ('COMPLETED', 'Hoàn thành'), ('FAILED', 'Thất bại'), ('CANCELLED', 'Đã hủy')], default='PENDING', max_length=20)),
                 ('transaction_code', models.CharField(blank=True, max_length=100, null=True, unique=True)),
                 ('paid_at', models.DateTimeField(blank=True, null=True)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
-                ('booking', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='payments', to='core.mockbooking')),
+                ('booking', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='payments', to='bookings.booking')),
             ],
+            options={
+                'db_table': 'payment',
+            },
+        ),
+        migrations.CreateModel(
+            name='Invoice',
+            fields=[
+                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
+                ('invoice_code', models.CharField(max_length=50, unique=True)),
+                ('subtotal_amount', models.DecimalField(decimal_places=2, default=0, max_digits=12)),
+                ('tax_amount', models.DecimalField(decimal_places=2, default=0, max_digits=12)),
+                ('total_amount', models.DecimalField(decimal_places=2, default=0, max_digits=12)),
+                ('issued_at', models.DateTimeField(auto_now_add=True)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('updated_at', models.DateTimeField(auto_now=True)),
+                ('payment', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='invoice', to='payments.payment')),
+            ],
+            options={
+                'db_table': 'invoice',
+            },
         ),
         migrations.CreateModel(
             name='Wallet',
@@ -54,7 +77,7 @@ class Migration(migrations.Migration):
                 ('balance', models.DecimalField(decimal_places=0, default=0, max_digits=12)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
-                ('user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='wallet', to=settings.AUTH_USER_MODEL)),
+                ('user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='payment_wallet', to=settings.AUTH_USER_MODEL)),
             ],
         ),
         migrations.CreateModel(

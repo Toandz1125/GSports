@@ -2,3 +2,9 @@ gsports_env/
 db.sqlserver/
 media/
 __pycache__/
+planning.md
+myenv
+runserver.err.log
+runserver.out.log
+runserver8001.err.log
+runserver8001.out.log

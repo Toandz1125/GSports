@@ -30,6 +30,16 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    <!-- Global SVG Definitions -->
+    <svg style="position: absolute; width: 0; height: 0; overflow: hidden;" version="1.1" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <linearGradient id="half-star-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="50%" stop-color="#f59e0b"></stop>
+                <stop offset="50%" stop-color="var(--border-color)"></stop>
+            </linearGradient>
+        </defs>
+    </svg>
+
     {% block body %}
 
     <!-- ===== Messages Toast ===== -->

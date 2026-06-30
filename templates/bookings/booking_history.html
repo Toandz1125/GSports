@@ -207,6 +207,84 @@
         font-weight: 700;
         color: var(--primary-600);
     }
+
+    .booking-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        min-width: 150px;
+    }
+
+    .booking-action-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 34px;
+        padding: 0.45rem 0.75rem;
+        border-radius: var(--radius-md);
+        font-size: 0.8rem;
+        font-weight: 700;
+        text-decoration: none;
+        transition: all var(--transition-fast);
+        white-space: nowrap;
+    }
+
+    .booking-action-link--detail {
+        color: var(--text-main);
+        background: transparent;
+        border: 1px solid var(--border-color);
+    }
+
+    .booking-action-link--detail:hover {
+        border-color: var(--text-muted);
+        background: var(--bg-body);
+    }
+
+    .booking-action-link--pay {
+        color: #fff;
+        background: var(--primary-600);
+        border: 1px solid var(--primary-600);
+    }
+
+    .booking-action-link--pay:hover {
+        background: var(--primary-500);
+        border-color: var(--primary-500);
+    }
+
+    .booking-action-link--invoice {
+        color: var(--success-600, #059669);
+        background: rgba(16, 185, 129, 0.12);
+        border: 1px solid var(--success-600, #059669);
+    }
+
+    .booking-action-link--invoice:hover {
+        color: #fff;
+        background: var(--success-600, #059669);
+    }
+
+    .booking-action-cancel-form {
+        margin: 0;
+        display: inline-flex;
+    }
+
+    .booking-action-link--cancel {
+        cursor: pointer;
+        color: var(--error-500, #ef4444);
+        background: transparent;
+        border: 1px solid var(--error-500, #ef4444);
+        font-family: inherit;
+    }
+
+    .booking-action-link--cancel:hover {
+        color: #fff;
+        background: var(--error-500, #ef4444);
+    }
+
+    /* Clickable rows (progressive enhancement; the action links are the no-JS fallback) */
+    .booking-table tbody tr[data-target-url] {
+        cursor: pointer;
+    }
 </style>
 {% endblock %}
 
@@ -224,7 +302,8 @@
         <!-- Search bar (live filter) -->
         <div class="live-filter-group">
             <label for="booking-search">Tìm kiếm</label>
-            <input type="text" id="booking-search" class="live-filter-input" placeholder="Tìm tên, email, cơ sở, sân...">
+            <input type="text" id="booking-search" class="live-filter-input"
+                placeholder="Tìm tên, email, cơ sở, sân...">
         </div>
 
         <!-- Venue filter dropdown (if context provides) -->
@@ -265,7 +344,10 @@
         </div>
 
         <button class="btn-clear-filter" onclick="clearBookingFilters()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                style="width:14px;height:14px;">
+                <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
             Xoá bộ lọc
         </button>
     </div>
@@ -284,18 +366,15 @@
                     <th>Giờ đặt</th>
                     <th>Tổng tiền</th>
                     <th>Trạng thái</th>
+                    <th>Hành động</th>
                 </tr>
             </thead>
             <tbody id="booking-tbody">
                 {% for booking in bookings %}
-                <tr 
-                    data-venue="{{ booking.venue.name|lower }}"
-                    data-field="{{ booking.field.name|lower }}"
+                <tr data-venue="{{ booking.venue.name|lower }}" data-field="{{ booking.field.name|lower }}"
                     data-email="{{ booking.booking_package.user.email|lower }}"
                     data-name="{% if booking.booking_package.user.first_name or booking.booking_package.user.last_name %}{{ booking.booking_package.user.first_name|lower }} {{ booking.booking_package.user.last_name|lower }}{% endif %}"
-                    data-date="{{ booking.booking_date|date:'Y-m-d' }}"
-                    data-status="{{ booking.status|lower }}"
-                >
+                    data-date="{{ booking.booking_date|date:'Y-m-d' }}" data-status="{{ booking.status|lower }}"{% if booking.history_target_url %} data-target-url="{{ booking.history_target_url }}"{% endif %}>
                     <td>
                         <div class="venue-info">
                             <span class="venue-info__name">{{ booking.venue.name }}</span>
@@ -314,14 +393,46 @@
                         <span class="time-badge">{{ slot.start_time|time:"H:i" }}-{{ slot.end_time|time:"H:i" }}</span>
                         {% empty %}—{% endfor %}
                     </td>
-                    <td class="font-semibold" style="color: var(--text-main);">{{ booking.total_amount|floatformat:0 }} VNĐ</td>
+                    <td class="font-semibold" style="color: var(--text-main);">{{ booking.total_amount|floatformat:0 }}
+                        VNĐ</td>
                     <td>
                         <span class="status-badge status-badge--{{ booking.status|lower }}">{{ booking.get_status_display }}</span>
+                    </td>
+                    <td>
+                        {% if booking.history_action_type != 'none' or booking.history_can_cancel %}
+                        <div class="booking-actions" data-booking-actions>
+                            {% if booking.history_action_type == 'pay' %}
+                            <a href="{{ booking.history_action_url }}"
+                                class="booking-action-link booking-action-link--pay">{{ booking.history_action_label }}</a>
+                            {% elif booking.history_action_type == 'invoice' %}
+                            <a href="{{ booking.history_action_url }}"
+                                class="booking-action-link booking-action-link--invoice">{{ booking.history_action_label }}</a>
+                            {% elif booking.history_action_type == 'detail' %}
+                            <a href="{{ booking.history_action_url }}"
+                                class="booking-action-link booking-action-link--detail">{{ booking.history_action_label }}</a>
+                            {% endif %}
+                            {% if booking.history_detail_url and booking.history_action_type != 'detail' %}
+                            <a href="{{ booking.history_detail_url }}"
+                                class="booking-action-link booking-action-link--detail">Chi tiết</a>
+                            {% endif %}
+                            {% if booking.history_can_cancel %}
+                            <form method="post" action="{% url 'bookings:booking_cancel' booking.pk %}"
+                                class="booking-action-cancel-form"
+                                onsubmit="return confirm('Bạn có chắc muốn hủy lượt đặt sân này?');">
+                                {% csrf_token %}
+                                <button type="submit"
+                                    class="booking-action-link booking-action-link--cancel">Hủy</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        —
+                        {% endif %}
                     </td>
                 </tr>
                 {% empty %}
                 <tr class="no-results-row">
-                    <td colspan="6" style="text-align: center; padding: 3rem 1rem;">
+                    <td colspan="7" style="text-align: center; padding: 3rem 1rem;">
                         Chưa có lịch sử đặt sân nào.
                     </td>
                 </tr>
@@ -332,91 +443,103 @@
 </div>
 
 <script>
-(function () {
-    const searchEl   = document.getElementById('booking-search');
-    const venueEl    = document.getElementById('booking-venue');
-    const statusEl   = document.getElementById('booking-status');
-    const dateFromEl = document.getElementById('booking-date-from');
-    const dateToEl   = document.getElementById('booking-date-to');
-    const tbody      = document.getElementById('booking-tbody');
-    const countEl    = document.getElementById('booking-filter-count');
+    (function () {
+        const searchEl = document.getElementById('booking-search');
+        const venueEl = document.getElementById('booking-venue');
+        const statusEl = document.getElementById('booking-status');
+        const dateFromEl = document.getElementById('booking-date-from');
+        const dateToEl = document.getElementById('booking-date-to');
+        const tbody = document.getElementById('booking-tbody');
+        const countEl = document.getElementById('booking-filter-count');
 
-    if (!tbody) return;
+        if (!tbody) return;
 
-    const allRows = Array.from(tbody.querySelectorAll('tr:not(.no-results-row)'));
-    let noResultsRow = tbody.querySelector('tr.no-results-row');
+        const allRows = Array.from(tbody.querySelectorAll('tr:not(.no-results-row)'));
+        let noResultsRow = tbody.querySelector('tr.no-results-row');
 
-    if (!noResultsRow) {
-        noResultsRow = document.createElement('tr');
-        noResultsRow.className = 'no-results-row';
-        noResultsRow.innerHTML = `<td colspan="6" style="text-align:center;padding:2rem;color:var(--text-muted);">Không tìm thấy đặt lịch phù hợp.</td>`;
-        tbody.appendChild(noResultsRow);
-        noResultsRow.style.display = 'none';
-    }
-
-    function doFilter() {
-        const q        = searchEl.value.trim().toLowerCase();
-        const venueQ   = venueEl ? venueEl.value.toLowerCase() : '';
-        const statusQ  = statusEl.value.toLowerCase();
-        const dateFrom = dateFromEl.value ? dateFromEl.value : '';
-        const dateTo   = dateToEl.value   ? dateToEl.value   : '';
-
-        let visibleCount = 0;
-
-        allRows.forEach(row => {
-            const venue  = (row.dataset.venue || '').toLowerCase();
-            const field  = (row.dataset.field || '').toLowerCase();
-            const email  = (row.dataset.email || '').toLowerCase();
-            const name   = (row.dataset.name  || '').toLowerCase();
-            const date   = (row.dataset.date   || '');
-            const status = (row.dataset.status || '').toLowerCase();
-
-            // Search: matches venue, field, email, or name
-            const searchMatch = !q || [venue, field, email, name].some(f => f.includes(q));
-
-            // Venue filter
-            const venueMatch = !venueQ || venue.includes(venueQ);
-
-            // Status filter
-            const statusMatch = !statusQ || status === statusQ;
-
-            // Date range filter
-            const dateFromMatch = !dateFrom || date >= dateFrom;
-            const dateToMatch   = !dateTo   || date <= dateTo;
-
-            const show = searchMatch && venueMatch && statusMatch && dateFromMatch && dateToMatch;
-            row.classList.toggle('row-hidden', !show);
-            if (show) visibleCount++;
-        });
-
-        // Update counts
-        if (countEl) {
-            const total = allRows.length;
-            if (q || venueQ || statusQ || dateFrom || dateTo) {
-                countEl.innerHTML = `<span class="filter-count-num">${visibleCount}</span> / ${total} đặt lịch`;
-            } else {
-                countEl.textContent = '';
-            }
+        if (!noResultsRow) {
+            noResultsRow = document.createElement('tr');
+            noResultsRow.className = 'no-results-row';
+            noResultsRow.innerHTML = `<td colspan="7" style="text-align:center;padding:2rem;color:var(--text-muted);">Không tìm thấy đặt lịch phù hợp.</td>`;
+            tbody.appendChild(noResultsRow);
+            noResultsRow.style.display = 'none';
         }
 
-        // Show/hide no-results
-        noResultsRow.style.display = visibleCount === 0 ? '' : 'none';
-    }
+        function doFilter() {
+            const q = searchEl.value.trim().toLowerCase();
+            const venueQ = venueEl ? venueEl.value.toLowerCase() : '';
+            const statusQ = statusEl.value.toLowerCase();
+            const dateFrom = dateFromEl.value ? dateFromEl.value : '';
+            const dateTo = dateToEl.value ? dateToEl.value : '';
 
-    [searchEl, venueEl, statusEl, dateFromEl, dateToEl].forEach(el => {
-        if (!el) return;
-        el.addEventListener('input', doFilter);
-        el.addEventListener('change', doFilter);
-    });
+            let visibleCount = 0;
 
-    window.clearBookingFilters = function () {
-        if (searchEl) searchEl.value = '';
-        if (venueEl) venueEl.value = '';
-        if (statusEl) statusEl.value = '';
-        if (dateFromEl) dateFromEl.value = '';
-        if (dateToEl) dateToEl.value = '';
-        doFilter();
-    };
-})();
+            allRows.forEach(row => {
+                const venue = (row.dataset.venue || '').toLowerCase();
+                const field = (row.dataset.field || '').toLowerCase();
+                const email = (row.dataset.email || '').toLowerCase();
+                const name = (row.dataset.name || '').toLowerCase();
+                const date = (row.dataset.date || '');
+                const status = (row.dataset.status || '').toLowerCase();
+
+                // Search: matches venue, field, email, or name
+                const searchMatch = !q || [venue, field, email, name].some(f => f.includes(q));
+
+                // Venue filter
+                const venueMatch = !venueQ || venue.includes(venueQ);
+
+                // Status filter
+                const statusMatch = !statusQ || status === statusQ;
+
+                // Date range filter
+                const dateFromMatch = !dateFrom || date >= dateFrom;
+                const dateToMatch = !dateTo || date <= dateTo;
+
+                const show = searchMatch && venueMatch && statusMatch && dateFromMatch && dateToMatch;
+                row.classList.toggle('row-hidden', !show);
+                if (show) visibleCount++;
+            });
+
+            // Update counts
+            if (countEl) {
+                const total = allRows.length;
+                if (q || venueQ || statusQ || dateFrom || dateTo) {
+                    countEl.innerHTML = `<span class="filter-count-num">${visibleCount}</span> / ${total} đặt lịch`;
+                } else {
+                    countEl.textContent = '';
+                }
+            }
+
+            // Show/hide no-results
+            noResultsRow.style.display = visibleCount === 0 ? '' : 'none';
+        }
+
+        [searchEl, venueEl, statusEl, dateFromEl, dateToEl].forEach(el => {
+            if (!el) return;
+            el.addEventListener('input', doFilter);
+            el.addEventListener('change', doFilter);
+        });
+
+        window.clearBookingFilters = function () {
+            if (searchEl) searchEl.value = '';
+            if (venueEl) venueEl.value = '';
+            if (statusEl) statusEl.value = '';
+            if (dateFromEl) dateFromEl.value = '';
+            if (dateToEl) dateToEl.value = '';
+            doFilter();
+        };
+
+        // Row click -> the row's primary target (checkout for payable, invoice for
+        // paid, otherwise detail). Scoped to this table only. Ignores clicks on
+        // interactive elements so the action controls keep their own behaviour;
+        // the visible action links are the no-JS fallback.
+        tbody.addEventListener('click', function (event) {
+            const row = event.target.closest('tr[data-target-url]');
+            if (!row || !tbody.contains(row)) return;
+            if (event.target.closest('a, button, form, input, select, textarea, label')) return;
+            const url = row.getAttribute('data-target-url');
+            if (url) window.location.href = url;
+        });
+    })();
 </script>
 {% endblock %}

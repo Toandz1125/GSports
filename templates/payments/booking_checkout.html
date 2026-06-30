@@ -1,0 +1,286 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}Thanh toán booking — GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .checkout-page {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+    }
+
+    .checkout-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .checkout-header h1 {
+        color: var(--text-main);
+        font-size: 1.5rem;
+        font-weight: 800;
+        margin: 0;
+    }
+
+    .checkout-header p {
+        color: var(--text-muted);
+        font-size: 0.875rem;
+        margin: 0.25rem 0 0;
+        overflow-wrap: anywhere;
+    }
+
+    .checkout-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    @media (min-width: 900px) {
+        .checkout-grid {
+            grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+        }
+    }
+
+    .checkout-panel {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+        padding: 1.25rem;
+    }
+
+    .checkout-panel h2 {
+        color: var(--text-main);
+        font-size: 1rem;
+        margin: 0 0 1rem;
+    }
+
+    .checkout-list {
+        display: grid;
+        gap: 0.75rem;
+    }
+
+    .checkout-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 0.75rem;
+        color: var(--text-main);
+    }
+
+    .checkout-row span {
+        color: var(--text-muted);
+    }
+
+    .checkout-row strong {
+        text-align: right;
+    }
+
+    .checkout-total {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-top: 1rem;
+        color: var(--text-main);
+        font-size: 1.1rem;
+        font-weight: 800;
+    }
+
+    .checkout-countdown {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        margin-top: 1rem;
+        padding-top: 0.85rem;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .checkout-countdown__label,
+    .checkout-help {
+        color: var(--text-muted);
+        font-size: 0.82rem;
+    }
+
+    .booking-countdown {
+        color: var(--primary-600);
+        font-weight: 800;
+        font-size: 1.05rem;
+    }
+
+    .checkout-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 1.25rem;
+    }
+
+    .checkout-status {
+        border-radius: var(--radius-md);
+        padding: 0.65rem 0.85rem;
+        font-weight: 700;
+        font-size: 0.9rem;
+    }
+
+    .checkout-status--paid {
+        background: rgba(16, 185, 129, 0.12);
+        color: var(--success-600, #059669);
+    }
+
+    .checkout-status--blocked {
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--error-500);
+    }
+
+    .checkout-status--pending {
+        background: rgba(245, 158, 11, 0.12);
+        color: #d97706;
+    }
+
+    .wallet-ok {
+        color: var(--success-600, #059669);
+    }
+
+    .wallet-low {
+        color: var(--error-500);
+    }
+
+    .checkout-actions .btn[disabled] {
+        cursor: not-allowed;
+        opacity: 0.55;
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="checkout-page">
+    <div class="checkout-header">
+        <div>
+            <h1>Thanh toán booking</h1>
+            <p>Booking ID: {{ booking.id }}</p>
+        </div>
+        <a href="{% url 'bookings:booking_detail' booking.pk %}" class="btn btn--secondary">Quay lại chi tiết booking</a>
+    </div>
+
+    <div class="checkout-grid">
+        <section class="checkout-panel">
+            <h2>Thông tin đặt sân</h2>
+            <div class="checkout-list">
+                <div class="checkout-row">
+                    <span>Cơ sở</span>
+                    <strong>{{ booking.venue.name }}</strong>
+                </div>
+                <div class="checkout-row">
+                    <span>Sân</span>
+                    <strong>{{ booking.field.name }}</strong>
+                </div>
+                <div class="checkout-row">
+                    <span>Ngày đặt</span>
+                    <strong>{{ booking.booking_date|date:"d/m/Y" }}</strong>
+                </div>
+                <div class="checkout-row">
+                    <span>Khung giờ</span>
+                    <strong>
+                        {% for slot in booking.slots.all %}
+                        {{ slot.start_time|time:"H:i" }}-{{ slot.end_time|time:"H:i" }}{% if not forloop.last %}, {% endif %}
+                        {% empty %}—{% endfor %}
+                    </strong>
+                </div>
+                <div class="checkout-row">
+                    <span>Trạng thái</span>
+                    <strong data-booking-status-label>
+                        {% if booking.status == 'PENDING' %}Chờ thanh toán{% elif booking.status == 'PAID' %}Đã thanh toán{% elif booking.status == 'CANCELLED' %}Đã huỷ{% else %}{{ booking.get_status_display }}{% endif %}
+                    </strong>
+                </div>
+                {% if booking.payment_deadline %}
+                <div class="checkout-row">
+                    <span>Hạn thanh toán</span>
+                    <strong>{{ booking.payment_deadline|date:"d/m/Y H:i" }}</strong>
+                </div>
+                {% endif %}
+            </div>
+        </section>
+
+        <aside class="checkout-panel">
+            <h2>Thanh toán bằng ví</h2>
+            <div class="checkout-list">
+                <div class="checkout-row">
+                    <span>Tiền sân</span>
+                    <strong>{{ booking.court_total|floatformat:0 }}đ</strong>
+                </div>
+                <div class="checkout-row">
+                    <span>Tiền dịch vụ</span>
+                    <strong>{{ booking.service_total|floatformat:0 }}đ</strong>
+                </div>
+                <div class="checkout-row">
+                    <span>Số dư ví hiện tại</span>
+                    <strong class="{% if has_sufficient_balance %}wallet-ok{% else %}wallet-low{% endif %}">
+                        {{ wallet_balance|floatformat:0 }}đ
+                    </strong>
+                </div>
+                <div class="checkout-row">
+                    <span>Số dư sau thanh toán</span>
+                    <strong>
+                        {% if has_sufficient_balance %}
+                        {{ balance_after_payment|floatformat:0 }}đ
+                        {% else %}
+                        Không đủ số dư
+                        {% endif %}
+                    </strong>
+                </div>
+            </div>
+
+            <div class="checkout-total">
+                <span>Tổng tiền phải thanh toán</span>
+                <strong>{{ booking.grand_total|floatformat:0 }}đ</strong>
+            </div>
+
+            {% if can_pay_booking and booking.payment_deadline %}
+            <div class="checkout-countdown">
+                <span class="checkout-countdown__label">Thời gian còn lại để thanh toán</span>
+                <strong class="booking-countdown" data-booking-countdown
+                        data-countdown-deadline="{{ booking.payment_deadline|date:'c' }}"
+                        data-booking-status-url="{% url 'bookings:booking_status' booking.pk %}">
+                    Còn --:-- để thanh toán
+                </strong>
+            </div>
+            {% endif %}
+
+            <div class="checkout-actions">
+                {% if booking.status == 'PAID' %}
+                <div class="checkout-status checkout-status--paid">Booking đã thanh toán</div>
+                <a href="{% url 'payments:booking_invoice' booking.pk %}" class="btn btn--secondary">Xem hóa đơn</a>
+                {% elif booking.status == 'CANCELLED' %}
+                <div class="checkout-status checkout-status--blocked">Booking đã bị huỷ{% if payment_expired %} do quá hạn thanh toán{% endif %}</div>
+                {% elif not can_pay_booking %}
+                <div class="checkout-status checkout-status--blocked">Booking hiện không thể thanh toán</div>
+                {% else %}
+                <form method="post" action="{% url 'payments:booking_checkout' booking.pk %}" data-payment-action>
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="wallet_pay">
+                    <button type="submit" class="btn btn--primary" {% if not has_sufficient_balance %}disabled aria-disabled="true"{% endif %}>
+                        Thanh toán bằng ví
+                    </button>
+                </form>
+                {% if not has_sufficient_balance %}
+                <div class="checkout-status checkout-status--blocked">Số dư ví không đủ</div>
+                {% else %}
+                <div class="checkout-status checkout-status--pending">Sẵn sàng thanh toán</div>
+                {% endif %}
+                {% endif %}
+            </div>
+            <p class="checkout-help">CASH/VIETQR chỉ được xác nhận bởi nhân viên hoặc chủ sân qua luồng riêng.</p>
+        </aside>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script src="{% static 'js/booking-time-blocks.js' %}"></script>
+{% endblock %}

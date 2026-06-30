@@ -1,0 +1,161 @@
+<style>
+    .booking-detail-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+        padding: 1.5rem;
+    }
+
+    .booking-detail-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    @media (min-width: 900px) {
+        .booking-detail-grid {
+            grid-template-columns: 1.2fr 0.8fr;
+        }
+    }
+
+    .booking-info-list {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+
+    @media (min-width: 640px) {
+        .booking-info-list {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+
+    .booking-info-item {
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 0.85rem;
+        background: var(--bg-main);
+    }
+
+    .booking-info-item span {
+        display: block;
+        color: var(--text-muted);
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.2rem;
+    }
+
+    .booking-info-item strong {
+        color: var(--text-main);
+        font-size: 0.95rem;
+    }
+
+    .booking-detail-actions {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-top: 1.25rem;
+    }
+
+    .booking-service-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+        margin-top: 0.75rem;
+    }
+
+    .booking-service-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 0.6rem;
+        font-size: 0.875rem;
+    }
+
+    .booking-countdown {
+        color: var(--primary-600);
+        font-weight: 800;
+    }
+</style>
+
+<div class="booking-detail-grid">
+    <section class="booking-detail-card">
+        <div class="booking-info-list">
+            <div class="booking-info-item">
+                <span>Cơ sở</span>
+                <strong>{{ booking.venue.name }}</strong>
+            </div>
+            <div class="booking-info-item">
+                <span>Sân</span>
+                <strong>{{ booking.field.name }}</strong>
+            </div>
+            <div class="booking-info-item">
+                <span>Ngày đặt</span>
+                <strong>{{ booking.booking_date|date:"d/m/Y" }}</strong>
+            </div>
+            <div class="booking-info-item">
+                <span>Trạng thái</span>
+                <strong data-booking-status-label>{{ booking.get_status_display }}</strong>
+            </div>
+            {% if can_pay_booking and booking.payment_deadline %}
+            <div class="booking-info-item">
+                <span>Thời hạn thanh toán</span>
+                <strong class="booking-countdown" data-booking-countdown data-countdown-deadline="{{ booking.payment_deadline|date:'c' }}" data-booking-status-url="{% url 'bookings:booking_status' booking.pk %}">
+                    Còn --:-- để thanh toán
+                </strong>
+            </div>
+            {% endif %}
+            <div class="booking-info-item">
+                <span>Khung giờ</span>
+                <strong>
+                    {% for slot in booking.slots.all %}{{ slot.start_time|time:"H:i" }}-{{ slot.end_time|time:"H:i" }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}
+                </strong>
+            </div>
+            <div class="booking-info-item">
+                <span>Tiền sân</span>
+                <strong>{{ booking.court_total|floatformat:0 }}đ</strong>
+            </div>
+            <div class="booking-info-item">
+                <span>Dịch vụ</span>
+                <strong>{{ booking.service_total|floatformat:0 }}đ</strong>
+            </div>
+            <div class="booking-info-item">
+                <span>Tổng tiền</span>
+                <strong>{{ booking.grand_total|floatformat:0 }}đ</strong>
+            </div>
+        </div>
+
+        <div class="booking-detail-actions">
+            {% if can_pay_booking and booking.booking_package.user_id == request.user.id %}
+            <a href="{% url 'payments:booking_checkout' booking.pk %}" class="btn btn--primary" data-payment-action>Thanh toán</a>
+            {% endif %}
+            {% if booking.status == 'PAID' %}
+            <a href="{% url 'payments:booking_invoice' booking.pk %}" class="btn btn--secondary">Xem hóa đơn</a>
+            {% endif %}
+            {% if can_cancel_booking %}
+            <form method="post" action="{% url 'bookings:booking_cancel' booking.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn--danger">Hủy booking</button>
+            </form>
+            {% endif %}
+        </div>
+    </section>
+
+    <aside class="booking-detail-card">
+        <h2 style="font-size:1rem;margin:0 0 0.75rem 0;">Dịch vụ kèm theo</h2>
+        <div class="booking-service-list">
+            {% for service in booking.services_ordered.all %}
+            <div class="booking-service-row">
+                <span>{{ service.service_item.name }} x{{ service.quantity }}</span>
+                <strong>{{ service.total_price|floatformat:0 }}đ</strong>
+            </div>
+            {% empty %}
+            <p style="color:var(--text-muted);font-size:0.875rem;">Chưa có dịch vụ.</p>
+            {% endfor %}
+        </div>
+    </aside>
+</div>

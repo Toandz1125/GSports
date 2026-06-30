@@ -29,7 +29,11 @@ urlpatterns = [
 
     # --- Mật khẩu ---
     path('doi-mat-khau/',     views.ChangePasswordView.as_view(),    name='change_password'),
-# Trigger reload
+
+    # --- Thông báo ---
+    path('notifications/summary/', views.notification_summary, name='notification_summary'),
+    path('notifications/mark-read/', views.notification_mark_read, name='notification_mark_read'),
+
     # --- Duyệt đăng ký chủ sân (Admin) ---
     path('owner-request/<int:pk>/approve/', views.AdminApproveOwnerView.as_view(), name='admin_approve_owner'),
     path('owner-request/<int:pk>/reject/',  views.AdminRejectOwnerView.as_view(),  name='admin_reject_owner'),

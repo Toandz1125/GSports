@@ -29,6 +29,24 @@ def can_manage_owner_bookings(user):
 
 
 @register.filter
+def can_manage_owner_venues(user):
+    """True for users allowed into owner venue management."""
+    return user_has_role(user, Role.OWNER) and not is_admin(user)
+
+
+@register.filter
 def can_manage_owner_services(user):
     """True for OWNER role users; admin-facing accounts should not see owner service menu."""
     return user_has_role(user, Role.OWNER) and not is_admin(user)
+
+
+@register.filter
+def can_manage_venue_requests(user):
+    """True for ADMIN (or superuser): may see venue registration requests."""
+    return is_admin(user)
+
+
+@register.filter
+def can_manage_all_venues(user):
+    """True for ADMIN (or superuser): may manage all venues."""
+    return is_admin(user)

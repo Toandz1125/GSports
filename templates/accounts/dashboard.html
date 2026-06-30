@@ -1,5 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load booking_nav %}
+
 
 {% block title %}Dashboard — GSports{% endblock %}
 
@@ -46,15 +48,28 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
                 <span>Dashboard</span>
             </a>
+
+            <a href="{% url 'bookings:booking_create' %}" class="sidebar__link {% if request.resolver_match.app_name == 'bookings' and request.resolver_match.url_name == 'booking_create' %}sidebar__link--active{% endif %}" id="nav-booking-create">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h8M8 18h5"/></svg>
+                <span>Đặt sân</span>
+            </a>
             
-            {% if user.owner_profile %}
-            <a href="{% url 'venues:venue_list' %}" class="sidebar__link {% if request.resolver_match.app_name == 'venues' %}sidebar__link--active{% endif %}" id="nav-venues">
+            {% if user|can_manage_owner_venues %}
+            <a href="{% url 'venues:owner_venue_list' %}" class="sidebar__link {% if request.resolver_match.app_name == 'venues' and request.resolver_match.url_name in 'owner_venue_list owner_venue_create owner_field_list owner_field_create owner_price_rule_list owner_price_rule_create' %}sidebar__link--active{% endif %}" id="nav-venues">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
                 <span>Quản lý cơ sở</span>
             </a>
+            {% endif %}
+
+            {% if user.owner_profile %}
             <a href="{% url 'accounts:staff_list' %}" class="sidebar__link {% if request.resolver_match.url_name in 'staff_list staff_create staff_edit' %}sidebar__link--active{% endif %}" id="nav-staff-list">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                 <span>Quản lý nhân viên</span>
+            </a>
+            {% else %}
+            <a href="{% url 'venues:venue_list' %}" class="sidebar__link {% if request.resolver_match.app_name == 'venues' %}sidebar__link--active{% endif %}" id="nav-venues">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                <span>Tìm sân thể thao</span>
             </a>
             {% endif %}
 
@@ -65,16 +80,45 @@
             </a>
             {% endif %}
 
+            {% if user|can_manage_venue_requests %}
+            <a href="{% url 'venues:admin_request_list' %}" class="sidebar__link {% if request.resolver_match.app_name == 'venues' and request.resolver_match.url_name in 'admin_request_list admin_request_venue_approve admin_request_venue_reject admin_request_field_approve admin_request_field_reject admin_venue_request_list' %}sidebar__link--active{% endif %}" id="nav-admin-venue-requests">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <span>Duyệt yêu cầu</span>
+            </a>
+            {% endif %}
 
+            {% if user|can_manage_all_venues %}
+            <a href="{% url 'venues:admin_venue_list' %}" class="sidebar__link {% if request.resolver_match.app_name == 'venues' and request.resolver_match.url_name == 'admin_venue_list' %}sidebar__link--active{% endif %}" id="nav-admin-venues">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                <span>Quản lý tất cả cơ sở</span>
+            </a>
+            {% endif %}
+
+            {% if not request.user.is_admin %}
             <a href="{% url 'bookings:booking_history' %}" class="sidebar__link {% if request.resolver_match.url_name == 'booking_history' %}sidebar__link--active{% endif %}" id="nav-bookings">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                 <span>{% if user.owner_profile or user.staff_profile %}Lịch sử cho thuê sân{% else %}Lịch sử thuê sân{% endif %}</span>
             </a>
+            {% endif %}
 
             <a href="{% url 'accounts:profile' %}" class="sidebar__link {% if request.resolver_match.url_name == 'profile' %}sidebar__link--active{% endif %}" id="nav-profile">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 <span>Hồ sơ</span>
             </a>
+
+            <!-- Sân yêu thích Groupbox -->
+            {% if request.user.is_authenticated %}
+            <div class="sidebar__favorites-group" style="padding: 1.25rem 1rem 0.5rem; border-top: 1px solid var(--border-color); margin-top: 1.25rem;">
+                <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <svg viewBox="0 0 24 24" fill="currentColor" style="width: 14px; height: 14px; color: var(--error-500);"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                    <span>Sân yêu thích</span>
+                </div>
+                <div id="sidebar-favorites-list" style="display: flex; flex-direction: column; gap: 0.25rem; max-height: 200px; overflow-y: auto;">
+                    <span style="font-size: 0.8rem; color: var(--text-muted); padding-left: 0.25rem; font-style: italic;">Đang tải...</span>
+                </div>
+            </div>
+            {% endif %}
 
         </nav>
 
@@ -172,7 +216,10 @@
         <!-- Content area -->
         <div class="dashboard__content">
             {% block dashboard_content %}
-            <!-- Welcome -->
+
+            <!-- ══════════════════════════════════════════════════
+                 Welcome Banner
+            ══════════════════════════════════════════════════ -->
             <div class="welcome-banner">
                 <div class="welcome-banner__text">
                     <h1>Xin chào, <strong>{% if user.first_name or user.last_name %}{{ user.first_name }} {{ user.last_name }}{% else %}{{ user.username }}{% endif %}</strong>! 👋</h1>
@@ -180,7 +227,302 @@
                 </div>
             </div>
 
-            <!-- Stats cards -->
+            {% if admin_stats %}
+            <!-- ══════════════════════════════════════════════════
+                 ADMIN DASHBOARD
+            ══════════════════════════════════════════════════ -->
+            <div class="stats-grid stats-grid--admin">
+                <div class="stat-card" id="stat-venues">
+                    <div class="stat-card__icon stat-card__icon--blue">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    </div>
+                    <div class="stat-card__info">
+                        <span class="stat-card__label">Tổng cơ sở</span>
+                        <span class="stat-card__value">{{ admin_stats.total_venues }}</span>
+                    </div>
+                </div>
+                <div class="stat-card" id="stat-fields">
+                    <div class="stat-card__icon stat-card__icon--green">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3H8l-2 4h12z"/></svg>
+                    </div>
+                    <div class="stat-card__info">
+                        <span class="stat-card__label">Tổng số sân</span>
+                        <span class="stat-card__value">{{ admin_stats.total_fields }}</span>
+                    </div>
+                </div>
+                <div class="stat-card" id="stat-owners">
+                    <div class="stat-card__icon stat-card__icon--purple">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.58-7 8-7s8 3 8 7"/></svg>
+                    </div>
+                    <div class="stat-card__info">
+                        <span class="stat-card__label">Chủ sân (Owner)</span>
+                        <span class="stat-card__value">{{ admin_stats.total_owners }}</span>
+                    </div>
+                </div>
+                <div class="stat-card" id="stat-staff">
+                    <div class="stat-card__icon stat-card__icon--orange">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    </div>
+                    <div class="stat-card__info">
+                        <span class="stat-card__label">Nhân viên (Staff)</span>
+                        <span class="stat-card__value">{{ admin_stats.total_staff }}</span>
+                    </div>
+                </div>
+                <div class="stat-card" id="stat-customers">
+                    <div class="stat-card__icon stat-card__icon--blue">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </div>
+                    <div class="stat-card__info">
+                        <span class="stat-card__label">Khách hàng</span>
+                        <span class="stat-card__value">{{ admin_stats.total_customers }}</span>
+                    </div>
+                </div>
+                <div class="stat-card" id="stat-bookings">
+                    <div class="stat-card__icon stat-card__icon--green">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                    </div>
+                    <div class="stat-card__info">
+                        <span class="stat-card__label">Tổng lượt đặt</span>
+                        <span class="stat-card__value">{{ admin_stats.total_bookings }}</span>
+                    </div>
+                </div>
+                <div class="stat-card" id="stat-revenue">
+                    <div class="stat-card__icon stat-card__icon--purple">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
+                    </div>
+                    <div class="stat-card__info">
+                        <span class="stat-card__label">Tổng doanh thu (PAID)</span>
+                        <span class="stat-card__value" style="font-size:1.1rem;">{{ admin_stats.total_revenue|floatformat:0 }} đ</span>
+                    </div>
+                </div>
+                <div class="stat-card" id="stat-active-fields">
+                    <div class="stat-card__icon stat-card__icon--green">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    </div>
+                    <div class="stat-card__info">
+                        <span class="stat-card__label">Sân đang hoạt động</span>
+                        <span class="stat-card__value">{{ admin_stats.active_fields }}</span>
+                    </div>
+                </div>
+                <div class="stat-card" id="stat-maintenance">
+                    <div class="stat-card__icon stat-card__icon--orange">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+                    </div>
+                    <div class="stat-card__info">
+                        <span class="stat-card__label">Sân bảo trì</span>
+                        <span class="stat-card__value">{{ admin_stats.maintenance_fields }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Biểu đồ Admin -->
+            <div class="detail-card" style="margin-top:1.5rem;">
+                <h2 style="margin-bottom:1rem;">Lượt đặt sân 30 ngày gần nhất</h2>
+                <div style="position:relative;height:280px;">
+                    <canvas id="adminBookingChart"></canvas>
+                </div>
+            </div>
+
+            {% elif owner_stats %}
+            <!-- ══════════════════════════════════════════════════
+                 OWNER DASHBOARD
+            ══════════════════════════════════════════════════ -->
+            <div class="stats-grid">
+                <div class="stat-card" id="stat-owner-fields">
+                    <div class="stat-card__icon stat-card__icon--blue">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3H8l-2 4h12z"/></svg>
+                    </div>
+                    <div class="stat-card__info">
+                        <span class="stat-card__label">Số sân</span>
+                        <span class="stat-card__value">{{ owner_stats.total_fields }}</span>
+                    </div>
+                </div>
+                <div class="stat-card" id="stat-owner-bookings">
+                    <div class="stat-card__icon stat-card__icon--green">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                    </div>
+                    <div class="stat-card__info">
+                        <span class="stat-card__label">Tổng lượt đặt</span>
+                        <span class="stat-card__value">{{ owner_stats.total_bookings }}</span>
+                    </div>
+                </div>
+                <div class="stat-card" id="stat-owner-revenue">
+                    <div class="stat-card__icon stat-card__icon--purple">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
+                    </div>
+                    <div class="stat-card__info">
+                        <span class="stat-card__label">Doanh thu sân</span>
+                        <span class="stat-card__value" style="font-size:1rem;">{{ owner_stats.total_revenue|floatformat:0 }} đ</span>
+                    </div>
+                </div>
+                <div class="stat-card" id="stat-owner-service-revenue">
+                    <div class="stat-card__icon stat-card__icon--orange">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                    </div>
+                    <div class="stat-card__info">
+                        <span class="stat-card__label">Doanh thu dịch vụ</span>
+                        <span class="stat-card__value" style="font-size:1rem;">{{ owner_stats.service_revenue|floatformat:0 }} đ</span>
+                    </div>
+                </div>
+                <div class="stat-card" id="stat-owner-pending">
+                    <div class="stat-card__icon stat-card__icon--blue">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                    <div class="stat-card__info">
+                        <span class="stat-card__label">Chờ xác nhận</span>
+                        <span class="stat-card__value">{{ owner_stats.pending_bookings }}</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Biểu đồ Owner -->
+            <div class="detail-card" style="margin-top:1.5rem;">
+                <h2 style="margin-bottom:1rem;">Lượt đặt sân 30 ngày gần nhất</h2>
+                <div style="position:relative;height:250px;">
+                    <canvas id="ownerBookingChart"></canvas>
+                </div>
+            </div>
+            {% if top_fields %}
+            <div class="detail-card" style="margin-top:1rem;">
+                <h2 style="margin-bottom:1rem;">Sân được thuê nhiều nhất</h2>
+                <table class="data-table">
+                    <thead><tr><th>Tên sân</th><th>Lượt đặt</th></tr></thead>
+                    <tbody>
+                    {% for f in top_fields %}
+                    <tr><td>{{ f.name }}</td><td>{{ f.booking_count }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+
+            {% elif staff_stats %}
+            <!-- ══════════════════════════════════════════════════
+                 STAFF DASHBOARD
+            ══════════════════════════════════════════════════ -->
+            <div class="stats-grid">
+                <div class="stat-card" id="stat-staff-today">
+                    <div class="stat-card__icon stat-card__icon--blue">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                    </div>
+                    <div class="stat-card__info">
+                        <span class="stat-card__label">Lượt đặt hôm nay</span>
+                        <span class="stat-card__value">{{ staff_stats.today_bookings }}</span>
+                    </div>
+                </div>
+                <div class="stat-card" id="stat-staff-active">
+                    <div class="stat-card__icon stat-card__icon--green">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    </div>
+                    <div class="stat-card__info">
+                        <span class="stat-card__label">Sân đang hoạt động</span>
+                        <span class="stat-card__value">{{ staff_stats.active_fields }} / {{ staff_stats.total_fields }}</span>
+                    </div>
+                </div>
+            </div>
+            {% if staff_today_bookings %}
+            <div class="detail-card" style="margin-top:1.5rem;">
+                <h2 style="margin-bottom:1rem;">Lịch đặt sân hôm nay</h2>
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr><th>Sân</th><th>Khách hàng</th><th>Ngày</th><th>Trạng thái</th><th>Tổng tiền</th></tr>
+                        </thead>
+                        <tbody>
+                        {% for b in staff_today_bookings %}
+                        <tr>
+                            <td>{{ b.field.name }}</td>
+                            <td>{{ b.booking_package.user.get_full_name|default:b.booking_package.user.email }}</td>
+                            <td>{{ b.booking_date|date:"d/m/Y" }}</td>
+                            <td><span class="status-badge status-badge--{{ b.status|lower }}">{{ b.get_status_display }}</span></td>
+                            <td>{{ b.total_amount|floatformat:0 }} đ</td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
+            {% elif customer_stats %}
+            <!-- ══════════════════════════════════════════════════
+                 CUSTOMER DASHBOARD
+            ══════════════════════════════════════════════════ -->
+            <div class="stats-grid">
+                <div class="stat-card" id="stat-cust-bookings">
+                    <div class="stat-card__icon stat-card__icon--blue">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                    </div>
+                    <div class="stat-card__info">
+                        <span class="stat-card__label">Lần đã thuê</span>
+                        <span class="stat-card__value">{{ customer_stats.total_bookings }}</span>
+                    </div>
+                </div>
+                <div class="stat-card" id="stat-cust-upcoming">
+                    <div class="stat-card__icon stat-card__icon--green">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                    <div class="stat-card__info">
+                        <span class="stat-card__label">Lịch sắp tới</span>
+                        <span class="stat-card__value">{{ customer_stats.upcoming_count }}</span>
+                    </div>
+                </div>
+                <div class="stat-card" id="stat-cust-spent">
+                    <div class="stat-card__icon stat-card__icon--purple">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
+                    </div>
+                    <div class="stat-card__info">
+                        <span class="stat-card__label">Tổng đã chi</span>
+                        <span class="stat-card__value" style="font-size:1rem;">{{ customer_stats.total_paid|floatformat:0 }} đ</span>
+                    </div>
+                </div>
+            </div>
+            {% if customer_upcoming_bookings %}
+            <div class="detail-card" style="margin-top:1.5rem;">
+                <h2 style="margin-bottom:1rem;">Lịch đặt sắp tới</h2>
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead><tr><th>Cơ sở</th><th>Sân</th><th>Ngày</th><th>Trạng thái</th><th>Tổng tiền</th></tr></thead>
+                        <tbody>
+                        {% for b in customer_upcoming_bookings %}
+                        <tr>
+                            <td>{{ b.venue.name }}</td>
+                            <td>{{ b.field.name }}</td>
+                            <td>{{ b.booking_date|date:"d/m/Y" }}</td>
+                            <td><span class="status-badge status-badge--{{ b.status|lower }}">{{ b.get_status_display }}</span></td>
+                            <td>{{ b.total_amount|floatformat:0 }} đ</td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+            {% if customer_recent_bookings %}
+            <div class="detail-card" style="margin-top:1rem;">
+                <h2 style="margin-bottom:1rem;">Lịch sử đặt sân gần đây</h2>
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead><tr><th>Cơ sở</th><th>Sân</th><th>Ngày</th><th>Trạng thái</th><th>Tổng tiền</th></tr></thead>
+                        <tbody>
+                        {% for b in customer_recent_bookings %}
+                        <tr>
+                            <td>{{ b.venue.name }}</td>
+                            <td>{{ b.field.name }}</td>
+                            <td>{{ b.booking_date|date:"d/m/Y" }}</td>
+                            <td><span class="status-badge status-badge--{{ b.status|lower }}">{{ b.get_status_display }}</span></td>
+                            <td>{{ b.total_amount|floatformat:0 }} đ</td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
+            {% else %}
+            <!-- ══════════════════════════════════════════════════
+                 DEFAULT: thông tin cơ bản nếu không rõ role
+            ══════════════════════════════════════════════════ -->
             <div class="stats-grid">
                 <div class="stat-card" id="stat-email">
                     <div class="stat-card__icon stat-card__icon--blue">
@@ -191,7 +533,6 @@
                         <span class="stat-card__value">{{ user.email }}</span>
                     </div>
                 </div>
-
                 <div class="stat-card" id="stat-role">
                     <div class="stat-card__icon stat-card__icon--green">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -199,27 +540,19 @@
                     <div class="stat-card__info">
                         <span class="stat-card__label">Vai trò</span>
                         <span class="stat-card__value">
-                            {% for role in user_roles %}
-                                <span class="role-badge role-badge--{{ role|lower }}">{{ role }}</span>
-                            {% empty %}
-                                <span class="role-badge">Chưa gán</span>
-                            {% endfor %}
+                            {% for role in user_roles %}<span class="role-badge role-badge--{{ role|lower }}">{{ role }}</span>{% empty %}<span class="role-badge">Chưa gán</span>{% endfor %}
                         </span>
                     </div>
                 </div>
-
                 <div class="stat-card" id="stat-wallet">
                     <div class="stat-card__icon stat-card__icon--purple">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
                     </div>
                     <div class="stat-card__info">
                         <span class="stat-card__label">Số dư ví</span>
-                        <span class="stat-card__value">
-                            {% if wallet %}{{ wallet.balance|floatformat:0 }} VNĐ{% else %}—{% endif %}
-                        </span>
+                        <span class="stat-card__value">{% if wallet %}{{ wallet.balance|floatformat:0 }} VNĐ{% else %}—{% endif %}</span>
                     </div>
                 </div>
-
                 <div class="stat-card" id="stat-joined">
                     <div class="stat-card__icon stat-card__icon--orange">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
@@ -230,17 +563,11 @@
                     </div>
                 </div>
             </div>
+            {% endif %}
 
-            <!-- Placeholder sections -->
-            <div class="placeholder-section">
-                <div class="placeholder-section__icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></svg>
-                </div>
-                <h3>Sắp ra mắt</h3>
-                <p>Các tính năng đặt sân, quản lý lịch, thanh toán sẽ sớm được cập nhật tại đây.</p>
-            </div>
             {% endblock %}
         </div>
+
     </main>
 </div>
 
@@ -424,6 +751,44 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
+<!-- Load Sidebar Favorites -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        /* ── Sidebar Favorites loader ── */
+        window.loadSidebarFavorites = function() {
+            const listContainer = document.getElementById('sidebar-favorites-list');
+            if (!listContainer) return;
+            
+            fetch('/co-so/api/favorites/')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.favorites && data.favorites.length > 0) {
+                        listContainer.innerHTML = data.favorites.map(item => `
+                            <a href="${item.url}" class="sidebar__link" style="padding: 0.4rem 0.5rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem; border-radius: var(--radius-md); transition: all var(--transition-fast); background: none; border: none; width: 100%; text-decoration: none;">
+                                <span style="font-size: 0.9rem;">📍</span>
+                                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; text-align: left; flex: 1;">${item.name}</span>
+                            </a>
+                        `).join('');
+                    } else {
+                        listContainer.innerHTML = '<span style="font-size: 0.8rem; color: var(--text-muted); padding-left: 0.25rem; font-style: italic;">Chưa có cơ sở nào</span>';
+                    }
+                })
+                .catch(err => {
+                    console.error('Error loading favorites:', err);
+                    listContainer.innerHTML = '<span style="font-size: 0.8rem; color: var(--text-muted); padding-left: 0.25rem; font-style: italic;">Lỗi tải dữ liệu</span>';
+                });
+        };
+        loadSidebarFavorites();
+
+        // Listen for pageshow to reload favorites on browser back navigation (bfcache)
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted || (window.performance && window.performance.navigation.type === 2)) {
+                loadSidebarFavorites();
+            }
+        });
+    });
+</script>
+
 
 <!-- Auto-dismiss toasts -->
 <script>
@@ -437,5 +802,117 @@ document.addEventListener('DOMContentLoaded', function () {
             }, 5000 + i * 500);
         });
     });
+</script>
+
+<!-- Real-time table search & filter helper -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const searchInputs = document.querySelectorAll('[data-table-search]');
+    searchInputs.forEach(input => {
+        const targetSelector = input.getAttribute('data-table-search');
+        input.addEventListener('input', function () {
+            const query = input.value.toLowerCase().trim();
+            const table = document.querySelector(targetSelector || '.data-table');
+            if (!table) return;
+            const rows = table.querySelectorAll('tbody tr:not(.no-results-row)');
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                const text = row.innerText.toLowerCase();
+                if (text.includes(query)) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            // Handle empty state message
+            let noResultsRow = table.querySelector('.no-results-row');
+            if (visibleCount === 0) {
+                if (!noResultsRow) {
+                    const colsCount = table.querySelectorAll('thead th').length || 1;
+                    noResultsRow = document.createElement('tr');
+                    noResultsRow.className = 'no-results-row';
+                    noResultsRow.innerHTML = `<td colspan="${colsCount}" class="text-center py-4" style="color: var(--text-muted); font-style: italic; background: transparent;">Không tìm thấy kết quả phù hợp.</td>`;
+                    table.querySelector('tbody').appendChild(noResultsRow);
+                } else {
+                    noResultsRow.style.display = '';
+                }
+            } else {
+                if (noResultsRow) {
+                    noResultsRow.style.display = 'none';
+                }
+            }
+        });
+    });
+});
+</script>
+
+<!-- Chart.js for booking charts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Lấy màu accent từ CSS variable
+    const root = document.documentElement;
+    const accentColor = getComputedStyle(root).getPropertyValue('--accent').trim() || '#6366f1';
+    const isDark = root.getAttribute('data-theme') === 'dark';
+    const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
+    const textColor = isDark ? '#aab4be' : '#64748b';
+
+    function makeChart(canvasId, labels, data, label) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: label,
+                    data: data,
+                    backgroundColor: accentColor + '99',
+                    borderColor: accentColor,
+                    borderWidth: 2,
+                    borderRadius: 6,
+                    borderSkipped: false,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y} lượt` } }
+                },
+                scales: {
+                    x: {
+                        grid: { color: gridColor },
+                        ticks: { color: textColor, maxRotation: 45, minRotation: 30 }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: gridColor },
+                        ticks: { color: textColor, stepSize: 1, precision: 0 }
+                    }
+                }
+            }
+        });
+    }
+
+    {% if admin_chart_labels %}
+    makeChart('adminBookingChart',
+        {{ admin_chart_labels|safe }},
+        {{ admin_chart_data|safe }},
+        'Lượt đặt sân'
+    );
+    {% endif %}
+    {% if owner_chart_labels %}
+    makeChart('ownerBookingChart',
+        {{ owner_chart_labels|safe }},
+        {{ owner_chart_data|safe }},
+        'Lượt đặt sân'
+    );
+    {% endif %}
+});
 </script>
 {% endblock %}

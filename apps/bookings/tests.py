@@ -1,30 +1,93 @@
 import uuid
 from datetime import date, time, timedelta
 from decimal import Decimal
-import fakeredis
+try:
+    import fakeredis
+except ModuleNotFoundError:
+    import fnmatch
+
+    class _FakeStrictRedis:
+        def __init__(self, *args, **kwargs):
+            self._values = {}
+            self._sets = {}
+
+        def set(self, key, value, nx=False, ex=None):
+            if nx and (key in self._values or key in self._sets):
+                return False
+            self._values[key] = value
+            return True
+
+        def keys(self, pattern):
+            keys = list(self._values.keys()) + list(self._sets.keys())
+            return [key for key in keys if fnmatch.fnmatch(key, pattern)]
+
+        def sadd(self, key, *values):
+            current = self._sets.setdefault(key, set())
+            before = len(current)
+            current.update(values)
+            return len(current) - before
+
+        def expire(self, key, seconds):
+            return key in self._values or key in self._sets
+
+        def smembers(self, key):
+            return set(self._sets.get(key, set()))
+
+        def delete(self, *keys):
+            deleted = 0
+            for key in keys:
+                if key in self._values:
+                    del self._values[key]
+                    deleted += 1
+                if key in self._sets:
+                    del self._sets[key]
+                    deleted += 1
+            return deleted
+
+        def exists(self, key):
+            return key in self._values or key in self._sets
+
+        def flushdb(self):
+            self._values.clear()
+            self._sets.clear()
+
+    class fakeredis:
+        FakeStrictRedis = _FakeStrictRedis
 from unittest.mock import patch
 
 from django import forms as django_forms
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.messages import get_messages
 from django.core.exceptions import ValidationError
+from django.db import DatabaseError
 from django.http import HttpResponse
 from django.shortcuts import resolve_url
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import include, path, reverse
 from django.utils import timezone
 
-from apps.accounts.models import OwnerProfile, Role, UserRole
-from apps.payments.models import Invoice, Payment
+from apps.accounts.models import OwnerProfile, Role, StaffProfile, UserRole
+from apps.payments.models import Payment
 from apps.services.models import BookingService, ServiceItem
-from apps.venues.models import Field, FieldPriceRule, FieldType, Sport, Venue
+from apps.venues.models import Field, FieldPriceRule, FieldType, Sport, Venue, VenueOperatingHour
 from .forms import BookingCreateForm, generate_time_block_choices
-from .models import Booking, BookingPackage, BookingSlot
+from .models import Booking, BookingPackage, BookingSlot, SlotLock
 from .views import _management_base_queryset
 from .services import (
+    BOOKING_NO_SLOT_SELECTED_ERROR,
     BOOKING_PRICE_RULE_MISSING_ERROR,
+    BOOKING_PAST_SLOT_ERROR,
     BOOKING_UNAVAILABLE_ERROR,
+    BOOKING_PAYMENT_TIMEOUT_MINUTES,
+    cancel_expired_booking_if_needed,
+    cancel_expired_pending_bookings,
     create_booking,
+    create_booking_for_slots,
+    get_booking_slot_options,
+    get_payment_deadline,
+    get_time_blocks_for_field_date,
     get_unavailable_time_blocks,
     is_time_range_available,
     generate_time_blocks,
@@ -55,6 +118,7 @@ urlpatterns = [
     path('', include(_ACCOUNT_URLPATTERNS, namespace='accounts')),
     path('dang-nhap/', _test_login_view, name='login'),
     path('dat-san/', include('apps.bookings.urls')),
+    path('payments/', include('apps.payments.urls')),
     path('services/', include('apps.services.urls')),
 ]
 
@@ -75,6 +139,12 @@ _SCOPED_TEMPLATE_MAP = {
     'bookings/booking_history.html': (
         '{% for booking in bookings %}'
         '{{ booking.pk }} {{ booking.venue.name }} {{ booking.field.name }}'
+        '{% if show_customer_booking_actions %}'
+        '<a href="{% url "bookings:booking_detail" booking.pk %}">Chi tiết</a>'
+        '{% if booking.can_pay and booking.booking_package.user_id == request.user.id %}'
+        '<a href="{% url "payments:booking_checkout" booking.pk %}">Thanh toán</a>'
+        '{% endif %}'
+        '{% endif %}'
         '{% endfor %}'
     ),
     'bookings/booking_detail.html': (
@@ -89,8 +159,8 @@ _SCOPED_TEMPLATE_MAP = {
         'Tiền sân'
         '{% for slot in booking.slots.all %}{{ slot.price|floatformat:0 }}đ{% endfor %}'
         '{{ booking.grand_total|floatformat:0 }}đ'
-        '{% if can_pay_booking %}'
-        '<a href="/payments/bookings/{{ booking.pk }}/">Thanh toán</a>'
+        '{% if can_pay_booking and booking.booking_package.user_id == request.user.id %}'
+        '<a href="{% url "payments:booking_checkout" booking.pk %}">Thanh toán</a>'
         '{% endif %}'
     ),
     'bookings/booking_form.html': (
@@ -101,11 +171,11 @@ _SCOPED_TEMPLATE_MAP = {
         '{% for service in form.service_items %}{{ service.name }}{% endfor %}'
         '</tbody></section>'
         '<script src="js/booking-time-blocks.js"></script>'
-        '{% for block in time_blocks %}'
-        '<button data-time="{{ block }}" '
-        'class="time-block{% if block in unavailable_blocks %} is-unavailable{% endif %}"'
-        '{% if block in unavailable_blocks %} disabled aria-disabled="true"{% endif %}>'
-        '{{ block }}</button>'
+        '{% for slot in slot_options %}'
+        '<button data-time="{{ slot.start_label }}" name="slot" value="{{ slot.value }}" '
+        'class="time-block{% if not slot.is_bookable %} is-unavailable{% endif %}"'
+        '{% if not slot.is_bookable %} disabled aria-disabled="true"{% endif %}>'
+        'Chọn</button>'
         '{% endfor %}'
     ),
     'bookings/staff_booking_list.html': (
@@ -132,7 +202,7 @@ _SCOPED_TEMPLATE_MAP = {
     'bookings/partials/_booking_detail_content.html': (
         '{{ booking.status }}'
         '{% if can_cancel_booking %}<button>Hủy booking</button>{% endif %}'
-        '{% if can_pay_booking %}<a>Thanh toán</a>{% endif %}'
+        '{% if can_pay_booking and booking.booking_package.user_id == request.user.id %}<a>Thanh toán</a>{% endif %}'
     ),
     'bookings/partials/_booking_management_table.html': (
         '{% for booking in bookings %}'
@@ -159,6 +229,47 @@ _SCOPED_TEMPLATE_MAP = {
         '{{ item.name }} {% if item.is_active %}ACTIVE{% else %}INACTIVE{% endif %}'
         '<form data-ajax-form action="{% url "services:owner_serviceitem_toggle" item.pk %}"></form>'
         '{% endfor %}'
+    ),
+    'bookings/booking_checkout.html': (
+        '{{ booking.pk }} {{ booking.venue.name }} {{ booking.field.name }} '
+        '{{ booking.grand_total|floatformat:0 }}đ '
+        '{% for slot in booking.slots.all %}'
+        '{{ slot.start_time|time:"H:i" }}-{{ slot.end_time|time:"H:i" }} '
+        '{% endfor %}'
+        '{% if booking.status == "PAID" %}Đã thanh toán{% endif %}'
+        '{% if payment_expired %}Booking đã bị huỷ do quá hạn thanh toán'
+        '{% elif booking.status == "CANCELLED" %}Đã huỷ{% endif %}'
+        '{% if can_pay_booking %}'
+        '<form method="post" action="{% url "payments:booking_checkout" booking.pk %}" data-payment-action>'
+        '<input type="hidden" name="action" value="wallet_pay">'
+        '<button>Thanh toán bằng ví</button></form>'
+        '<strong data-booking-countdown '
+        'data-countdown-deadline="{{ booking.payment_deadline|date:"c" }}">Còn --:--</strong>'
+        '{% endif %}'
+        '{% if can_cancel_booking %}'
+        '<form method="post" action="{% url "bookings:booking_cancel" booking.pk %}">'
+        '<button>Huỷ booking</button></form>'
+        '{% endif %}'
+    ),
+    'payments/booking_checkout.html': (
+        '{{ booking.pk }} {{ booking.venue.name }} {{ booking.field.name }} '
+        '{{ booking.grand_total|floatformat:0 }}đ {{ wallet_balance|floatformat:0 }}đ '
+        '{% for slot in booking.slots.all %}'
+        '{{ slot.start_time|time:"H:i" }}-{{ slot.end_time|time:"H:i" }} '
+        '{% endfor %}'
+        '{% for message in messages %}{{ message }}{% endfor %}'
+        '{% if booking.status == "PAID" %}Đã thanh toán{% endif %}'
+        '{% if payment_expired %}Booking đã bị huỷ do quá hạn thanh toán'
+        '{% elif booking.status == "CANCELLED" %}Đã huỷ{% endif %}'
+        '{% if can_pay_booking %}'
+        '<form method="post" action="{% url "payments:booking_checkout" booking.pk %}" data-payment-action>'
+        '<input type="hidden" name="action" value="wallet_pay">'
+        '<button{% if not has_sufficient_balance %} disabled aria-disabled="true"{% endif %}>'
+        'Thanh toán bằng ví</button></form>'
+        '<strong data-booking-countdown '
+        'data-countdown-deadline="{{ booking.payment_deadline|date:"c" }}">Còn --:--</strong>'
+        '{% if not has_sufficient_balance %}Số dư ví không đủ{% endif %}'
+        '{% endif %}'
     ),
 }
 
@@ -187,6 +298,21 @@ class ScopedBookingTestCase(TestCase):
 
 def _login_redirect_url(url):
     return f'{resolve_url(settings.LOGIN_URL)}?next={url}'
+
+
+def future_date(days=30):
+    return timezone.localdate() + timedelta(days=days)
+
+
+def optional_model_count(app_label, model_name):
+    try:
+        model = apps.get_model(app_label, model_name)
+    except LookupError:
+        return 0
+    try:
+        return model.objects.count()
+    except DatabaseError:
+        return 0
 
 
 class BookingTimeRangeValidationTests(SimpleTestCase):
@@ -313,7 +439,7 @@ class BookingAuthTests(ScopedBookingTestCase):
         self.booking = create_booking(
             user=self.customer,
             field=self.field,
-            booking_date=date(2026, 6, 3),
+            booking_date=future_date(31),
             start_time=time(8, 0),
             end_time=time(9, 0),
             price=Decimal('100000.00'),
@@ -321,13 +447,13 @@ class BookingAuthTests(ScopedBookingTestCase):
         other_package = BookingPackage.objects.create(
             user=self.other_customer,
             package_type=BookingPackage.SINGLE,
-            start_date=date(2026, 6, 4),
+            start_date=future_date(32),
         )
         self.other_booking = Booking.objects.create(
             booking_package=other_package,
             venue=self.other_venue,
             field=self.other_field,
-            booking_date=date(2026, 6, 4),
+            booking_date=future_date(32),
             status=Booking.PENDING,
             booking_channel=Booking.WEB,
             total_amount=Decimal('200000.00'),
@@ -339,6 +465,37 @@ class BookingAuthTests(ScopedBookingTestCase):
             price=Decimal('200000.00'),
         )
 
+    def _make_customer_booking(
+        self,
+        status,
+        booking_date=None,
+        start_time=time(12, 0),
+        end_time=time(13, 0),
+        amount=Decimal('150000.00'),
+    ):
+        booking_date = booking_date or future_date(34)
+        package = BookingPackage.objects.create(
+            user=self.customer,
+            package_type=BookingPackage.SINGLE,
+            start_date=booking_date,
+        )
+        booking = Booking.objects.create(
+            booking_package=package,
+            venue=self.venue,
+            field=self.field,
+            booking_date=booking_date,
+            status=status,
+            booking_channel=Booking.WEB,
+            total_amount=amount,
+        )
+        BookingSlot.objects.create(
+            booking=booking,
+            start_time=start_time,
+            end_time=end_time,
+            price=amount,
+        )
+        return booking
+
     def assert_login_required(self, url):
         response = self.client.get(url)
         self.assertRedirects(response, _login_redirect_url(url))
@@ -346,6 +503,7 @@ class BookingAuthTests(ScopedBookingTestCase):
     def test_anonymous_user_is_redirected_from_booking_pages(self):
         urls = [
             reverse('bookings:booking_list'),
+            reverse('bookings:booking_history'),
             reverse('bookings:booking_create'),
             reverse('bookings:booking_availability'),
             reverse('bookings:booking_detail', kwargs={'pk': uuid.uuid4()}),
@@ -359,6 +517,7 @@ class BookingAuthTests(ScopedBookingTestCase):
         self.client.force_login(self.customer)
         urls = [
             reverse('bookings:booking_list'),
+            reverse('bookings:booking_history'),
             reverse('bookings:booking_create'),
             reverse('bookings:booking_detail', kwargs={'pk': self.booking.pk}),
         ]
@@ -373,9 +532,76 @@ class BookingAuthTests(ScopedBookingTestCase):
 
         response = self.client.get(reverse('bookings:booking_detail', kwargs={'pk': self.other_booking.pk}))
 
-        self.assertEqual(response.status_code, 403)
-        self.assertNotContains(response, 'Private Other Venue', status_code=403)
-        self.assertNotContains(response, str(self.other_booking.pk), status_code=403)
+        self.assertEqual(response.status_code, 404)
+        self.assertNotContains(response, 'Private Other Venue', status_code=404)
+        self.assertNotContains(response, str(self.other_booking.pk), status_code=404)
+
+    def test_customer_history_shows_detail_link_for_own_booking(self):
+        self.client.force_login(self.customer)
+
+        response = self.client.get(reverse('bookings:booking_history'))
+
+        detail_url = reverse('bookings:booking_detail', kwargs={'pk': self.booking.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'href="{detail_url}"')
+        self.assertContains(response, 'Chi tiết')
+        self.assertNotContains(response, str(self.other_booking.pk))
+
+    def test_customer_history_shows_payment_link_for_pending_booking(self):
+        self.client.force_login(self.customer)
+
+        response = self.client.get(reverse('bookings:booking_history'))
+
+        payment_url = reverse('payments:booking_checkout', kwargs={'booking_pk': self.booking.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'href="{payment_url}"')
+        self.assertContains(response, 'Thanh toán')
+
+    def test_customer_history_hides_payment_link_for_paid_and_cancelled_bookings(self):
+        paid_booking = self._make_customer_booking(
+            Booking.PAID,
+            booking_date=future_date(35),
+            start_time=time(13, 0),
+            end_time=time(14, 0),
+            amount=Decimal('160000.00'),
+        )
+        cancelled_booking = self._make_customer_booking(
+            Booking.CANCELLED,
+            booking_date=future_date(36),
+            start_time=time(14, 0),
+            end_time=time(15, 0),
+            amount=Decimal('170000.00'),
+        )
+        self.client.force_login(self.customer)
+
+        response = self.client.get(reverse('bookings:booking_history'))
+
+        paid_payment_url = reverse('payments:booking_checkout', kwargs={'booking_pk': paid_booking.pk})
+        cancelled_payment_url = reverse('payments:booking_checkout', kwargs={'booking_pk': cancelled_booking.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, str(paid_booking.pk))
+        self.assertContains(response, str(cancelled_booking.pk))
+        self.assertNotContains(response, f'href="{paid_payment_url}"')
+        self.assertNotContains(response, f'href="{cancelled_payment_url}"')
+
+    def test_customer_history_hides_payment_link_after_payment_deadline(self):
+        expired_booking = self._make_customer_booking(
+            Booking.PENDING,
+            booking_date=future_date(37),
+            start_time=time(15, 0),
+            end_time=time(16, 0),
+            amount=Decimal('180000.00'),
+        )
+        expired_booking.payment_deadline = timezone.now() - timedelta(minutes=1)
+        expired_booking.save(update_fields=['payment_deadline', 'updated_at'])
+        self.client.force_login(self.customer)
+
+        response = self.client.get(reverse('bookings:booking_history'))
+
+        expired_payment_url = reverse('payments:booking_checkout', kwargs={'booking_pk': expired_booking.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, str(expired_booking.pk))
+        self.assertNotContains(response, f'href="{expired_payment_url}"')
 
     def test_customer_booking_list_only_shows_own_bookings(self):
         self.client.force_login(self.customer)
@@ -416,6 +642,18 @@ class BookingAuthTests(ScopedBookingTestCase):
         self.client.logout()
         response = self.client.get(reverse('bookings:booking_list'))
         self.assertRedirects(response, _login_redirect_url(reverse('bookings:booking_list')))
+
+    def test_anonymous_post_booking_redirects_to_login_with_next(self):
+        url = reverse('bookings:booking_create')
+
+        response = self.client.post(url, {
+            'field': self.field.pk,
+            'booking_date': future_date(33).isoformat(),
+            'slot': '09:00|09:30',
+            'note': '',
+        })
+
+        self.assertRedirects(response, _login_redirect_url(url))
 
 
 class CancelBookingStatusTests(ScopedBookingTestCase):
@@ -599,7 +837,7 @@ class BookingServiceTests(ScopedBookingTestCase):
             end_time=time(23, 30),
             price_per_hour=Decimal('100000.00'),
         )
-        self.booking_date = date(2026, 6, 1)
+        self.booking_date = future_date(30)
 
         self.redis_client = fakeredis.FakeStrictRedis(decode_responses=True)
         self.redis_patcher = patch('apps.bookings.services.get_redis_client', return_value=self.redis_client)
@@ -623,6 +861,67 @@ class BookingServiceTests(ScopedBookingTestCase):
         self.assertEqual(booking.status, Booking.PENDING)
         self.assertEqual(booking.venue, self.venue)
         self.assertEqual(BookingSlot.objects.filter(booking=booking).count(), 1)
+
+    def test_time_blocks_for_field_date_uses_one_hour_operating_blocks(self):
+        VenueOperatingHour.objects.create(
+            venue=self.venue,
+            weekday=self.booking_date.weekday(),
+            open_time=time(6, 0),
+            close_time=time(9, 0),
+        )
+
+        time_blocks = get_time_blocks_for_field_date(self.field, self.booking_date)
+        slot_options = get_booking_slot_options(self.field, self.booking_date, time_blocks)
+
+        self.assertEqual(time_blocks, ['06:00', '07:00', '08:00', '09:00'])
+        self.assertEqual(
+            [(slot['start_label'], slot['end_label']) for slot in slot_options],
+            [('06:00', '07:00'), ('07:00', '08:00'), ('08:00', '09:00')],
+        )
+
+    def test_create_booking_for_slots_creates_multiple_slots(self):
+        booking = create_booking_for_slots(
+            user=self.customer,
+            field=self.field,
+            booking_date=self.booking_date,
+            slot_ranges=[
+                (time(9, 0), time(10, 0)),
+                (time(10, 0), time(11, 0)),
+            ],
+            note='Multi slot',
+        )
+
+        slots = list(booking.slots.order_by('start_time'))
+        self.assertEqual(booking.status, Booking.PENDING)
+        self.assertEqual(len(slots), 2)
+        self.assertEqual(slots[0].start_time, time(9, 0))
+        self.assertEqual(slots[1].start_time, time(10, 0))
+        self.assertEqual(booking.total_amount, Decimal('200000.00'))
+        self.assertIsNotNone(booking.payment_deadline)
+
+    def test_create_booking_for_slots_rolls_back_when_one_slot_conflicts(self):
+        create_booking(
+            user=self.customer,
+            field=self.field,
+            booking_date=self.booking_date,
+            start_time=time(10, 0),
+            end_time=time(11, 0),
+            price=Decimal('100000.00'),
+        )
+
+        with self.assertRaises(ValidationError):
+            create_booking_for_slots(
+                user=self.customer,
+                field=self.field,
+                booking_date=self.booking_date,
+                slot_ranges=[
+                    (time(9, 0), time(10, 0)),
+                    (time(10, 0), time(11, 0)),
+                ],
+            )
+
+        self.assertEqual(Booking.objects.filter(field=self.field, booking_date=self.booking_date).count(), 1)
+        self.assertEqual(BookingSlot.objects.filter(booking__field=self.field).count(), 1)
 
     def test_prevent_overlapping_booking(self):
         create_booking(
@@ -668,12 +967,33 @@ class BookingServiceTests(ScopedBookingTestCase):
         unavailable_blocks = get_unavailable_time_blocks(
             self.field,
             self.booking_date,
-            ['06:30', '07:00', '07:30'],
+            ['06:30', '07:30', '08:30'],
         )
 
-        self.assertIn('07:00', unavailable_blocks)
-        self.assertNotIn('06:30', unavailable_blocks)
+        self.assertIn('06:30', unavailable_blocks)
         self.assertNotIn('07:30', unavailable_blocks)
+        self.assertNotIn('08:30', unavailable_blocks)
+
+    def test_one_hour_block_unavailable_when_half_hour_lock_overlaps(self):
+        SlotLock.objects.create(
+            field=self.field,
+            booking_date=self.booking_date,
+            start_time=time(8, 30),
+            end_time=time(9, 0),
+            user=self.customer,
+            created_by=self.customer,
+            lock_session_id='test-lock',
+            expires_at=timezone.now() + timedelta(minutes=10),
+        )
+
+        unavailable_blocks = get_unavailable_time_blocks(
+            self.field,
+            self.booking_date,
+            ['08:00', '09:00'],
+        )
+
+        self.assertIn('08:00', unavailable_blocks)
+        self.assertNotIn('09:00', unavailable_blocks)
 
     def test_cancelled_booking_does_not_block_availability(self):
         booking = create_booking(
@@ -716,6 +1036,20 @@ class BookingServiceTests(ScopedBookingTestCase):
         self.assertFalse(form.is_valid())
         self.assertIn(BOOKING_UNAVAILABLE_ERROR, form.non_field_errors())
 
+    def test_booking_form_rejects_past_slot(self):
+        past_date = timezone.localdate() - timedelta(days=1)
+
+        form = BookingCreateForm(data={
+            'field': self.field.pk,
+            'booking_date': past_date.isoformat(),
+            'start_time': '10:00',
+            'end_time': '10:30',
+            'note': '',
+        })
+
+        self.assertFalse(form.is_valid())
+        self.assertIn(BOOKING_PAST_SLOT_ERROR, form.non_field_errors())
+
     def test_booking_create_template_marks_unavailable_blocks(self):
         create_booking(
             user=self.customer,
@@ -732,7 +1066,7 @@ class BookingServiceTests(ScopedBookingTestCase):
             'booking_date': self.booking_date.isoformat(),
         })
 
-        self.assertContains(response, 'data-time="07:00"')
+        self.assertContains(response, 'data-time="06:30"')
         self.assertContains(response, 'class="time-block is-unavailable"')
         self.assertContains(response, 'disabled aria-disabled="true"')
 
@@ -754,7 +1088,8 @@ class BookingServiceTests(ScopedBookingTestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertIn('07:00', payload['unavailable_blocks'])
+        self.assertIn('06:30', payload['unavailable_blocks'])
+        self.assertNotIn('07:30', payload['unavailable_blocks'])
         self.assertIn('05:30', payload['time_blocks'])
 
     def test_create_booking_without_services_still_works(self):
@@ -772,6 +1107,79 @@ class BookingServiceTests(ScopedBookingTestCase):
         self.assertRedirects(response, reverse('bookings:booking_detail', kwargs={'pk': booking.pk}))
         self.assertEqual(booking.total_amount, Decimal('100000.00'))
         self.assertFalse(BookingService.objects.filter(booking=booking).exists())
+
+    def test_slot_button_post_creates_booking_for_current_user(self):
+        self.client.force_login(self.customer)
+
+        response = self.client.post(reverse('bookings:booking_create'), {
+            'field': self.field.pk,
+            'booking_date': self.booking_date.isoformat(),
+            'start_time': '',
+            'end_time': '',
+            'slot': '10:00|11:00',
+            'note': '',
+        })
+
+        booking = Booking.objects.get(field=self.field, booking_date=self.booking_date)
+        slot = booking.slots.get()
+        self.assertRedirects(response, reverse('bookings:booking_detail', kwargs={'pk': booking.pk}))
+        self.assertEqual(booking.booking_package.user, self.customer)
+        self.assertEqual(slot.start_time, time(10, 0))
+        self.assertEqual(slot.end_time, time(11, 0))
+        self.assertEqual(slot.price, Decimal('100000.00'))
+        self.assertEqual(booking.total_amount, Decimal('100000.00'))
+
+    def test_ajax_submit_without_selected_slots_returns_error(self):
+        self.client.force_login(self.customer)
+
+        response = self.client.post(
+            reverse('bookings:booking_create'),
+            {
+                'field': self.field.pk,
+                'booking_date': self.booking_date.isoformat(),
+                'start_time': '',
+                'end_time': '',
+                'note': '',
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+            HTTP_ACCEPT='application/json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertEqual(payload['error'], 'FORM_INVALID')
+        self.assertIn(BOOKING_NO_SLOT_SELECTED_ERROR, str(payload['errors']))
+        self.assertFalse(Booking.objects.filter(field=self.field, booking_date=self.booking_date).exists())
+
+    def test_ajax_submit_multiple_selected_slots_returns_countdown_payload(self):
+        self.client.force_login(self.customer)
+
+        response = self.client.post(
+            reverse('bookings:booking_create'),
+            {
+                'field': self.field.pk,
+                'booking_date': self.booking_date.isoformat(),
+                'slots': ['09:00|10:00', '10:00|11:00'],
+                'note': 'AJAX multi',
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+            HTTP_ACCEPT='application/json',
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        booking = Booking.objects.get(pk=payload['booking_id'])
+        self.assertEqual(booking.slots.count(), 2)
+        self.assertEqual(booking.total_amount, Decimal('200000.00'))
+        self.assertIn('payment_deadline', payload)
+        self.assertIn('status_url', payload)
+        self.assertEqual(len(payload['slots']), 2)
+        # After creating a booking the booking screen sends the user straight to
+        # the booking detail page (no checkout/payment hand-off on this screen).
+        self.assertEqual(
+            payload['redirect_url'],
+            reverse('bookings:booking_detail', kwargs={'pk': booking.pk}),
+        )
 
     def test_create_booking_creates_selected_services(self):
         service_item = ServiceItem.objects.create(
@@ -905,6 +1313,87 @@ class BookingServiceTests(ScopedBookingTestCase):
                 self.customer, session_id, self.field, self.booking_date, time(6, 0), time(8, 0), Decimal('100000.00')
             )
 
+class BookingRealTemplateRenderingTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.customer = User.objects.create_user(
+            username='real-template-customer',
+            email='real-template-customer@example.com',
+            password='password',
+        )
+        self.owner_user = User.objects.create_user(
+            username='real-template-owner',
+            email='real-template-owner@example.com',
+            password='password',
+        )
+        self.owner_profile = OwnerProfile.objects.create(
+            user=self.owner_user,
+            business_name='Real Template Owner',
+            is_verified=True,
+        )
+        self.sport = Sport.objects.create(name='Real Futsal', slug='real-futsal')
+        self.field_type = FieldType.objects.create(
+            sport=self.sport,
+            name='Indoor',
+            slug='real-futsal-indoor',
+            player_count=10,
+        )
+        self.venue = Venue.objects.create(
+            owner=self.owner_profile,
+            name='Real Template Venue',
+            address='1 Real Street',
+            status='ACTIVE',
+        )
+        self.field = Field.objects.create(
+            venue=self.venue,
+            field_type=self.field_type,
+            name='Real Template Field',
+            status='ACTIVE',
+        )
+        FieldPriceRule.objects.create(
+            field=self.field,
+            start_time=time(8, 0),
+            end_time=time(12, 0),
+            price_per_hour=Decimal('100000.00'),
+        )
+        self.booking_date = future_date(70)
+        VenueOperatingHour.objects.create(
+            venue=self.venue,
+            weekday=self.booking_date.weekday(),
+            open_time=time(8, 0),
+            close_time=time(12, 0),
+        )
+
+    def test_real_booking_form_renders_book_button_for_available_slot(self):
+        self.client.force_login(self.customer)
+
+        response = self.client.get(reverse('bookings:booking_create'), {
+            'field': self.field.pk,
+            'booking_date': self.booking_date.isoformat(),
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Đặt sân')
+        self.assertContains(response, 'Chọn')
+        self.assertContains(response, 'data-time="09:00"')
+        self.assertContains(response, 'name="slot" value="09:00|10:00"')
+        self.assertContains(response, 'csrfmiddlewaretoken')
+
+    def test_real_booking_form_has_no_payment_or_detail_buttons(self):
+        """The booking screen must not show a 'Thanh toán' / 'Chi tiết booking'
+        success panel — after booking we redirect straight to the detail page."""
+        self.client.force_login(self.customer)
+
+        response = self.client.get(reverse('bookings:booking_create'), {
+            'field': self.field.pk,
+            'booking_date': self.booking_date.isoformat(),
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'Chi tiết booking')
+        self.assertNotContains(response, 'data-booking-checkout-link')
+        self.assertNotContains(response, 'data-booking-detail-link')
+
 
 class ManagementDashboardTests(ScopedBookingTestCase):
     """Role-based staff/owner booking dashboards (non-/admin)."""
@@ -969,7 +1458,7 @@ class ManagementDashboardTests(ScopedBookingTestCase):
         self.field_b = Field.objects.create(
             venue=self.venue_b, field_type=self.field_type, name='Field B1',
         )
-        self.booking_date = date(2026, 6, 10)
+        self.booking_date = future_date(40)
 
         # Bookings on venue A with a service attached + various statuses.
         self.booking_a_paid = self._make_booking(
@@ -1449,7 +1938,7 @@ class OwnerCreatedFieldBookingFlowTests(ScopedBookingTestCase):
             price_per_hour=Decimal('120000.00'),
             priority=1,
         )
-        self.booking_date = date(2026, 6, 1)
+        self.booking_date = future_date(50)
 
         self.redis_client = fakeredis.FakeStrictRedis(decode_responses=True)
         self.redis_patcher = patch('apps.bookings.services.get_redis_client', return_value=self.redis_client)
@@ -1495,10 +1984,11 @@ class OwnerCreatedFieldBookingFlowTests(ScopedBookingTestCase):
         booking = Booking.objects.get(field=self.field, booking_date=self.booking_date)
         detail_response = self.client.get(reverse('bookings:booking_detail', kwargs={'pk': booking.pk}))
 
-        self.assertContains(detail_response, f'href="/payments/bookings/{booking.pk}/"')
+        checkout_url = reverse('payments:booking_checkout', kwargs={'booking_pk': booking.pk})
+        self.assertContains(detail_response, f'href="{checkout_url}"')
         self.assertContains(detail_response, 'Thanh toán')
-        self.assertFalse(Payment.objects.exists())
-        self.assertFalse(Invoice.objects.exists())
+        self.assertEqual(optional_model_count('payments', 'Payment'), 0)
+        self.assertEqual(optional_model_count('payments', 'Invoice'), 0)
         booking.refresh_from_db()
         self.assertEqual(booking.status, Booking.PENDING)
 
@@ -1644,6 +2134,21 @@ class OwnerCreatedFieldBookingFlowTests(ScopedBookingTestCase):
         self.assertFalse(Booking.objects.exists())
         self.assertTrue(response.context['form'].has_error('field', code='invalid_choice'))
 
+    def test_cannot_book_soft_deleted_venue(self):
+        self.venue.is_deleted = True
+        self.venue.deleted_at = timezone.now()
+        self.venue.save(update_fields=['is_deleted', 'deleted_at'])
+        self.client.force_login(self.customer)
+
+        response = self.client.post(
+            reverse('bookings:booking_create_for_field', kwargs={'field_id': self.field.pk}),
+            self._booking_payload(),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Booking.objects.exists())
+        self.assertTrue(response.context['form'].has_error('field', code='invalid_choice'))
+
     def test_anonymous_user_redirected_from_direct_field_booking(self):
         url = reverse('bookings:booking_create_for_field', kwargs={'field_id': self.field.pk})
 
@@ -1733,7 +2238,7 @@ class BookingServiceQueryTests(ScopedBookingTestCase):
             stock=10,
             is_active=False,
         )
-        self.booking_date = date(2026, 6, 10)
+        self.booking_date = future_date(60)
 
         self.redis_client = fakeredis.FakeStrictRedis(decode_responses=True)
         self.redis_patcher = patch('apps.bookings.services.get_redis_client', return_value=self.redis_client)
@@ -1906,3 +2411,631 @@ class BookingServiceQueryTests(ScopedBookingTestCase):
         self.assertFalse(BookingService.objects.exists())
         self.service_a_inactive.refresh_from_db()
         self.assertEqual(self.service_a_inactive.stock, 10)
+
+
+class BookingCheckoutViewTests(ScopedBookingTestCase):
+    def setUp(self):
+        super().setUp()
+        self.customer = get_user_model().objects.create_user(
+            username='customer-checkout',
+            email='customer-checkout@example.com',
+            password='password',
+        )
+        self.other_customer = get_user_model().objects.create_user(
+            username='other-customer-checkout',
+            email='other-customer-checkout@example.com',
+            password='password',
+        )
+        self.owner_user = get_user_model().objects.create_user(
+            username='owner-checkout',
+            email='owner-checkout@example.com',
+            password='password',
+        )
+        self.owner_profile = OwnerProfile.objects.create(
+            user=self.owner_user,
+            business_name='Auth Owner Business',
+        )
+        self.sport = Sport.objects.create(name='Tennis', slug='tennis-checkout')
+        self.field_type = FieldType.objects.create(
+            sport=self.sport,
+            name='Outdoor',
+            slug='tennis-outdoor-checkout',
+            player_count=2,
+        )
+        self.venue = Venue.objects.create(
+            owner=self.owner_profile,
+            name='Auth Venue',
+            address='456 Test Street',
+        )
+        self.field = Field.objects.create(
+            venue=self.venue,
+            field_type=self.field_type,
+            name='Court 1',
+        )
+        self.other_venue = Venue.objects.create(
+            owner=self.owner_profile,
+            name='Private Other Venue',
+            address='789 Other Street',
+        )
+        self.other_field = Field.objects.create(
+            venue=self.other_venue,
+            field_type=self.field_type,
+            name='Private Other Court',
+        )
+        
+        package = BookingPackage.objects.create(
+            user=self.customer,
+            package_type=BookingPackage.SINGLE,
+            start_date=future_date(31),
+        )
+        self.booking = Booking.objects.create(
+            booking_package=package,
+            venue=self.venue,
+            field=self.field,
+            booking_date=future_date(31),
+            status=Booking.PENDING,
+            booking_channel=Booking.WEB,
+            total_amount=Decimal('100000.00'),
+        )
+        
+        other_package = BookingPackage.objects.create(
+            user=self.other_customer,
+            package_type=BookingPackage.SINGLE,
+            start_date=future_date(32),
+        )
+        self.other_booking = Booking.objects.create(
+            booking_package=other_package,
+            venue=self.other_venue,
+            field=self.other_field,
+            booking_date=future_date(32),
+            status=Booking.PENDING,
+            booking_channel=Booking.WEB,
+            total_amount=Decimal('200000.00'),
+        )
+
+    def test_anonymous_user_is_redirected_to_login(self):
+        url = reverse('bookings:booking_checkout', kwargs={'booking_pk': self.booking.pk})
+        response = self.client.get(url)
+        self.assertRedirects(response, _login_redirect_url(url))
+
+    def test_customer_can_open_own_pending_checkout(self):
+        self.client.force_login(self.customer)
+        response = self.client.get(reverse('bookings:booking_checkout', kwargs={'booking_pk': self.booking.pk}))
+        self.assertRedirects(
+            response,
+            reverse('payments:booking_checkout', kwargs={'booking_pk': self.booking.pk}),
+            fetch_redirect_response=False,
+        )
+
+    def test_customer_cannot_open_other_customers_checkout(self):
+        self.client.force_login(self.customer)
+        response = self.client.get(
+            reverse('bookings:booking_checkout', kwargs={'booking_pk': self.other_booking.pk}),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertNotContains(response, 'Private Other Venue', status_code=404)
+
+    def _checkout_url(self, booking=None):
+        booking = booking or self.booking
+        return reverse('payments:booking_checkout', kwargs={'booking_pk': booking.pk})
+
+    def _pay_url(self, booking=None):
+        booking = booking or self.booking
+        return reverse('bookings:booking_pay', kwargs={'booking_pk': booking.pk})
+
+    def _add_slot(self, booking, start, end, price):
+        BookingSlot.objects.create(booking=booking, start_time=start, end_time=end, price=price)
+
+    def test_pending_checkout_shows_wallet_pay_button(self):
+        self.booking.payment_deadline = timezone.now() + timedelta(minutes=10)
+        self.booking.save(update_fields=['payment_deadline', 'updated_at'])
+        self.customer.wallet.balance = Decimal('200000.00')
+        self.customer.wallet.save(update_fields=['balance'])
+        self.client.force_login(self.customer)
+
+        response = self.client.get(self._checkout_url())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Thanh toán bằng ví')
+        self.assertContains(response, reverse('payments:booking_checkout', kwargs={'booking_pk': self.booking.pk}))
+        self.assertContains(response, 'data-booking-countdown')
+
+    def test_paid_checkout_hides_pay_button(self):
+        self.booking.status = Booking.PAID
+        self.booking.save(update_fields=['status', 'updated_at'])
+        self.client.force_login(self.customer)
+
+        response = self.client.get(self._checkout_url(), follow=True)
+
+        self.assertRedirects(response, reverse('bookings:booking_detail', kwargs={'pk': self.booking.pk}))
+        self.assertContains(response, 'Booking đã được thanh toán')
+        self.assertNotContains(response, 'Thanh toán bằng ví')
+
+    def test_cancelled_checkout_hides_pay_button(self):
+        self.booking.status = Booking.CANCELLED
+        self.booking.save(update_fields=['status', 'updated_at'])
+        self.client.force_login(self.customer)
+
+        response = self.client.get(self._checkout_url(), follow=True)
+
+        self.assertRedirects(response, reverse('bookings:booking_detail', kwargs={'pk': self.booking.pk}))
+        self.assertContains(response, 'Booking hiện không thể thanh toán')
+        self.assertNotContains(response, 'Thanh toán bằng ví')
+
+    def test_payment_deadline_not_reset_on_refresh(self):
+        deadline = timezone.now() + timedelta(minutes=7)
+        self.booking.payment_deadline = deadline
+        self.booking.save(update_fields=['payment_deadline', 'updated_at'])
+        self.client.force_login(self.customer)
+
+        self.client.get(self._checkout_url())
+        self.client.get(self._checkout_url())
+
+        self.booking.refresh_from_db()
+        self.assertEqual(self.booking.payment_deadline, deadline)
+
+    def test_expired_pending_booking_is_cancelled_when_opening_checkout(self):
+        self.booking.payment_deadline = timezone.now() - timedelta(minutes=1)
+        self.booking.save(update_fields=['payment_deadline', 'updated_at'])
+        self.client.force_login(self.customer)
+
+        response = self.client.get(self._checkout_url(), follow=True)
+
+        self.assertRedirects(response, reverse('bookings:booking_detail', kwargs={'pk': self.booking.pk}))
+        self.assertContains(response, 'Đơn đặt sân đã quá hạn thanh toán và đã bị hủy.')
+        self.assertNotContains(response, 'Thanh toán bằng ví')
+        self.booking.refresh_from_db()
+        self.assertEqual(self.booking.status, Booking.CANCELLED)
+
+    def test_multi_slot_checkout_shows_each_timeslot(self):
+        self.booking.total_amount = Decimal('200000.00')
+        self.booking.payment_deadline = timezone.now() + timedelta(minutes=10)
+        self.booking.save(update_fields=['total_amount', 'payment_deadline', 'updated_at'])
+        self._add_slot(self.booking, time(8, 0), time(9, 0), Decimal('100000.00'))
+        self._add_slot(self.booking, time(9, 0), time(10, 0), Decimal('100000.00'))
+        self.client.force_login(self.customer)
+
+        response = self.client.get(self._checkout_url())
+
+        self.assertContains(response, '08:00-09:00')
+        self.assertContains(response, '09:00-10:00')
+        self.assertContains(response, '200000đ')
+
+    def test_legacy_post_pay_does_not_mark_booking_paid(self):
+        self.booking.payment_deadline = timezone.now() + timedelta(minutes=10)
+        self.booking.save(update_fields=['payment_deadline', 'updated_at'])
+        self.client.force_login(self.customer)
+
+        response = self.client.post(self._pay_url())
+
+        self.assertRedirects(
+            response,
+            reverse('payments:booking_checkout', kwargs={'booking_pk': self.booking.pk}),
+            fetch_redirect_response=False,
+        )
+        self.booking.refresh_from_db()
+        self.assertEqual(self.booking.status, Booking.PENDING)
+
+    def test_legacy_post_pay_for_expired_booking_does_not_mark_paid(self):
+        self.booking.payment_deadline = timezone.now() - timedelta(minutes=1)
+        self.booking.save(update_fields=['payment_deadline', 'updated_at'])
+        self.client.force_login(self.customer)
+
+        response = self.client.post(
+            self._pay_url(),
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.booking.refresh_from_db()
+        self.assertEqual(self.booking.status, Booking.CANCELLED)
+
+    def test_pay_get_not_allowed(self):
+        self.client.force_login(self.customer)
+        response = self.client.get(self._pay_url())
+        self.assertEqual(response.status_code, 405)
+
+    def test_other_customer_cannot_pay_booking(self):
+        self.client.force_login(self.other_customer)
+        response = self.client.post(self._pay_url(), follow=True)
+        self.assertEqual(response.status_code, 404)
+        self.booking.refresh_from_db()
+        self.assertEqual(self.booking.status, Booking.PENDING)
+
+
+class RealBookingTemplateCompileTests(SimpleTestCase):
+    """Guard against multi-line template tags that crash the real templates.
+
+    The other booking tests swap in stub templates, so a syntax error in the real
+    ``booking_history.html`` / detail templates would otherwise go unnoticed. These
+    use the project's real template engine (no ``override_settings``).
+    """
+
+    def test_real_booking_templates_compile(self):
+        from django.template import TemplateSyntaxError
+        from django.template.loader import get_template
+
+        templates = [
+            'bookings/booking_history.html',
+            'bookings/booking_detail.html',
+            'bookings/booking_list.html',
+            'bookings/booking_form.html',
+            'bookings/booking_checkout.html',
+            'bookings/partials/_booking_detail_content.html',
+            'payments/booking_checkout.html',
+        ]
+        for name in templates:
+            with self.subTest(template=name):
+                try:
+                    get_template(name)
+                except TemplateSyntaxError as exc:  # pragma: no cover - failure path
+                    self.fail(f'{name} failed to compile: {exc}')
+
+
+class BookingHistoryRealTemplateTests(TestCase):
+    """Render the real history page (no stub templates) to verify it loads and
+    that each booking's actions respect the booking status / permissions."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.customer = User.objects.create_user(
+            username='hist-customer', email='hist-customer@example.com', password='password',
+        )
+        self.other_customer = User.objects.create_user(
+            username='hist-other', email='hist-other@example.com', password='password',
+        )
+        self.owner_user = User.objects.create_user(
+            username='hist-owner', email='hist-owner@example.com', password='password',
+        )
+        self.admin_user = User.objects.create_user(
+            username='hist-admin', email='hist-admin@example.com', password='password',
+        )
+        self.staff_user = User.objects.create_user(
+            username='hist-staff', email='hist-staff@example.com', password='password',
+        )
+        self.owner_profile = OwnerProfile.objects.create(
+            user=self.owner_user, business_name='History Owner',
+        )
+        owner_role, _ = Role.objects.get_or_create(name=Role.OWNER)
+        admin_role, _ = Role.objects.get_or_create(name=Role.ADMIN)
+        staff_role, _ = Role.objects.get_or_create(name=Role.STAFF)
+        UserRole.objects.update_or_create(user=self.owner_user, defaults={'role': owner_role})
+        UserRole.objects.update_or_create(user=self.admin_user, defaults={'role': admin_role})
+        UserRole.objects.update_or_create(user=self.staff_user, defaults={'role': staff_role})
+        self.sport = Sport.objects.create(name='HistSport', slug='hist-sport')
+        self.field_type = FieldType.objects.create(
+            sport=self.sport, name='Hist Court', slug='hist-court', player_count=2,
+        )
+        self.venue = Venue.objects.create(
+            owner=self.owner_profile, name='History Venue', address='1 History Street',
+        )
+        self.other_venue = Venue.objects.create(
+            owner=self.owner_profile, name='Private Other Venue', address='2 History Street',
+        )
+        self.field = Field.objects.create(
+            venue=self.venue, field_type=self.field_type, name='History Court', status='ACTIVE',
+        )
+        self.other_field = Field.objects.create(
+            venue=self.other_venue, field_type=self.field_type, name='Private Other Court', status='ACTIVE',
+        )
+        StaffProfile.objects.create(user=self.staff_user, owner=self.owner_profile, venue=self.venue)
+
+    def _make_booking(self, user, status, venue=None, field=None, days=10):
+        venue = venue or self.venue
+        field = field or self.field
+        package = BookingPackage.objects.create(
+            user=user, package_type=BookingPackage.SINGLE, start_date=future_date(days),
+        )
+        booking = Booking.objects.create(
+            booking_package=package, venue=venue, field=field,
+            booking_date=future_date(days), status=status,
+            booking_channel=Booking.WEB, total_amount=Decimal('120000.00'),
+        )
+        BookingSlot.objects.create(
+            booking=booking, start_time=time(9, 0), end_time=time(10, 0), price=Decimal('120000.00'),
+        )
+        return booking
+
+    def test_history_page_loads_for_customer(self):
+        self._make_booking(self.customer, Booking.PENDING)
+        self.client.force_login(self.customer)
+        response = self.client.get(reverse('bookings:booking_history'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'History Venue')
+        self.assertContains(response, 'History Court')
+
+    def test_pending_booking_shows_detail_pay_and_cancel(self):
+        booking = self._make_booking(self.customer, Booking.PENDING)
+        self.client.force_login(self.customer)
+        response = self.client.get(reverse('bookings:booking_history'))
+
+        detail_url = reverse('bookings:booking_detail', kwargs={'pk': booking.pk})
+        checkout_url = reverse('payments:booking_checkout', kwargs={'booking_pk': booking.pk})
+        cancel_url = reverse('bookings:booking_cancel', kwargs={'pk': booking.pk})
+        self.assertContains(response, f'href="{detail_url}"')
+        self.assertContains(response, f'href="{checkout_url}"')
+        self.assertContains(response, f'action="{cancel_url}"')
+        # Payable row: whole-row click targets the checkout, not the detail.
+        self.assertContains(response, f'data-target-url="{checkout_url}"')
+
+    def test_paid_booking_hides_pay_and_cancel(self):
+        booking = self._make_booking(self.customer, Booking.PAID)
+        self.client.force_login(self.customer)
+        response = self.client.get(reverse('bookings:booking_history'))
+
+        detail_url = reverse('bookings:booking_detail', kwargs={'pk': booking.pk})
+        checkout_url = reverse('payments:booking_checkout', kwargs={'booking_pk': booking.pk})
+        cancel_url = reverse('bookings:booking_cancel', kwargs={'pk': booking.pk})
+        self.assertContains(response, f'href="{detail_url}"')
+        self.assertNotContains(response, f'href="{checkout_url}"')
+        self.assertNotContains(response, f'action="{cancel_url}"')
+
+    def test_cancelled_booking_hides_pay_and_cancel(self):
+        booking = self._make_booking(self.customer, Booking.CANCELLED)
+        self.client.force_login(self.customer)
+        response = self.client.get(reverse('bookings:booking_history'))
+
+        checkout_url = reverse('payments:booking_checkout', kwargs={'booking_pk': booking.pk})
+        cancel_url = reverse('bookings:booking_cancel', kwargs={'pk': booking.pk})
+        self.assertNotContains(response, f'href="{checkout_url}"')
+        self.assertNotContains(response, f'action="{cancel_url}"')
+
+    def test_pending_booking_shows_continue_payment_label(self):
+        self._make_booking(self.customer, Booking.PENDING)
+        self.client.force_login(self.customer)
+        response = self.client.get(reverse('bookings:booking_history'))
+        self.assertContains(response, 'Tiếp tục thanh toán')
+
+    def test_customer_paid_booking_shows_invoice_action(self):
+        booking = self._make_booking(self.customer, Booking.PAID)
+        self.client.force_login(self.customer)
+        response = self.client.get(reverse('bookings:booking_history'))
+
+        invoice_url = reverse('payments:booking_invoice', kwargs={'booking_pk': booking.pk})
+        checkout_url = reverse('payments:booking_checkout', kwargs={'booking_pk': booking.pk})
+        self.assertContains(response, f'href="{invoice_url}"')
+        self.assertContains(response, 'Xem hóa đơn')
+        self.assertContains(response, f'data-target-url="{invoice_url}"')
+        self.assertNotContains(response, f'href="{checkout_url}"')
+
+    def test_customer_booking_with_completed_payment_shows_invoice_action(self):
+        # Booking still PENDING but a completed Payment exists -> treated as paid.
+        booking = self._make_booking(self.customer, Booking.PENDING)
+        Payment.objects.create(
+            booking=booking,
+            method=Payment.Method.WALLET,
+            payment_type=Payment.PaymentType.FINAL,
+            amount=booking.total_amount,
+            status=Payment.Status.COMPLETED,
+        )
+        self.client.force_login(self.customer)
+        response = self.client.get(reverse('bookings:booking_history'))
+
+        invoice_url = reverse('payments:booking_invoice', kwargs={'booking_pk': booking.pk})
+        checkout_url = reverse('payments:booking_checkout', kwargs={'booking_pk': booking.pk})
+        self.assertContains(response, f'href="{invoice_url}"')
+        self.assertNotContains(response, f'href="{checkout_url}"')
+
+    def test_owner_sees_invoice_action_for_paid_booking_in_own_venue(self):
+        booking = self._make_booking(self.customer, Booking.PAID)
+        self.client.force_login(self.owner_user)
+        response = self.client.get(reverse('bookings:booking_history'))
+
+        invoice_url = reverse('payments:booking_invoice', kwargs={'booking_pk': booking.pk})
+        self.assertContains(response, f'href="{invoice_url}"')
+        self.assertContains(response, 'Xem hóa đơn')
+
+    def test_admin_sees_invoice_action_for_paid_booking(self):
+        booking = self._make_booking(self.customer, Booking.PAID)
+        self.client.force_login(self.admin_user)
+        response = self.client.get(reverse('bookings:booking_history'))
+
+        invoice_url = reverse('payments:booking_invoice', kwargs={'booking_pk': booking.pk})
+        self.assertContains(response, f'href="{invoice_url}"')
+
+    def test_history_does_not_leak_other_customers_booking(self):
+        own = self._make_booking(self.customer, Booking.PENDING)
+        other = self._make_booking(
+            self.other_customer, Booking.PENDING, venue=self.other_venue, field=self.other_field,
+        )
+        self.client.force_login(self.customer)
+        response = self.client.get(reverse('bookings:booking_history'))
+
+        self.assertContains(response, str(own.pk))
+        self.assertNotContains(response, str(other.pk))
+        self.assertNotContains(response, 'Private Other Venue')
+
+    def test_privileged_history_hides_customer_payment_link_for_managed_booking(self):
+        booking = self._make_booking(self.customer, Booking.PENDING)
+        checkout_url = reverse('payments:booking_checkout', kwargs={'booking_pk': booking.pk})
+
+        for user in (self.owner_user, self.admin_user, self.staff_user):
+            with self.subTest(user=user.email):
+                self.client.force_login(user)
+                response = self.client.get(reverse('bookings:booking_history'))
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, 'History Venue')
+                self.assertContains(response, 'History Court')
+                self.assertNotContains(response, f'href="{checkout_url}"')
+                self.client.logout()
+
+    def test_owner_detail_hides_customer_payment_link_for_managed_booking(self):
+        booking = self._make_booking(self.customer, Booking.PENDING)
+        checkout_url = reverse('payments:booking_checkout', kwargs={'booking_pk': booking.pk})
+        self.client.force_login(self.owner_user)
+
+        response = self.client.get(reverse('bookings:owner_booking_detail', kwargs={'pk': booking.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'History Venue')
+        self.assertNotContains(response, f'href="{checkout_url}"')
+
+    def test_customer_cannot_open_other_customers_detail_real_template(self):
+        other = self._make_booking(
+            self.other_customer, Booking.PENDING, venue=self.other_venue, field=self.other_field,
+        )
+        self.client.force_login(self.customer)
+        response = self.client.get(reverse('bookings:booking_detail', kwargs={'pk': other.pk}))
+        self.assertEqual(response.status_code, 404)
+
+    def test_customer_detail_page_loads_real_template(self):
+        booking = self._make_booking(self.customer, Booking.PENDING)
+        self.client.force_login(self.customer)
+        response = self.client.get(reverse('bookings:booking_detail', kwargs={'pk': booking.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'History Venue')
+        self.assertContains(response, booking.get_status_display())
+
+
+class BookingPaymentTimeoutTests(ScopedBookingTestCase):
+    """Feature #2 — the 10-minute hold is handled entirely inside bookings."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.customer = User.objects.create_user(
+            username='timeout-customer', email='timeout-customer@example.com', password='password',
+        )
+        self.owner_user = User.objects.create_user(
+            username='timeout-owner', email='timeout-owner@example.com', password='password',
+        )
+        self.owner_profile = OwnerProfile.objects.create(
+            user=self.owner_user, business_name='Timeout Owner',
+        )
+        self.sport = Sport.objects.create(name='TimeoutSport', slug='timeout-sport')
+        self.field_type = FieldType.objects.create(
+            sport=self.sport, name='Timeout Court', slug='timeout-court', player_count=2,
+        )
+        self.venue = Venue.objects.create(
+            owner=self.owner_profile, name='Timeout Venue', address='1 Timeout Street', status='ACTIVE',
+        )
+        self.field = Field.objects.create(
+            venue=self.venue, field_type=self.field_type, name='Timeout Court 1', status='ACTIVE',
+        )
+
+    def _make_booking(self, status=Booking.PENDING, deadline_minutes=BOOKING_PAYMENT_TIMEOUT_MINUTES,
+                      start=time(9, 0), end=time(10, 0), days=10, user=None):
+        user = user or self.customer
+        package = BookingPackage.objects.create(
+            user=user, package_type=BookingPackage.SINGLE, start_date=future_date(days),
+        )
+        deadline = None
+        if deadline_minutes is not None:
+            deadline = timezone.now() + timedelta(minutes=deadline_minutes)
+        booking = Booking.objects.create(
+            booking_package=package, venue=self.venue, field=self.field,
+            booking_date=future_date(days), status=status, booking_channel=Booking.WEB,
+            total_amount=Decimal('120000.00'), payment_deadline=deadline,
+        )
+        BookingSlot.objects.create(
+            booking=booking, start_time=start, end_time=end, price=Decimal('120000.00'),
+        )
+        return booking
+
+    def test_cancel_expired_pending_bookings_cancels_expired(self):
+        booking = self._make_booking(deadline_minutes=-1)
+        cancelled = cancel_expired_pending_bookings()
+        self.assertEqual(cancelled, 1)
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, Booking.CANCELLED)
+
+    def test_non_expired_pending_booking_keeps_slot(self):
+        booking = self._make_booking(deadline_minutes=5)
+        cancelled = cancel_expired_pending_bookings()
+        self.assertEqual(cancelled, 0)
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, Booking.PENDING)
+
+    def test_paid_booking_is_not_cancelled_by_timeout(self):
+        booking = self._make_booking(status=Booking.PAID, deadline_minutes=-1)
+        cancel_expired_pending_bookings()
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, Booking.PAID)
+
+    def test_expired_booking_frees_its_slot(self):
+        booking = self._make_booking(deadline_minutes=-1)
+        # Held while still pending.
+        self.assertFalse(is_time_range_available(self.field, booking.booking_date, time(9, 0), time(10, 0)))
+        cancel_expired_pending_bookings()
+        # Freed once cancelled.
+        self.assertTrue(is_time_range_available(self.field, booking.booking_date, time(9, 0), time(10, 0)))
+
+    def test_cancel_expired_booking_if_needed_and_can_pay(self):
+        booking = self._make_booking(deadline_minutes=-1)
+        self.assertTrue(cancel_expired_booking_if_needed(booking))
+        self.assertFalse(booking.can_pay())
+        # Idempotent: a second call does nothing.
+        self.assertFalse(cancel_expired_booking_if_needed(booking))
+
+    def test_checkout_view_cancels_expired_and_redirects_to_detail(self):
+        booking = self._make_booking(deadline_minutes=-1)
+        self.client.force_login(self.customer)
+        response = self.client.get(
+            reverse('payments:booking_checkout', kwargs={'booking_pk': booking.pk}),
+            follow=True,
+        )
+        # Redirects to detail so the user sees why it lapsed without rendering checkout.
+        self.assertEqual(response.status_code, 200)
+        self.assertRedirects(response, reverse('bookings:booking_detail', kwargs={'pk': booking.pk}))
+        self.assertNotContains(
+            response,
+            'Thanh toán bằng ví',
+        )
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, Booking.CANCELLED)
+        messages = [str(m) for m in get_messages(response.wsgi_request)]
+        self.assertTrue(any('quá hạn' in m for m in messages))
+
+    def test_booking_status_endpoint_cancels_expired_pending_booking(self):
+        booking = self._make_booking(deadline_minutes=-1)
+        self.client.force_login(self.customer)
+
+        response = self.client.get(
+            reverse('bookings:booking_status', kwargs={'pk': booking.pk}),
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+            HTTP_ACCEPT='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, Booking.CANCELLED)
+        self.assertEqual(payload['status'], Booking.CANCELLED)
+        self.assertFalse(payload['can_pay'])
+
+    def test_history_view_cancels_expired_pending(self):
+        booking = self._make_booking(deadline_minutes=-1)
+        self.client.force_login(self.customer)
+        response = self.client.get(reverse('bookings:booking_history'))
+        self.assertEqual(response.status_code, 200)
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, Booking.CANCELLED)
+
+    def test_create_booking_sets_payment_deadline(self):
+        before = timezone.now()
+        booking = create_booking(
+            user=self.customer,
+            field=self.field,
+            booking_date=future_date(12),
+            start_time=time(9, 0),
+            end_time=time(10, 0),
+            price=Decimal('120000.00'),
+        )
+        self.assertIsNotNone(booking.payment_deadline)
+        expected = before + timedelta(minutes=BOOKING_PAYMENT_TIMEOUT_MINUTES)
+        # Allow a little execution slack.
+        self.assertGreaterEqual(booking.payment_deadline, expected - timedelta(seconds=30))
+        self.assertLessEqual(booking.payment_deadline, expected + timedelta(seconds=60))
+
+    def test_management_command_cancels_expired_bookings(self):
+        from django.core.management import call_command
+
+        booking = self._make_booking(deadline_minutes=-1)
+        call_command('cancel_expired_bookings')
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, Booking.CANCELLED)
+
+    def test_get_payment_deadline_is_ten_minutes(self):
+        now = timezone.now()
+        self.assertEqual(get_payment_deadline(now), now + timedelta(minutes=10))
+

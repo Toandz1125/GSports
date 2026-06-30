@@ -1,0 +1,281 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}Hóa đơn booking — GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .invoice-page {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+    }
+
+    .invoice-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .invoice-header h1 {
+        color: var(--text-main);
+        font-size: 1.5rem;
+        font-weight: 800;
+        margin: 0;
+    }
+
+    .invoice-header p {
+        color: var(--text-muted);
+        font-size: 0.875rem;
+        margin: 0.25rem 0 0;
+        overflow-wrap: anywhere;
+    }
+
+    .invoice-header-actions {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .invoice-note {
+        border-radius: var(--radius-md);
+        padding: 0.65rem 0.85rem;
+        font-weight: 600;
+        font-size: 0.85rem;
+        background: rgba(245, 158, 11, 0.12);
+        color: #d97706;
+    }
+
+    .invoice-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    @media (min-width: 900px) {
+        .invoice-grid {
+            grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+        }
+    }
+
+    .invoice-panel {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+        padding: 1.25rem;
+    }
+
+    .invoice-panel h2 {
+        color: var(--text-main);
+        font-size: 1rem;
+        margin: 0 0 1rem;
+    }
+
+    .invoice-list {
+        display: grid;
+        gap: 0.75rem;
+    }
+
+    .invoice-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 0.75rem;
+        color: var(--text-main);
+    }
+
+    .invoice-row span {
+        color: var(--text-muted);
+    }
+
+    .invoice-row strong {
+        text-align: right;
+        overflow-wrap: anywhere;
+    }
+
+    .invoice-total {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-top: 1rem;
+        color: var(--text-main);
+        font-size: 1.1rem;
+        font-weight: 800;
+    }
+
+    .invoice-status {
+        border-radius: var(--radius-md);
+        padding: 0.55rem 0.8rem;
+        font-weight: 700;
+        font-size: 0.85rem;
+        display: inline-flex;
+    }
+
+    .invoice-status--paid {
+        background: rgba(16, 185, 129, 0.12);
+        color: var(--success-600, #059669);
+    }
+
+    .invoice-status--pending {
+        background: rgba(245, 158, 11, 0.12);
+        color: #d97706;
+    }
+
+    .invoice-status--cancelled {
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--error-500, #ef4444);
+    }
+
+    .invoice-actions {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-top: 1.25rem;
+    }
+
+    .invoice-services {
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+        margin-top: 0.5rem;
+    }
+
+    .invoice-service-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 0.6rem;
+        font-size: 0.875rem;
+        color: var(--text-main);
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="invoice-page">
+    <div class="invoice-header">
+        <div>
+            <h1>Hóa đơn / Biên nhận</h1>
+            <p>Mã booking: {{ booking.id }}</p>
+            {% if invoice %}<p>Mã hóa đơn: {{ invoice.invoice_code }}</p>{% endif %}
+        </div>
+        <div class="invoice-header-actions">
+            <a href="{% url 'bookings:booking_history' %}" class="btn btn--secondary">Quay lại lịch sử</a>
+            {% if can_pay_booking and is_owner_self %}
+            <a href="{% url 'payments:booking_checkout' booking.pk %}" class="btn btn--primary">Tiếp tục thanh toán</a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if no_official_invoice %}
+    <div class="invoice-note">Chưa có mã hóa đơn chính thức</div>
+    {% endif %}
+
+    <div class="invoice-grid">
+        <section class="invoice-panel">
+            <h2>Thông tin đặt sân</h2>
+            <div class="invoice-list">
+                <div class="invoice-row">
+                    <span>Cơ sở</span>
+                    <strong>{{ booking.venue.name }}</strong>
+                </div>
+                <div class="invoice-row">
+                    <span>Sân</span>
+                    <strong>{{ booking.field.name }}</strong>
+                </div>
+                <div class="invoice-row">
+                    <span>Khách hàng</span>
+                    <strong>
+                        {% if booking.booking_package.user.first_name or booking.booking_package.user.last_name %}{{ booking.booking_package.user.first_name }} {{ booking.booking_package.user.last_name }}{% else %}Khách hàng{% endif %}
+                        <br><span style="font-weight:400;">{{ booking.booking_package.user.email }}</span>
+                    </strong>
+                </div>
+                <div class="invoice-row">
+                    <span>Ngày đặt</span>
+                    <strong>{{ booking.booking_date|date:"d/m/Y" }}</strong>
+                </div>
+                <div class="invoice-row">
+                    <span>Khung giờ</span>
+                    <strong>{% for slot in booking.slots.all %}{{ slot.start_time|time:"H:i" }}-{{ slot.end_time|time:"H:i" }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</strong>
+                </div>
+            </div>
+
+            <h2 style="margin-top:1.5rem;">Dịch vụ đi kèm</h2>
+            <div class="invoice-services">
+                {% for service in booking.services_ordered.all %}
+                <div class="invoice-service-row">
+                    <span>{{ service.service_item.name }} x{{ service.quantity }}</span>
+                    <strong>{{ service.total_price|floatformat:0 }}đ</strong>
+                </div>
+                {% empty %}
+                <p style="color:var(--text-muted);font-size:0.875rem;">Không có dịch vụ đi kèm.</p>
+                {% endfor %}
+            </div>
+        </section>
+
+        <aside class="invoice-panel">
+            <h2>Thanh toán</h2>
+            <div class="invoice-list">
+                <div class="invoice-row">
+                    <span>Tiền sân</span>
+                    <strong>{{ booking.court_total|floatformat:0 }}đ</strong>
+                </div>
+                <div class="invoice-row">
+                    <span>Tiền dịch vụ</span>
+                    <strong>{{ booking.service_total|floatformat:0 }}đ</strong>
+                </div>
+                <div class="invoice-row">
+                    <span>Trạng thái booking</span>
+                    <strong>
+                        <span class="invoice-status {% if booking.status == 'PAID' %}invoice-status--paid{% elif booking.status == 'CANCELLED' %}invoice-status--cancelled{% else %}invoice-status--pending{% endif %}">{{ booking.get_status_display }}</span>
+                    </strong>
+                </div>
+                <div class="invoice-row">
+                    <span>Trạng thái thanh toán</span>
+                    <strong>
+                        {% if payment %}
+                        <span class="invoice-status invoice-status--paid">{{ payment.get_status_display }}</span>
+                        {% elif is_paid %}
+                        <span class="invoice-status invoice-status--paid">Đã thanh toán</span>
+                        {% elif is_cancelled %}
+                        <span class="invoice-status invoice-status--cancelled">Chưa thanh toán</span>
+                        {% else %}
+                        <span class="invoice-status invoice-status--pending">Chưa thanh toán</span>
+                        {% endif %}
+                    </strong>
+                </div>
+                {% if payment.transaction_code %}
+                <div class="invoice-row">
+                    <span>Mã giao dịch</span>
+                    <strong>{{ payment.transaction_code }}</strong>
+                </div>
+                {% endif %}
+                {% if payment.paid_at %}
+                <div class="invoice-row">
+                    <span>Thời gian thanh toán</span>
+                    <strong>{{ payment.paid_at|date:"d/m/Y H:i" }}</strong>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="invoice-total">
+                <span>Tổng tiền</span>
+                <strong>{{ booking.grand_total|floatformat:0 }}đ</strong>
+            </div>
+
+            <div class="invoice-actions">
+                <a href="{% url 'bookings:booking_history' %}" class="btn btn--secondary">Quay lại lịch sử</a>
+                {% if can_pay_booking and is_owner_self %}
+                <a href="{% url 'payments:booking_checkout' booking.pk %}" class="btn btn--primary">Tiếp tục thanh toán</a>
+                {% endif %}
+            </div>
+        </aside>
+    </div>
+</div>
+{% endblock %}

@@ -1,17 +1,208 @@
 from django.urls import path
-from . import views
+
+from .views import (
+    AdminApproveFieldRequestView,
+    AdminApproveVenueRequestView,
+    AdminRejectFieldRequestView,
+    AdminRejectVenueRequestView,
+    AdminRequestListView,
+    AdminRegistrationRequestApproveView,
+    AdminRegistrationRequestDetailView,
+    AdminRegistrationRequestListView,
+    AdminRegistrationRequestRejectView,
+    AdminFieldCreateView,
+    AdminVenueFieldDeleteView,
+    AdminVenueFieldListView,
+    AdminVenueFieldToggleView,
+    AdminVenueFieldUpdateView,
+    AdminVenueCreateView,
+    AdminVenueDeactivateView,
+    AdminVenueDetailView,
+    AdminVenueListView,
+    AdminVenueRestoreView,
+    AdminVenueSoftDeleteView,
+    AdminVenueUpdateView,
+    FieldManageView,
+    FieldPricingUpdateView,
+    FieldServicePriceView,
+    FieldServiceToggleView,
+    OwnerFieldCreateView,
+    OwnerFieldListView,
+    OwnerPriceRuleCreateView,
+    OwnerPriceRuleListView,
+    OwnerPriceRuleUpdateView,
+    OwnerPriceRuleDeleteView,
+    OwnerVenueCreateView,
+    OwnerVenueListView,
+)
 
 app_name = 'venues'
 
 urlpatterns = [
-    # --- Quản lý Cơ sở (Venues) ---
-    path('', views.VenueListView.as_view(), name='venue_list'),
-    path('tao/', views.VenueCreateView.as_view(), name='venue_create'),
-    path('<int:pk>/', views.VenueDetailView.as_view(), name='venue_detail'),
-    path('<int:pk>/sua/', views.VenueUpdateView.as_view(), name='venue_edit'),
-    
-    # --- Quản lý Sân con (Fields) ---
-    path('<int:venue_id>/san/them/', views.FieldCreateView.as_view(), name='field_create'),
-    path('san/<int:pk>/sua/', views.FieldUpdateView.as_view(), name='field_edit'),
-    path('san/<int:pk>/xoa/', views.FieldDeleteView.as_view(), name='field_delete'),
+    path('admin/requests/', AdminRequestListView.as_view(), name='admin_request_list'),
+    path(
+        'admin/requests/venues/<int:pk>/approve/',
+        AdminApproveVenueRequestView.as_view(),
+        name='admin_request_venue_approve',
+    ),
+    path(
+        'admin/requests/venues/<int:pk>/reject/',
+        AdminRejectVenueRequestView.as_view(),
+        name='admin_request_venue_reject',
+    ),
+    path(
+        'admin/requests/fields/<int:pk>/approve/',
+        AdminApproveFieldRequestView.as_view(),
+        name='admin_request_field_approve',
+    ),
+    path(
+        'admin/requests/fields/<int:pk>/reject/',
+        AdminRejectFieldRequestView.as_view(),
+        name='admin_request_field_reject',
+    ),
+    path('admin/venues/', AdminVenueListView.as_view(), name='admin_venue_list'),
+    path('admin/venues/create/', AdminVenueCreateView.as_view(), name='admin_venue_create'),
+    path(
+        'admin/venues/<int:venue_id>/fields/',
+        AdminVenueFieldListView.as_view(),
+        name='admin_venue_field_list',
+    ),
+    path(
+        'admin/venues/<int:venue_id>/fields/create/',
+        AdminFieldCreateView.as_view(),
+        name='admin_venue_field_create',
+    ),
+    path(
+        'admin/venues/<int:venue_id>/fields/<int:pk>/edit/',
+        AdminVenueFieldUpdateView.as_view(),
+        name='admin_venue_field_update',
+    ),
+    path(
+        'admin/venues/<int:venue_id>/fields/<int:pk>/toggle/',
+        AdminVenueFieldToggleView.as_view(),
+        name='admin_venue_field_toggle',
+    ),
+    path(
+        'admin/venues/<int:venue_id>/fields/<int:pk>/delete/',
+        AdminVenueFieldDeleteView.as_view(),
+        name='admin_venue_field_delete',
+    ),
+    path(
+        'admin/venues/<int:venue_pk>/fields/create/',
+        AdminFieldCreateView.as_view(),
+        name='admin_field_create',
+    ),
+    path('admin/venues/<int:pk>/', AdminVenueDetailView.as_view(), name='admin_venue_detail'),
+    path('admin/venues/<int:pk>/edit/', AdminVenueUpdateView.as_view(), name='admin_venue_update'),
+    path('admin/venues/<int:pk>/deactivate/', AdminVenueDeactivateView.as_view(), name='admin_venue_deactivate'),
+    path('admin/venues/<int:pk>/delete/', AdminVenueSoftDeleteView.as_view(), name='admin_venue_delete'),
+    path('admin/venues/<int:pk>/restore/', AdminVenueRestoreView.as_view(), name='admin_venue_restore'),
+    path(
+        'admin/venue-requests/',
+        AdminRegistrationRequestListView.as_view(),
+        name='admin_venue_request_list',
+    ),
+    path(
+        'admin/venue-requests/<int:pk>/',
+        AdminRegistrationRequestDetailView.as_view(),
+        name='admin_venue_request_detail',
+    ),
+    path(
+        'admin/venue-requests/<int:pk>/approve/',
+        AdminRegistrationRequestApproveView.as_view(),
+        name='admin_venue_request_approve',
+    ),
+    path(
+        'admin/venue-requests/<int:pk>/reject/',
+        AdminRegistrationRequestRejectView.as_view(),
+        name='admin_venue_request_reject',
+    ),
+    path(
+        'admin/registration-requests/',
+        AdminRegistrationRequestListView.as_view(),
+        name='admin_registration_request_list',
+    ),
+    path(
+        'admin/registration-requests/<int:pk>/',
+        AdminRegistrationRequestDetailView.as_view(),
+        name='admin_registration_request_detail',
+    ),
+    path(
+        'admin/registration-requests/<int:pk>/approve/',
+        AdminRegistrationRequestApproveView.as_view(),
+        name='admin_registration_request_approve',
+    ),
+    path(
+        'admin/registration-requests/<int:pk>/reject/',
+        AdminRegistrationRequestRejectView.as_view(),
+        name='admin_registration_request_reject',
+    ),
+    path(
+        'owner/venues/',
+        OwnerVenueListView.as_view(),
+        name='owner_venue_list',
+    ),
+    path(
+        'owner/venues/',
+        OwnerVenueListView.as_view(),
+        name='venue_list',
+    ),
+    path(
+        'owner/venues/create/',
+        OwnerVenueCreateView.as_view(),
+        name='owner_venue_create',
+    ),
+    path(
+        'owner/venues/create/',
+        OwnerVenueCreateView.as_view(),
+        name='venue_create',
+    ),
+    path(
+        'owner/venues/<int:pk>/fields/',
+        OwnerFieldListView.as_view(),
+        name='venue_detail',
+    ),
+    path(
+        'owner/venues/<int:venue_pk>/fields/',
+        OwnerFieldListView.as_view(),
+        name='owner_field_list',
+    ),
+    path(
+        'owner/venues/<int:venue_pk>/fields/create/',
+        OwnerFieldCreateView.as_view(),
+        name='owner_field_create',
+    ),
+    path(
+        'owner/fields/<int:field_pk>/price-rules/',
+        OwnerPriceRuleListView.as_view(),
+        name='owner_price_rule_list',
+    ),
+    path(
+        'owner/fields/<int:field_pk>/price-rules/create/',
+        OwnerPriceRuleCreateView.as_view(),
+        name='owner_price_rule_create',
+    ),
+    path(
+        'owner/price-rules/<int:pk>/edit/',
+        OwnerPriceRuleUpdateView.as_view(),
+        name='owner_price_rule_edit',
+    ),
+    path(
+        'owner/price-rules/<int:pk>/delete/',
+        OwnerPriceRuleDeleteView.as_view(),
+        name='owner_price_rule_delete',
+    ),
+    # 3-panel field management screen (info / pricing / services).
+    path('san/<int:pk>/sua/', FieldManageView.as_view(), name='field_edit'),
+    path('san/<int:pk>/gia/', FieldPricingUpdateView.as_view(), name='field_pricing_update'),
+    path(
+        'san/<int:pk>/dich-vu/<int:item_id>/gia/',
+        FieldServicePriceView.as_view(),
+        name='field_service_price',
+    ),
+    path(
+        'san/<int:pk>/dich-vu/<int:item_id>/trang-thai/',
+        FieldServiceToggleView.as_view(),
+        name='field_service_toggle',
+    ),
 ]

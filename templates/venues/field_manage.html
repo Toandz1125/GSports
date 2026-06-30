@@ -1,0 +1,234 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }} — GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .field-manage__back {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--text-muted);
+        font-weight: 500;
+        font-size: 0.875rem;
+        margin-bottom: 1rem;
+        transition: color var(--transition-fast);
+    }
+    .field-manage__back:hover { color: var(--primary-600); }
+    .field-manage__back svg { width: 1.1rem; height: 1.1rem; }
+
+    .field-manage__head { margin-bottom: 1.5rem; }
+    .field-manage__title {
+        font-size: 1.6rem;
+        font-weight: 800;
+        color: var(--text-main);
+        margin-bottom: 1rem;
+    }
+
+    /* Tab switcher */
+    .field-manage__tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 0.4rem;
+    }
+    .fm-tab {
+        flex: 1 1 auto;
+        text-align: center;
+        padding: 0.65rem 1rem;
+        border-radius: var(--radius-md);
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 0.875rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        white-space: nowrap;
+    }
+    .fm-tab:hover { color: var(--text-main); background: var(--bg-main); }
+    .fm-tab--active {
+        background: var(--primary-600);
+        color: #fff;
+        border-color: var(--primary-600);
+    }
+    .fm-tab--active:hover { color: #fff; background: var(--primary-600); }
+
+    /* Panels */
+    .fm-panel { margin-top: 1.5rem; }
+    .fm-panel[hidden] { display: none; }
+    .fm-panel--active { animation: fmFade var(--transition-base, 0.25s) ease; }
+    @keyframes fmFade {
+        from { opacity: 0; transform: translateY(6px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .fm-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 2rem;
+        box-shadow: var(--shadow-sm);
+    }
+    .fm-card__title {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--text-main);
+        margin-bottom: 1.5rem;
+        border-left: 4px solid var(--primary-600);
+        padding-left: 0.75rem;
+    }
+
+    .form-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+    @media (min-width: 768px) {
+        .form-grid { grid-template-columns: 1fr 1fr; }
+        .form-grid--full-width { grid-column: span 2; }
+    }
+    .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
+    .form-group label { font-size: 0.875rem; font-weight: 600; color: var(--text-muted); }
+    .form-group input, .form-group select {
+        padding: 0.75rem 1rem;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-color);
+        background-color: var(--bg-main);
+        color: var(--text-main);
+        font-size: 0.875rem;
+        width: 100%;
+        box-sizing: border-box;
+        transition: border-color var(--transition-fast);
+    }
+    .form-group input:focus, .form-group select:focus {
+        border-color: var(--primary-500);
+        outline: none;
+        background-color: var(--bg-surface);
+    }
+    .form-group--error input, .form-group--error select { border-color: var(--error-500) !important; }
+    .form-error { color: var(--error-500); font-size: 0.75rem; margin-top: 0.25rem; }
+
+    .fm-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: flex-end;
+        margin-top: 1.75rem;
+        border-top: 1px solid var(--border-color);
+        padding-top: 1.25rem;
+        flex-wrap: wrap;
+    }
+    .btn--secondary { background-color: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-main); }
+    .btn--secondary:hover { background-color: var(--border-color); }
+    .btn--danger-outline { background: none; border: 1px solid var(--error-500); color: var(--error-500); }
+    .btn--danger-outline:hover { background-color: rgba(239, 68, 68, 0.08); }
+
+    /* Pricing panel */
+    .fm-pricing-controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 1.5rem;
+        margin-bottom: 1.25rem;
+    }
+    .fm-pricing-controls .form-group { min-width: 200px; }
+    .fm-pricing-select-all { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-muted); }
+    .fm-pricing-table-wrap { overflow-x: auto; border: 1px solid var(--border-color); border-radius: var(--radius-md); }
+    .fm-pricing-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    .fm-pricing-table th {
+        text-align: left;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-muted);
+        text-transform: uppercase;
+        font-size: 0.7rem;
+        letter-spacing: 0.05em;
+    }
+    .fm-pricing-table td { padding: 0.65rem 1rem; border-bottom: 1px solid var(--border-color); color: var(--text-main); }
+    .fm-pricing-table tr:last-child td { border-bottom: none; }
+    .fm-price-row--custom td { background: rgba(79, 70, 229, 0.04); }
+
+    .fm-source {
+        display: inline-block;
+        padding: 0.1rem 0.55rem;
+        border-radius: var(--radius-full);
+        font-size: 0.72rem;
+        font-weight: 600;
+        background: var(--bg-main);
+        color: var(--text-muted);
+        border: 1px solid var(--border-color);
+    }
+    .fm-source--custom { background: rgba(16, 185, 129, 0.12); color: #10b981; border-color: transparent; }
+
+    /* Services panel */
+    .fm-services-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 1.25rem;
+    }
+    .fm-service-card {
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        background: var(--bg-main);
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+    }
+    .fm-service-card--off { opacity: 0.65; }
+    .fm-service-card__img { width: 100%; height: 120px; object-fit: cover; border-radius: var(--radius-sm); }
+    .fm-service-card__name { font-weight: 700; color: var(--text-main); }
+    .fm-service-card__cat { font-size: 0.75rem; color: var(--text-muted); }
+    .fm-service-card__price { font-size: 1.05rem; font-weight: 700; color: var(--primary-600); }
+    .fm-service-card__stock { font-size: 0.8rem; color: var(--text-muted); }
+    .fm-service-card__actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: auto; }
+    .fm-service-card__actions .btn { padding: 0.45rem 0.75rem; font-size: 0.78rem; }
+    .fm-service-card__actions form { margin: 0; }
+    .fm-service-price-form { display: flex; flex-direction: column; gap: 0.5rem; margin: 0; }
+    .fm-service-price-form[hidden] { display: none; }
+    .fm-service-price-form input {
+        padding: 0.5rem 0.75rem;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-color);
+        background-color: var(--bg-surface);
+        color: var(--text-main);
+        font-size: 0.85rem;
+    }
+    .fm-service-price-form .fm-actions { margin-top: 0.25rem; padding-top: 0; border-top: none; justify-content: flex-start; }
+    .fm-service-price-form .btn { padding: 0.4rem 0.7rem; font-size: 0.78rem; }
+    .fm-empty { color: var(--text-muted); font-size: 0.9rem; padding: 1.5rem 0; }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="field-manage" data-field-manage data-field-id="{{ field.pk }}">
+    <a href="{% url 'venues:venue_detail' venue.pk %}" class="field-manage__back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        <span>Quay lại cơ sở</span>
+    </a>
+
+    <div class="field-manage__head">
+        <h1 class="field-manage__title">{{ field.name }}</h1>
+        <div class="field-manage__tabs" role="tablist">
+            <a href="?tab=info" class="fm-tab {% if active_tab == 'info' %}fm-tab--active{% endif %}" data-field-tab="info" role="tab">Chỉnh thông tin sân</a>
+            <a href="?tab=pricing" class="fm-tab {% if active_tab == 'pricing' %}fm-tab--active{% endif %}" data-field-tab="pricing" role="tab">Chỉnh bảng giá</a>
+            <a href="?tab=services" class="fm-tab {% if active_tab == 'services' %}fm-tab--active{% endif %}" data-field-tab="services" role="tab">Chỉnh services</a>
+        </div>
+    </div>
+
+    <section class="fm-panel {% if active_tab == 'info' %}fm-panel--active{% endif %}" data-field-panel="info"{% if active_tab != 'info' %} hidden{% endif %}>
+        {% include 'venues/partials/_field_info_form.html' %}
+    </section>
+
+    <section class="fm-panel {% if active_tab == 'pricing' %}fm-panel--active{% endif %}" data-field-panel="pricing"{% if active_tab != 'pricing' %} hidden{% endif %}>
+        {% include 'venues/partials/_field_pricing_panel.html' %}
+    </section>
+
+    <section class="fm-panel {% if active_tab == 'services' %}fm-panel--active{% endif %}" data-field-panel="services"{% if active_tab != 'services' %} hidden{% endif %}>
+        {% include 'venues/partials/_field_services_panel.html' %}
+    </section>
+</div>
+
+<script src="{% static 'js/field-manage.js' %}" defer></script>
+{% endblock %}

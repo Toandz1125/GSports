@@ -7,7 +7,7 @@ class Wallet(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name='payments_wallet'
+        related_name='payment_wallet'
     )
     balance = models.DecimalField(max_digits=12, decimal_places=0, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -68,14 +68,16 @@ class Payment(models.Model):
     class Status(models.TextChoices):
         PENDING = 'PENDING', 'Chờ xử lý'
         PAID = 'PAID', 'Đã thanh toán'
+        COMPLETED = 'COMPLETED', 'Hoàn thành'
         FAILED = 'FAILED', 'Thất bại'
         CANCELLED = 'CANCELLED', 'Đã hủy'
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     booking = models.ForeignKey('bookings.Booking', on_delete=models.CASCADE, related_name='payments')
+    booking = models.ForeignKey('bookings.Booking', on_delete=models.CASCADE, related_name='payments')
     method = models.CharField(max_length=20, choices=Method.choices)
     payment_type = models.CharField(max_length=20, choices=PaymentType.choices)
-    amount = models.DecimalField(max_digits=12, decimal_places=0)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     transaction_code = models.CharField(max_length=100, blank=True, null=True, unique=True)
     paid_at = models.DateTimeField(null=True, blank=True)
@@ -84,6 +86,29 @@ class Payment(models.Model):
     
     def __str__(self):
         return f"Payment {self.id} - {self.get_method_display()} - {self.amount}đ"
+
+    class Meta:
+        db_table = 'payment'
+
+
+class Invoice(models.Model):
+    """Hóa đơn cho payment đã hoàn tất."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    payment = models.OneToOneField(Payment, on_delete=models.CASCADE, related_name='invoice')
+    invoice_code = models.CharField(max_length=50, unique=True)
+    subtotal_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    issued_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Invoice {self.invoice_code} - {self.total_amount}đ"
+
+    class Meta:
+        db_table = 'invoice'
 
 class Promotion(models.Model):
     """Mã khuyến mãi"""
@@ -104,6 +129,9 @@ class Promotion(models.Model):
     
     def __str__(self):
         return f"{self.code} - {self.discount_value}{'%' if self.discount_type == 'PERCENTAGE' else 'đ'}"
+
+    class Meta:
+        db_table = 'promotion'
     
     def is_valid(self):
         from django.utils import timezone

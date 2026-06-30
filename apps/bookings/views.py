@@ -20,17 +20,19 @@ from apps.venues.models import Field, Venue
 from .forms import BookingCreateForm
 from .models import Booking
 from .permissions import (
-    BOOKING_ACCESS_DENIED_MESSAGE,
     BOOKING_MANAGE_DENIED_MESSAGE,
     OwnerBookingRequiredMixin,
     StaffRequiredMixin,
     can_manage_booking,
+    can_view_booking,
     get_booking_queryset_for_user,
     get_owner_profile,
 )
 from .services import (
-    calculate_booking_price,
-    create_booking,
+    cancel_expired_booking_if_needed,
+    cancel_expired_pending_bookings,
+    create_booking_for_slots,
+    get_booking_slot_options,
     get_bookable_fields_queryset,
     get_time_blocks_for_field_date,
     get_unavailable_time_blocks,
@@ -38,10 +40,17 @@ from .services import (
 
 
 FIELD_ACTIVE_STATUS = getattr(Field, 'ACTIVE', 'ACTIVE')
+BOOKING_EXPIRED_MESSAGE = 'Đơn đặt sân đã quá hạn thanh toán và đã bị hủy.'
+# A booking is treated as paid when it is PAID or carries a completed payment.
+COMPLETED_PAYMENT_STATUSES = ('COMPLETED', 'PAID', 'SUCCESS')
 
 
 def _is_ajax(request):
     return request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+
+def _wants_json(request):
+    return _is_ajax(request) or request.headers.get('Accept') == 'application/json'
 
 
 def _booking_detail_partial_context(booking, back_url=None):
@@ -51,7 +60,7 @@ def _booking_detail_partial_context(booking, back_url=None):
         'booking_service_lock_message': booking.get_service_modification_block_message(),
         'can_cancel_booking': booking.can_cancel(),
         'cancel_block_message': booking.get_cancel_block_message(),
-        'can_pay_booking': booking.status == Booking.PENDING,
+        'can_pay_booking': booking.can_pay(),
         'back_url': back_url or reverse('bookings:booking_list'),
     }
 
@@ -73,6 +82,29 @@ def _validation_error_messages(exc):
                 messages.append(f'{field}: {message}')
         return messages
     return exc.messages if hasattr(exc, 'messages') else [str(exc)]
+
+
+def _booking_json_payload(booking):
+    return {
+        'ok': True,
+        'booking_id': str(booking.pk),
+        'status': booking.status,
+        'status_display': booking.get_status_display(),
+        'redirect_url': reverse('bookings:booking_detail', kwargs={'pk': booking.pk}),
+        'checkout_url': reverse('payments:booking_checkout', kwargs={'booking_pk': booking.pk})
+        if booking.can_pay() else None,
+        'status_url': reverse('bookings:booking_status', kwargs={'pk': booking.pk}),
+        'payment_deadline': booking.payment_deadline.isoformat() if booking.payment_deadline else None,
+        'slots': [
+            {
+                'start_time': slot.start_time.strftime('%H:%M'),
+                'end_time': slot.end_time.strftime('%H:%M'),
+                'price': str(slot.price),
+            }
+            for slot in booking.slots.all().order_by('start_time')
+        ],
+        'total_amount': str(booking.total_amount),
+    }
 
 
 def _parse_booking_date(value):
@@ -103,6 +135,8 @@ class BookingListView(LoginRequiredMixin, ListView):
     context_object_name = 'bookings'
 
     def get_queryset(self):
+        # Auto-cancel expired pending holds before listing so statuses are fresh.
+        cancel_expired_pending_bookings()
         return get_booking_queryset_for_user(
             self.request.user,
             Booking.objects.select_related('venue', 'field', 'booking_package').prefetch_related(
@@ -123,13 +157,26 @@ class BookingHistoryListView(LoginRequiredMixin, ListView):
     context_object_name = 'bookings'
     login_url = reverse_lazy('accounts:login')
 
+    def _role_names(self):
+        if not hasattr(self, '_cached_role_names'):
+            self._cached_role_names = set(
+                UserRole.objects.filter(user=self.request.user).values_list('role__name', flat=True)
+            )
+        return self._cached_role_names
+
+    def _is_customer_scope(self):
+        privileged_roles = {'ADMIN', 'OWNER', 'STAFF'}
+        return not bool(self._role_names() & privileged_roles)
+
     def get_queryset(self):
+        # Auto-cancel expired pending holds so history shows the real status.
+        cancel_expired_pending_bookings()
         user = self.request.user
-        roles = UserRole.objects.filter(user=user).values_list('role__name', flat=True)
+        roles = self._role_names()
         queryset = (
             Booking.objects
             .select_related('booking_package__user', 'venue', 'field')
-            .prefetch_related('slots')
+            .prefetch_related('slots', 'payments')
             .order_by('-created_at')
         )
 
@@ -150,7 +197,7 @@ class BookingHistoryListView(LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
-        roles = UserRole.objects.filter(user=user).values_list('role__name', flat=True)
+        roles = self._role_names()
 
         if 'ADMIN' in roles:
             context['filter_venues'] = Venue.objects.filter(is_deleted=False)
@@ -167,7 +214,74 @@ class BookingHistoryListView(LoginRequiredMixin, ListView):
             context['page_title'] = 'Lịch sử cho thuê sân'
         else:
             context['page_title'] = 'Lịch sử thuê sân'
+        context['show_customer_booking_actions'] = self._is_customer_scope()
+        self._annotate_history_actions(context['bookings'], user, roles)
         return context
+
+    def _annotate_history_actions(self, bookings, user, roles):
+        """Attach a per-booking action (pay / invoice / detail / none) to each row.
+
+        Decided per booking instead of one shared flag, so a paid booking offers
+        an invoice while a payable one offers checkout — without widening role
+        scope. All URLs are resolved with reverse() (no hard-coded paths) and use
+        the prefetched payments to avoid N+1 queries.
+        """
+        if 'ADMIN' in roles:
+            detail_scope = 'admin'
+        elif 'OWNER' in roles:
+            detail_scope = 'owner'
+        elif 'STAFF' in roles:
+            detail_scope = 'staff'
+        else:
+            detail_scope = 'customer'
+
+        for booking in bookings:
+            is_self = booking.booking_package.user_id == user.id
+            has_completed_payment = any(
+                payment.status in COMPLETED_PAYMENT_STATUSES
+                for payment in booking.payments.all()
+            )
+
+            if detail_scope == 'customer':
+                detail_url = reverse('bookings:booking_detail', kwargs={'pk': booking.pk})
+            elif detail_scope == 'owner':
+                detail_url = reverse('bookings:owner_booking_detail', kwargs={'pk': booking.pk})
+            else:
+                # Staff/admin have no per-booking customer detail page they may open.
+                detail_url = None
+
+            if booking.status == Booking.PAID or has_completed_payment:
+                booking.history_action_type = 'invoice'
+                booking.history_action_url = reverse(
+                    'payments:booking_invoice', kwargs={'booking_pk': booking.pk},
+                )
+                booking.history_action_label = 'Xem hóa đơn'
+            elif booking.status == Booking.PENDING and booking.can_pay() and is_self:
+                booking.history_action_type = 'pay'
+                booking.history_action_url = reverse(
+                    'payments:booking_checkout', kwargs={'booking_pk': booking.pk},
+                )
+                booking.history_action_label = 'Tiếp tục thanh toán'
+            elif detail_url:
+                booking.history_action_type = 'detail'
+                booking.history_action_url = detail_url
+                booking.history_action_label = 'Chi tiết'
+            else:
+                booking.history_action_type = 'none'
+                booking.history_action_url = ''
+                booking.history_action_label = ''
+
+            booking.history_detail_url = detail_url
+            # Cancel stays a customer-only, self-owned action (server still re-checks).
+            booking.history_can_cancel = bool(
+                is_self and detail_scope == 'customer' and booking.can_cancel()
+            )
+            # Whole-row click target: primary action, else detail when available.
+            booking.history_target_url = (
+                booking.history_action_url
+                if booking.history_action_type != 'none'
+                else (detail_url or '')
+            )
 
 
 class BookingDetailView(LoginRequiredMixin, DetailView):
@@ -187,23 +301,71 @@ class BookingDetailView(LoginRequiredMixin, DetailView):
                 'services_ordered',
                 queryset=BookingService.objects.select_related('service_item'),
             ),
-        )
-
-    def get_object(self, queryset=None):
-        booking = get_object_or_404(queryset or self.get_queryset(), pk=self.kwargs[self.pk_url_kwarg])
-        if not can_manage_booking(self.request.user, booking):
-            raise PermissionDenied(BOOKING_ACCESS_DENIED_MESSAGE)
-        return booking
+        ).filter(booking_package__user=self.request.user)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        # Flip the booking to CANCELLED if its 10-minute hold has expired.
+        if cancel_expired_booking_if_needed(self.object):
+            messages.warning(self.request, BOOKING_EXPIRED_MESSAGE)
         context['can_edit_booking_services'] = self.object.can_modify_services()
         context['booking_service_lock_message'] = self.object.get_service_modification_block_message()
         context['can_cancel_booking'] = self.object.can_cancel()
         context['cancel_block_message'] = self.object.get_cancel_block_message()
-        context['can_pay_booking'] = self.object.status == Booking.PENDING
+        context['can_pay_booking'] = self.object.can_pay()
         context['back_url'] = reverse('bookings:booking_list')
+
+        # Thống kê & Kiểm tra đánh giá
+        from apps.reviews.models import Review
+        booking = self.object
+        # Booking hoàn thành khi đã thanh toán (PAID) và ngày thuê bằng hoặc trước hôm nay
+        context['is_completed'] = (booking.status == Booking.PAID and booking.booking_date <= timezone.localdate())
+        context['existing_review'] = Review.objects.filter(booking=booking).first()
         return context
+
+
+class CreateBookingReviewView(LoginRequiredMixin, View):
+    """Xử lý submit đánh giá cho booking hoàn thành."""
+
+    def post(self, request, *args, **kwargs):
+        from apps.reviews.models import Review
+        booking = get_object_or_404(Booking, pk=kwargs['booking_pk'])
+        
+        # Quyền kiểm tra: Chỉ người đặt booking mới được đánh giá
+        if booking.booking_package.user != request.user:
+            raise PermissionDenied("Bạn không có quyền đánh giá booking này.")
+            
+        # Kiểm tra trạng thái hoàn thành
+        is_completed = (booking.status == Booking.PAID and booking.booking_date <= timezone.localdate())
+        if not is_completed:
+            messages.error(request, "Chỉ có thể đánh giá sau khi hoàn thành lượt thuê sân.")
+            return redirect('bookings:booking_detail', pk=booking.pk)
+            
+        # Kiểm tra xem đã đánh giá chưa
+        if Review.objects.filter(booking=booking).exists():
+            messages.error(request, "Bạn đã đánh giá booking này rồi.")
+            return redirect('bookings:booking_detail', pk=booking.pk)
+
+        try:
+            rating = int(request.POST.get('rating') or 5)
+            comment = (request.POST.get('comment') or '').strip()
+            
+            if not (1 <= rating <= 5):
+                raise ValueError("Điểm đánh giá phải từ 1 đến 5.")
+                
+            Review.objects.create(
+                user=request.user,
+                venue=booking.venue,
+                booking=booking,
+                rating=rating,
+                comment=comment,
+            )
+            messages.success(request, "Cảm ơn bạn đã gửi đánh giá!")
+        except Exception as e:
+            messages.error(request, f"Lỗi gửi đánh giá: {str(e)}")
+            
+        return redirect('bookings:booking_detail', pk=booking.pk)
+
 
 
 class BookingCreateView(LoginRequiredMixin, FormView):
@@ -226,7 +388,25 @@ class BookingCreateView(LoginRequiredMixin, FormView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['field_queryset'] = get_bookable_fields_queryset()
+        user = self.request.user
+        queryset = get_bookable_fields_queryset()
+        
+        # Import lazy để tránh circular imports
+        from apps.accounts.models import Role
+        from apps.bookings.permissions import user_has_role
+        
+        if user_has_role(user, Role.STAFF):
+            if hasattr(user, 'staff_profile') and user.staff_profile.owner:
+                queryset = queryset.filter(venue__owner=user.staff_profile.owner)
+            else:
+                queryset = queryset.none()
+        elif user_has_role(user, Role.OWNER):
+            if hasattr(user, 'owner_profile'):
+                queryset = queryset.filter(venue__owner=user.owner_profile)
+            else:
+                queryset = queryset.none()
+                
+        kwargs['field_queryset'] = queryset
         return kwargs
 
     def _get_context_selection(self, form):
@@ -258,6 +438,8 @@ class BookingCreateView(LoginRequiredMixin, FormView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        # Free up slots held by expired pending bookings before drawing the picker.
+        cancel_expired_pending_bookings()
         form = context['form']
         selected_field, selected_date = self._get_context_selection(form)
         time_blocks = get_time_blocks_for_field_date(selected_field, selected_date)
@@ -266,9 +448,17 @@ class BookingCreateView(LoginRequiredMixin, FormView):
             selected_date,
             time_blocks,
         )
+        slot_options = get_booking_slot_options(
+            selected_field,
+            selected_date,
+            time_blocks,
+            unavailable_blocks,
+        )
         context.update({
+            'bookable_fields': form.fields['field'].queryset,
             'time_blocks': time_blocks,
             'unavailable_blocks': unavailable_blocks,
+            'slot_options': slot_options,
             'selected_field': selected_field,
             'selected_date': selected_date,
         })
@@ -276,22 +466,15 @@ class BookingCreateView(LoginRequiredMixin, FormView):
 
     def form_valid(self, form):
         data = form.cleaned_data
-        price = getattr(form, 'calculated_price', None)
-        if price is None:
-            price, _ = calculate_booking_price(
-                data['field'],
-                data['booking_date'],
-                data['start_time'],
-                data['end_time'],
-            )
+        slot_ranges = getattr(form, 'selected_slot_ranges', None) or [
+            (data['start_time'], data['end_time']),
+        ]
         try:
-            self.booking = create_booking(
+            self.booking = create_booking_for_slots(
                 user=self.request.user,
                 field=data['field'],
                 booking_date=data['booking_date'],
-                start_time=data['start_time'],
-                end_time=data['end_time'],
-                price=price,
+                slot_ranges=slot_ranges,
                 note=data.get('note', ''),
                 service_quantities=form.service_quantities,
             )
@@ -299,7 +482,7 @@ class BookingCreateView(LoginRequiredMixin, FormView):
             error_messages = _validation_error_messages(exc)
             is_conflict = any('SLOT_CONFLICT' in msg for msg in error_messages)
 
-            if is_conflict and self.request.headers.get('Accept') == 'application/json':
+            if is_conflict and _wants_json(self.request):
                 return JsonResponse({
                     "error": "SLOT_CONFLICT",
                     "message": "Khung giờ này vừa có người khác đặt hoặc giữ chỗ. Vui lòng chọn khung giờ khác."
@@ -309,13 +492,13 @@ class BookingCreateView(LoginRequiredMixin, FormView):
                 form.add_error(None, message)
             return self.form_invalid(form)
 
-        messages.success(self.request, 'Booking created.')
-        if self.request.headers.get('Accept') == 'application/json':
-            return JsonResponse({'redirect_url': self.get_success_url()}, status=201)
+        messages.success(self.request, 'Đặt sân thành công. Vui lòng kiểm tra lịch sử đặt sân của bạn.')
+        if _wants_json(self.request):
+            return JsonResponse(_booking_json_payload(self.booking), status=201)
         return redirect(self.get_success_url())
 
     def form_invalid(self, form):
-        if self.request.headers.get('Accept') == 'application/json':
+        if _wants_json(self.request):
             return JsonResponse({'error': 'FORM_INVALID', 'errors': form.errors}, status=400)
         return super().form_invalid(form)
 
@@ -365,6 +548,8 @@ class BookingFieldServicesView(LoginRequiredMixin, View):
 
 class BookingAvailabilityView(LoginRequiredMixin, View):
     def get(self, request, *args, **kwargs):
+        # Cleanup expired pending holds so freed slots are reported as available.
+        cancel_expired_pending_bookings()
         selected_field = _get_field_from_value(
             request.GET.get('field_id') or request.GET.get('field'),
         )
@@ -378,6 +563,31 @@ class BookingAvailabilityView(LoginRequiredMixin, View):
         return JsonResponse({
             'time_blocks': time_blocks,
             'unavailable_blocks': unavailable_blocks,
+        })
+
+
+class BookingStatusView(LoginRequiredMixin, View):
+    def get(self, request, *args, **kwargs):
+        booking = get_object_or_404(
+            Booking.objects.select_related('booking_package', 'booking_package__user', 'venue', 'field')
+            .prefetch_related('slots'),
+            pk=kwargs['pk'],
+        )
+        if not can_view_booking(request.user, booking):
+            raise PermissionDenied(BOOKING_MANAGE_DENIED_MESSAGE)
+
+        cancel_expired_booking_if_needed(booking)
+        booking.refresh_from_db()
+        return JsonResponse({
+            'ok': True,
+            'booking_id': str(booking.pk),
+            'status': booking.status,
+            'status_display': booking.get_status_display(),
+            'can_pay': booking.can_pay(),
+            'payment_deadline': booking.payment_deadline.isoformat() if booking.payment_deadline else None,
+            'server_time': timezone.now().isoformat(),
+            'checkout_url': reverse('payments:booking_checkout', kwargs={'booking_pk': booking.pk})
+            if booking.can_pay() else None,
         })
 
 
@@ -676,3 +886,252 @@ class OwnerBookingDetailView(OwnerBookingRequiredMixin, DetailView):
         context['can_pay_booking'] = False
         context['back_url'] = reverse('bookings:owner_booking_list')
         return context
+
+
+class BookingCheckoutView(LoginRequiredMixin, View):
+    """Compatibility route: real checkout lives in apps.payments."""
+
+    def get(self, request, *args, **kwargs):
+        return redirect('payments:booking_checkout', booking_pk=kwargs['booking_pk'])
+
+    def post(self, request, *args, **kwargs):
+        return redirect('payments:booking_checkout', booking_pk=kwargs['booking_pk'])
+
+
+class BookingPayView(LoginRequiredMixin, View):
+    """Compatibility endpoint; bookings no longer performs payment mutation."""
+
+    def post(self, request, *args, **kwargs):
+        messages.error(request, 'Vui lòng thanh toán bằng ví tại trang checkout.')
+        return redirect('payments:booking_checkout', booking_pk=kwargs['booking_pk'])
+
+
+# ===========================================================================
+# Đăng ký & Huỷ sân (Owner Venue Registration & Removal)
+# ===========================================================================
+from django.db import transaction
+from django.shortcuts import render
+from apps.bookings.permissions import OwnerRequiredMixin
+from apps.venues.forms import (
+    VenueRegistrationRequestForm,
+    VenueFieldFormSet,
+    PriceRuleModeForm,
+    ManualFieldPriceRuleFormSet,
+)
+from apps.venues.models import OwnerVenueRequest
+from apps.venues.pricing import (
+    PRICING_MODE_DEFAULT,
+    PRICING_MODE_MANUAL,
+    get_default_price_rule_payloads,
+)
+from apps.venues.services import notify_admins_about_owner_venue_request
+
+
+def _to_int_or_none(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _build_venue_field_formset(data=None):
+    return VenueFieldFormSet(
+        data=data,
+        prefix='fields',
+        queryset=Field.objects.none(),
+    )
+
+
+def _build_price_rule_mode_form(data=None):
+    return PriceRuleModeForm(data=data, prefix='pricing')
+
+
+def _build_manual_price_rule_formset(data=None):
+    return ManualFieldPriceRuleFormSet(data=data, prefix='price_rules')
+
+
+def _validate_pricing_submission(pricing_form, manual_price_rule_formset):
+    if not pricing_form.is_valid():
+        return False, []
+    pricing_mode = pricing_form.cleaned_data['pricing_mode']
+    if pricing_mode == PRICING_MODE_DEFAULT:
+        return True, get_default_price_rule_payloads()
+    if pricing_mode == PRICING_MODE_MANUAL:
+        if not manual_price_rule_formset.is_valid():
+            return False, []
+        return True, manual_price_rule_formset.to_payload()
+    pricing_form.add_error('pricing_mode', 'Cách nhập bảng giá không hợp lệ.')
+    return False, []
+
+
+class OwnerVenueRegisterView(OwnerRequiredMixin, View):
+    """Owner-only page to request registering a new venue."""
+
+    template_name = 'bookings/owner_venue_register.html'
+
+    def _get_owner_profile_or_403(self, request):
+        owner_profile = get_owner_profile(request.user)
+        if not owner_profile:
+            raise PermissionDenied('Tài khoản chủ sân chưa có hồ sơ OwnerProfile.')
+        return owner_profile
+
+    def get(self, request, *args, **kwargs):
+        owner_profile = self._get_owner_profile_or_403(request)
+        return render(request, self.template_name, {
+            'form': VenueRegistrationRequestForm(),
+            'field_formset': _build_venue_field_formset(),
+            'pricing_form': _build_price_rule_mode_form(),
+            'price_rule_formset': _build_manual_price_rule_formset(),
+            'default_price_rules': get_default_price_rule_payloads(),
+            'owner_profile': owner_profile,
+        })
+
+    def post(self, request, *args, **kwargs):
+        owner_profile = self._get_owner_profile_or_403(request)
+        form = VenueRegistrationRequestForm(request.POST)
+        field_formset = _build_venue_field_formset(request.POST)
+        pricing_form = _build_price_rule_mode_form(request.POST)
+        price_rule_formset = _build_manual_price_rule_formset(request.POST)
+        pricing_is_valid, price_rule_payloads = _validate_pricing_submission(
+            pricing_form,
+            price_rule_formset,
+        )
+        if not form.is_valid() or not field_formset.is_valid() or not pricing_is_valid:
+            return render(request, self.template_name, {
+                'form': form,
+                'field_formset': field_formset,
+                'pricing_form': pricing_form,
+                'price_rule_formset': price_rule_formset,
+                'default_price_rules': get_default_price_rule_payloads(),
+                'owner_profile': owner_profile,
+            })
+
+        payload = form.to_payload()
+        payload['fields'] = field_formset.to_payload()
+        payload['pricing'] = {
+            'mode': pricing_form.cleaned_data['pricing_mode'],
+            'rules': price_rule_payloads,
+        }
+        with transaction.atomic():
+            venue_request = OwnerVenueRequest(
+                requested_by=request.user,
+                request_type=OwnerVenueRequest.CREATE,
+                payload=payload,
+            )
+            venue_request.full_clean()
+            venue_request.save()
+            notify_admins_about_owner_venue_request(venue_request)
+        messages.success(request, 'Yêu cầu tạo sân đã được gửi và đang chờ admin duyệt.')
+        return redirect('bookings:owner_venue_register')
+
+
+class OwnerVenueRemovalRequestView(OwnerRequiredMixin, View):
+    """Owner-only placeholder page to request removing an owned venue.
+
+    Removal is treated as a request only — no venue is deleted from here.
+    """
+
+    template_name = 'bookings/owner_venue_removal.html'
+
+    def _owned_venues(self, request):
+        owner_profile = get_owner_profile(request.user)
+        if not owner_profile:
+            raise PermissionDenied('Tài khoản chủ sân chưa có hồ sơ OwnerProfile.')
+        return owner_profile, Venue.objects.filter(
+            owner=owner_profile,
+            is_deleted=False,
+        ).order_by('name')
+
+    def get(self, request, *args, **kwargs):
+        owner_profile, venues = self._owned_venues(request)
+        return render(request, self.template_name, {
+            'owner_profile': owner_profile,
+            'venues': venues,
+        })
+
+    def post(self, request, *args, **kwargs):
+        owner_profile, venues = self._owned_venues(request)
+        venue_id = _to_int_or_none(request.POST.get('venue'))
+        # Only allow requesting removal of a venue the owner actually owns.
+        venue = venues.filter(pk=venue_id).first() if venue_id is not None else None
+        if venue is None:
+            messages.error(request, 'Vui lòng chọn một sân hợp lệ thuộc sở hữu của bạn.')
+        else:
+            venue_request = OwnerVenueRequest(
+                requested_by=request.user,
+                request_type=OwnerVenueRequest.DELETE,
+                target_venue=venue,
+                reason=(request.POST.get('reason') or '').strip(),
+            )
+            venue_request.full_clean()
+            venue_request.save()
+            notify_admins_about_owner_venue_request(venue_request)
+            messages.success(request, 'Yêu cầu huỷ sân đã được gửi và đang chờ admin duyệt.')
+        return redirect('bookings:owner_venue_removal')
+
+
+class FieldDetailJSONView(LoginRequiredMixin, View):
+    """AJAX: Trả về thông tin chi tiết của sân con cùng các reviews của cơ sở đó."""
+
+    def get(self, request, *args, **kwargs):
+        from django.db.models import Avg
+        from apps.reviews.models import Review
+        
+        field = get_object_or_404(
+            Field.objects.select_related('venue', 'field_type', 'field_type__sport'),
+            pk=kwargs['field_id']
+        )
+        venue = field.venue
+        
+        # Lấy trung bình đánh giá và danh sách reviews
+        reviews_qs = Review.objects.filter(venue=venue).select_related('user').order_by('-created_at')
+        avg_rating = reviews_qs.aggregate(avg=Avg('rating'))['avg'] or 0
+        
+        reviews_list = []
+        for r in reviews_qs[:10]:
+            reviews_list.append({
+                'user': r.user.get_full_name() or r.user.email,
+                'rating': r.rating,
+                'comment': r.comment or '',
+                'created_at': r.created_at.strftime('%d/%m/%Y'),
+            })
+
+        # Lấy bảng giá của sân con này
+        price_rules = []
+        for rule in field.price_rules.all().order_by('day_of_week', 'start_time'):
+            day_label = 'Tất cả các ngày'
+            if rule.day_of_week is not None:
+                days = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật']
+                if 0 <= rule.day_of_week < len(days):
+                    day_label = days[rule.day_of_week]
+            price_rules.append({
+                'day_of_week': day_label,
+                'start_time': rule.start_time.strftime('%H:%M'),
+                'end_time': rule.end_time.strftime('%H:%M'),
+                'price': float(rule.price_per_hour),
+            })
+            
+        payload = {
+            'ok': True,
+            'field': {
+                'id': field.pk,
+                'name': field.name,
+                'sport': field.field_type.sport.name,
+                'capacity': field.capacity or 0,
+                'surface_type': field.surface_type or 'Mặc định',
+                'length': float(field.length) if field.length else 0,
+                'width': float(field.width) if field.width else 0,
+                'status': field.status,
+            },
+            'venue': {
+                'name': venue.name,
+                'address': venue.address,
+                'latitude': float(venue.latitude) if venue.latitude else None,
+                'longitude': float(venue.longitude) if venue.longitude else None,
+                'avg_rating': round(float(avg_rating), 1),
+                'reviews': reviews_list,
+            },
+            'price_rules': price_rules,
+        }
+        return JsonResponse(payload)
+

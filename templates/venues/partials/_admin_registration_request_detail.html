@@ -1,0 +1,75 @@
+<div class="detail-card">
+  <dl>
+    <dt>Loại yêu cầu</dt>
+    <dd>{{ venue_request.get_request_type_display }}</dd>
+    <dt>Trạng thái</dt>
+    <dd><span class="status-badge">{{ venue_request.get_status_display }}</span></dd>
+    <dt>Owner</dt>
+    <dd>{{ venue_request.owner_profile.business_name|default:"-" }} ({{ venue_request.requested_by.email }})</dd>
+    <dt>Tên sân</dt>
+    <dd>{{ venue_request.venue_name }}</dd>
+    <dt>Địa chỉ</dt>
+    <dd>{{ venue_request.venue_address }}</dd>
+    <dt>Ghi chú</dt>
+    <dd>{{ venue_request.venue_note|default:"-" }}</dd>
+    <dt>Venue liên quan</dt>
+    <dd>{{ venue_request.target_venue.name|default:"-" }}</dd>
+    <dt>Ngày gửi</dt>
+    <dd>{{ venue_request.created_at|date:"d/m/Y H:i" }}</dd>
+    <dt>Người duyệt</dt>
+    <dd>{{ venue_request.reviewed_by.email|default:"-" }}</dd>
+    <dt>Ngày duyệt</dt>
+    <dd>{{ venue_request.reviewed_at|date:"d/m/Y H:i"|default:"-" }}</dd>
+    <dt>Lý do từ owner</dt>
+    <dd>{{ venue_request.reason|default:"-" }}</dd>
+    <dt>Ghi chú admin</dt>
+    <dd>{{ venue_request.admin_note|default:"-" }}</dd>
+  </dl>
+</div>
+
+{% if venue_request.payload %}
+  <div class="detail-card">
+    <h2>Dữ liệu owner gửi</h2>
+    <dl>
+      {% for key, value in venue_request.payload.items %}
+        <dt>{{ key }}</dt>
+        <dd>{{ value|default:"-" }}</dd>
+      {% endfor %}
+    </dl>
+  </div>
+{% endif %}
+
+{% if venue_request.status == 'PENDING' %}
+  <div class="detail-grid grid approval-actions">
+    <div class="detail-card">
+      <h2>Duyệt yêu cầu</h2>
+      <form
+        method="post"
+        action="{% url 'venues:admin_venue_request_approve' venue_request.pk %}"
+        data-ajax-form
+        data-refresh-target="#admin-venue-request-detail"
+        data-confirm-message="Duyệt yêu cầu này?"
+      >
+        {% csrf_token %}
+        <button type="submit" class="btn btn--primary">Duyệt yêu cầu</button>
+      </form>
+    </div>
+
+    <div class="detail-card">
+      <h2>Từ chối yêu cầu</h2>
+      <form
+        method="post"
+        action="{% url 'venues:admin_venue_request_reject' venue_request.pk %}"
+        data-ajax-form
+        data-refresh-target="#admin-venue-request-detail"
+      >
+        {% csrf_token %}
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+          <label for="admin-note" style="font-size: 0.875rem; font-weight: 600; color: var(--text-muted);">Lý do từ chối</label>
+          <textarea id="admin-note" name="admin_note" rows="4" required style="width: 100%; border-radius: var(--radius-md); border: 1px solid var(--border-color); background-color: var(--bg-body); color: var(--text-main); padding: 0.75rem 1rem;"></textarea>
+        </div>
+        <button type="submit" class="btn btn--danger">Từ chối</button>
+      </form>
+    </div>
+  </div>
+{% endif %}
