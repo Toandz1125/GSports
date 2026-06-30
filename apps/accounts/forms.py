@@ -181,6 +181,11 @@ class LoginForm(forms.Form):
         label='Mật khẩu',
         widget=forms.PasswordInput(attrs={'placeholder': 'Mật khẩu'}),
     )
+    remember_me = forms.BooleanField(
+        label='Ghi nhớ đăng nhập',
+        required=False,
+        widget=forms.CheckboxInput(attrs={'id': 'id_remember_me'}),
+    )
 
     def __init__(self, *args, request=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -206,7 +211,6 @@ class LoginForm(forms.Form):
             if not self.user_cache.is_active:
                 raise forms.ValidationError('Tài khoản đã bị vô hiệu hóa.')
         return cleaned_data
-
 
     def get_user(self):
         return self.user_cache

@@ -1,0 +1,25 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}Chi tiết yêu cầu sân | GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/gsports.css' %}">
+{% endblock %}
+
+{% block dashboard_content %}
+  <section class="page-heading">
+    <div>
+      <p class="eyebrow">Quản trị</p>
+      <h1>{{ venue_request.venue_name }}</h1>
+      <p class="muted">Chi tiết yêu cầu {{ venue_request.get_request_type_display|lower }}.</p>
+    </div>
+    <a class="btn btn--secondary" href="{% url 'venues:admin_venue_request_list' %}">Quay lại</a>
+  </section>
+
+  <div id="admin-venue-request-detail" data-refresh-url="{{ request.get_full_path }}">
+    {% include "venues/partials/_admin_registration_request_detail.html" %}
+  </div>
+{% endblock %}
+
