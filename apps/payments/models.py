@@ -74,6 +74,7 @@ class Payment(models.Model):
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     booking = models.ForeignKey('bookings.Booking', on_delete=models.CASCADE, related_name='payments')
+    booking = models.ForeignKey('bookings.Booking', on_delete=models.CASCADE, related_name='payments')
     method = models.CharField(max_length=20, choices=Method.choices)
     payment_type = models.CharField(max_length=20, choices=PaymentType.choices)
     amount = models.DecimalField(max_digits=12, decimal_places=2)

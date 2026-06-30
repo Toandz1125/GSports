@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 
 class Review(models.Model):
@@ -10,7 +11,10 @@ class Review(models.Model):
         'bookings.Booking', on_delete=models.SET_NULL,
         blank=True, null=True, related_name='review',
     )
-    rating = models.SmallIntegerField(help_text='1-5')
+    rating = models.SmallIntegerField(
+        validators=[MinValueValidator(0), MaxValueValidator(5)],
+        help_text='0-5 sao'
+    )
     comment = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

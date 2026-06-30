@@ -142,6 +142,14 @@ class Booking(models.Model):
         """Final total stored on Booking, including court and service charges."""
         return self.total_amount or Decimal('0.00')
 
+    @property
+    def venue_name(self):
+        return self.venue.name
+
+    @property
+    def deposit_amount(self):
+        return self.total_amount * Decimal('0.30')
+
     def can_cancel(self):
         return self.status in self.CANCELLABLE_STATUSES
 
