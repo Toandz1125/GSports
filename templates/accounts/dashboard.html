@@ -68,6 +68,11 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                 <span>Quản lý nhân viên</span>
             </a>
+            {% else %}
+            <a href="{% url 'venues:venue_list' %}" class="sidebar__link {% if request.resolver_match.app_name == 'venues' %}sidebar__link--active{% endif %}" id="nav-venues">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                <span>Tìm sân thể thao</span>
+            </a>
             {% endif %}
 
             {% if request.user.is_admin %}
@@ -104,8 +109,22 @@
 
             <a href="{% url 'accounts:profile' %}" class="sidebar__link {% if request.resolver_match.url_name == 'profile' %}sidebar__link--active{% endif %}" id="nav-profile">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 <span>Hồ sơ</span>
             </a>
+
+            <!-- Sân yêu thích Groupbox -->
+            {% if request.user.is_authenticated %}
+            <div class="sidebar__favorites-group" style="padding: 1.25rem 1rem 0.5rem; border-top: 1px solid var(--border-color); margin-top: 1.25rem;">
+                <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <svg viewBox="0 0 24 24" fill="currentColor" style="width: 14px; height: 14px; color: var(--error-500);"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                    <span>Sân yêu thích</span>
+                </div>
+                <div id="sidebar-favorites-list" style="display: flex; flex-direction: column; gap: 0.25rem; max-height: 200px; overflow-y: auto;">
+                    <span style="font-size: 0.8rem; color: var(--text-muted); padding-left: 0.25rem; font-style: italic;">Đang tải...</span>
+                </div>
+            </div>
+            {% endif %}
 
         </nav>
 
@@ -736,6 +755,44 @@ document.addEventListener('DOMContentLoaded', function () {
 
     updateUI();
 });
+</script>
+
+<!-- Load Sidebar Favorites -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        /* ── Sidebar Favorites loader ── */
+        window.loadSidebarFavorites = function() {
+            const listContainer = document.getElementById('sidebar-favorites-list');
+            if (!listContainer) return;
+            
+            fetch('/co-so/api/favorites/')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.favorites && data.favorites.length > 0) {
+                        listContainer.innerHTML = data.favorites.map(item => `
+                            <a href="${item.url}" class="sidebar__link" style="padding: 0.4rem 0.5rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem; border-radius: var(--radius-md); transition: all var(--transition-fast); background: none; border: none; width: 100%; text-decoration: none;">
+                                <span style="font-size: 0.9rem;">📍</span>
+                                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; text-align: left; flex: 1;">${item.name}</span>
+                            </a>
+                        `).join('');
+                    } else {
+                        listContainer.innerHTML = '<span style="font-size: 0.8rem; color: var(--text-muted); padding-left: 0.25rem; font-style: italic;">Chưa có cơ sở nào</span>';
+                    }
+                })
+                .catch(err => {
+                    console.error('Error loading favorites:', err);
+                    listContainer.innerHTML = '<span style="font-size: 0.8rem; color: var(--text-muted); padding-left: 0.25rem; font-style: italic;">Lỗi tải dữ liệu</span>';
+                });
+        };
+        loadSidebarFavorites();
+
+        // Listen for pageshow to reload favorites on browser back navigation (bfcache)
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted || (window.performance && window.performance.navigation.type === 2)) {
+                loadSidebarFavorites();
+            }
+        });
+    });
 </script>
 
 

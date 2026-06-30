@@ -31,12 +31,15 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # Third-party
+    'channels',
     # GSports apps
     'apps.accounts',
     'apps.venues',
@@ -152,3 +155,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = 'accounts:login'
 LOGIN_REDIRECT_URL = 'accounts:dashboard'
 LOGOUT_REDIRECT_URL = 'accounts:login'
+
+
+# ASGI — Django Channels
+ASGI_APPLICATION = 'config.asgi.application'
+
+# Channel Layers (Development — InMemory)
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}
