@@ -2,3 +2,5 @@ Django==4.2.21
 mssql-django==1.7.2
 pillow==10.3.0
 python-decouple==3.8
+channels[daphne]==4.2.0
+redis==5.0.4

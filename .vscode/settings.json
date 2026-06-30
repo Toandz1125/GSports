@@ -1,0 +1,6 @@
+{
+    "python.defaultInterpreterPath": "c:\\Users\\naith\\Desktop\\GSports\\gsports_env\\Scripts\\python.exe",
+    "python.analysis.extraPaths": [
+        "c:\\Users\\naith\\Desktop\\GSports\\gsports_env\\Lib\\site-packages"
+    ]
+}
