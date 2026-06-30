@@ -22,7 +22,12 @@ DEFAULT_CLOSE_TIME = time(23, 30)
 # This is purely a booking-side hold; it does not touch the payments module.
 BOOKING_PAYMENT_TIMEOUT_MINUTES = 10
 TIME_BLOCK_FORMAT = '%H:%M'
+# Internal lock granularity stays at 30 minutes because existing Redis keys and
+# validators are built around :00/:30 boundaries.
 TIME_BLOCK_INTERVAL_MINUTES = 30
+BOOKING_SLOT_INTERVAL_MINUTES = 60
+BOOKING_NO_SLOT_SELECTED_ERROR = 'Vui lòng chọn ít nhất một khung giờ.'
+BOOKING_INVALID_SLOT_ERROR = 'Khung giờ đã chọn không hợp lệ.'
 BOOKING_UNAVAILABLE_ERROR = (
     'Khung giờ đã chọn có thời gian đã được đặt. Vui lòng chọn khung giờ khác.'
 )
@@ -80,6 +85,11 @@ def cancel_expired_pending_bookings(now=None):
     Returns the number of bookings cancelled.
     """
     now = now or timezone.now()
+    SlotLock.objects.filter(
+        status=SlotLock.ACTIVE,
+        expires_at__lte=now,
+    ).update(status=SlotLock.EXPIRED)
+
     expired_ids = list(
         Booking.objects.filter(
             status=Booking.PENDING,
@@ -217,7 +227,7 @@ def get_time_blocks_for_field_date(field, booking_date):
     current = start_dt
     while current <= end_dt:
         blocks.append(current.strftime(TIME_BLOCK_FORMAT))
-        current += timedelta(minutes=TIME_BLOCK_INTERVAL_MINUTES)
+        current += timedelta(minutes=BOOKING_SLOT_INTERVAL_MINUTES)
     return blocks
 
 
@@ -329,7 +339,7 @@ def get_unavailable_time_blocks(field, booking_date, time_blocks=None):
     )
 
     # 3. Check Redis locked blocks when Redis is configured and reachable.
-    locked_block_times = set()
+    locked_block_ranges = []
     redis_client = _get_redis_client_or_none()
     if redis_client:
         pattern = f"booking_lock:field:{field.pk}:date:{booking_date.isoformat()}:block:*"
@@ -338,12 +348,19 @@ def get_unavailable_time_blocks(field, booking_date, time_blocks=None):
             # Extract HH:MM from key:
             # booking_lock:field:5:date:2026-05-29:block:07:30
             block_time = key.split(':block:')[-1]
-            locked_block_times.add(block_time)
+            try:
+                lock_start = datetime.strptime(block_time, TIME_BLOCK_FORMAT).time()
+            except ValueError:
+                continue
+            locked_block_ranges.append((
+                lock_start,
+                _add_minutes(lock_start, TIME_BLOCK_INTERVAL_MINUTES),
+            ))
 
     unavailable_blocks = []
     for block in blocks:
         block_start = datetime.strptime(block, TIME_BLOCK_FORMAT).time()
-        block_end = _add_minutes(block_start, TIME_BLOCK_INTERVAL_MINUTES)
+        block_end = _add_minutes(block_start, BOOKING_SLOT_INTERVAL_MINUTES)
 
         is_booked = any(
             is_time_overlap(slot.start_time, slot.end_time, block_start, block_end)
@@ -353,7 +370,10 @@ def get_unavailable_time_blocks(field, booking_date, time_blocks=None):
             is_time_overlap(lock.start_time, lock.end_time, block_start, block_end)
             for lock in active_locks
         )
-        is_redis_locked = block in locked_block_times
+        is_redis_locked = any(
+            is_time_overlap(lock_start, lock_end, block_start, block_end)
+            for lock_start, lock_end in locked_block_ranges
+        )
 
         if is_booked or is_db_locked or is_redis_locked:
             unavailable_blocks.append(block)
@@ -423,6 +443,7 @@ def get_booking_slot_options(field, booking_date, time_blocks=None, unavailable_
         slot_options.append({
             'start_label': start_label,
             'end_label': end_label,
+            'value': f'{start_label}|{end_label}',
             'start_time': start_time,
             'end_time': end_time,
             'status': status,
@@ -500,6 +521,61 @@ def _normalize_price(price):
     return Decimal(str(price)).quantize(MONEY_QUANTIZER, rounding=ROUND_HALF_UP)
 
 
+def _normalize_slot_ranges(slot_ranges):
+    normalized = []
+    for slot_range in slot_ranges or []:
+        if isinstance(slot_range, dict):
+            start_time = slot_range.get('start_time')
+            end_time = slot_range.get('end_time')
+        else:
+            try:
+                start_time, end_time = slot_range
+            except (TypeError, ValueError) as exc:
+                raise ValidationError(BOOKING_INVALID_SLOT_ERROR) from exc
+
+        if not start_time or not end_time:
+            raise ValidationError(BOOKING_INVALID_SLOT_ERROR)
+        normalized.append((start_time, end_time))
+
+    if not normalized:
+        raise ValidationError(BOOKING_NO_SLOT_SELECTED_ERROR)
+
+    normalized.sort(key=lambda slot_range: slot_range[0])
+    for index, (start_time, end_time) in enumerate(normalized):
+        validate_booking_time_range(start_time, end_time)
+        for previous_start, previous_end in normalized[:index]:
+            if is_time_overlap(previous_start, previous_end, start_time, end_time):
+                raise ValidationError(BOOKING_UNAVAILABLE_ERROR)
+    return normalized
+
+
+def _acquire_slot_lock_sessions(user, field, booking_date, slot_ranges):
+    lock_session_ids = []
+    try:
+        for start_time, end_time in slot_ranges:
+            lock_session_id, _ = acquire_slot_lock(
+                user,
+                field,
+                booking_date,
+                start_time,
+                end_time,
+            )
+            lock_session_ids.append(lock_session_id)
+    except Exception:
+        for lock_session_id in lock_session_ids:
+            release_slot_lock(lock_session_id)
+        raise
+    return lock_session_ids
+
+
+def _release_slot_lock_sessions(lock_session_ids):
+    for lock_session_id in lock_session_ids:
+        try:
+            release_slot_lock(lock_session_id)
+        except (ImproperlyConfigured, redis.exceptions.RedisError):
+            pass
+
+
 def _create_booking_records(
     user,
     field,
@@ -558,6 +634,100 @@ def _create_booking_records(
         add_services_to_booking(booking, service_quantities)
 
     return booking
+
+
+@transaction.atomic
+def _create_booking_records_for_slots(
+    user,
+    field,
+    booking_date,
+    slot_ranges,
+    note='',
+    service_quantities=None,
+):
+    slot_ranges = _normalize_slot_ranges(slot_ranges)
+    field = Field.objects.select_related('venue').select_for_update().get(pk=field.pk)
+    validate_bookable_field(field)
+
+    priced_slots = []
+    for start_time, end_time in slot_ranges:
+        validate_booking_not_in_past(booking_date, start_time)
+        validate_booking_time_range(start_time, end_time)
+
+        if check_booking_slot_conflict(field, booking_date, start_time, end_time):
+            raise ValidationError(SLOT_CONFLICT_ERROR)
+        if check_active_slot_lock_conflict(field, booking_date, start_time, end_time):
+            raise ValidationError(SLOT_CONFLICT_ERROR)
+
+        price, _ = calculate_booking_price(field, booking_date, start_time, end_time)
+        priced_slots.append((start_time, end_time, _normalize_price(price)))
+
+    court_total = sum((price for _, _, price in priced_slots), Decimal('0.00'))
+
+    package = BookingPackage(
+        user=user,
+        package_type=BookingPackage.SINGLE,
+        start_date=booking_date,
+    )
+    package.full_clean()
+    package.save()
+
+    booking = Booking(
+        booking_package=package,
+        venue=field.venue,
+        field=field,
+        booking_date=booking_date,
+        status=Booking.PENDING,
+        booking_channel=Booking.WEB,
+        total_amount=court_total,
+        note=note or '',
+        payment_deadline=get_payment_deadline(),
+    )
+    booking.full_clean()
+    booking.save()
+
+    for start_time, end_time, price in priced_slots:
+        slot = BookingSlot(
+            booking=booking,
+            start_time=start_time,
+            end_time=end_time,
+            price=price,
+        )
+        slot.full_clean()
+        slot.save()
+
+    if service_quantities:
+        from apps.services.services import add_services_to_booking
+        add_services_to_booking(booking, service_quantities)
+
+    return booking
+
+
+def create_booking_for_slots(user, field, booking_date, slot_ranges, note='', service_quantities=None):
+    slot_ranges = _normalize_slot_ranges(slot_ranges)
+    try:
+        lock_session_ids = _acquire_slot_lock_sessions(user, field, booking_date, slot_ranges)
+    except (ImproperlyConfigured, redis.exceptions.RedisError):
+        return _create_booking_records_for_slots(
+            user=user,
+            field=field,
+            booking_date=booking_date,
+            slot_ranges=slot_ranges,
+            note=note,
+            service_quantities=service_quantities,
+        )
+
+    try:
+        return _create_booking_records_for_slots(
+            user=user,
+            field=field,
+            booking_date=booking_date,
+            slot_ranges=slot_ranges,
+            note=note,
+            service_quantities=service_quantities,
+        )
+    finally:
+        _release_slot_lock_sessions(lock_session_ids)
 
 
 @transaction.atomic

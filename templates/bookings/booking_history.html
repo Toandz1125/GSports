@@ -252,6 +252,17 @@
         border-color: var(--primary-500);
     }
 
+    .booking-action-link--invoice {
+        color: var(--success-600, #059669);
+        background: rgba(16, 185, 129, 0.12);
+        border: 1px solid var(--success-600, #059669);
+    }
+
+    .booking-action-link--invoice:hover {
+        color: #fff;
+        background: var(--success-600, #059669);
+    }
+
     .booking-action-cancel-form {
         margin: 0;
         display: inline-flex;
@@ -270,8 +281,8 @@
         background: var(--error-500, #ef4444);
     }
 
-    /* Clickable rows (progressive enhancement; the "Chi tiết" link is the no-JS fallback) */
-    .booking-table tbody tr[data-detail-url] {
+    /* Clickable rows (progressive enhancement; the action links are the no-JS fallback) */
+    .booking-table tbody tr[data-target-url] {
         cursor: pointer;
     }
 </style>
@@ -363,7 +374,7 @@
                 <tr data-venue="{{ booking.venue.name|lower }}" data-field="{{ booking.field.name|lower }}"
                     data-email="{{ booking.booking_package.user.email|lower }}"
                     data-name="{% if booking.booking_package.user.first_name or booking.booking_package.user.last_name %}{{ booking.booking_package.user.first_name|lower }} {{ booking.booking_package.user.last_name|lower }}{% endif %}"
-                    data-date="{{ booking.booking_date|date:'Y-m-d' }}" data-status="{{ booking.status|lower }}"{% if show_customer_booking_actions %} data-detail-url="{% url 'bookings:booking_detail' booking.pk %}"{% endif %}>
+                    data-date="{{ booking.booking_date|date:'Y-m-d' }}" data-status="{{ booking.status|lower }}"{% if booking.history_target_url %} data-target-url="{{ booking.history_target_url }}"{% endif %}>
                     <td>
                         <div class="venue-info">
                             <span class="venue-info__name">{{ booking.venue.name }}</span>
@@ -388,15 +399,23 @@
                         <span class="status-badge status-badge--{{ booking.status|lower }}">{{ booking.get_status_display }}</span>
                     </td>
                     <td>
-                        {% if show_customer_booking_actions %}
+                        {% if booking.history_action_type != 'none' or booking.history_can_cancel %}
                         <div class="booking-actions" data-booking-actions>
-                            <a href="{% url 'bookings:booking_detail' booking.pk %}"
-                                class="booking-action-link booking-action-link--detail">Chi tiết</a>
-                            {% if booking.can_pay %}
-                            <a href="{% url 'bookings:booking_checkout' booking.pk %}"
-                                class="booking-action-link booking-action-link--pay">Thanh toán</a>
+                            {% if booking.history_action_type == 'pay' %}
+                            <a href="{{ booking.history_action_url }}"
+                                class="booking-action-link booking-action-link--pay">{{ booking.history_action_label }}</a>
+                            {% elif booking.history_action_type == 'invoice' %}
+                            <a href="{{ booking.history_action_url }}"
+                                class="booking-action-link booking-action-link--invoice">{{ booking.history_action_label }}</a>
+                            {% elif booking.history_action_type == 'detail' %}
+                            <a href="{{ booking.history_action_url }}"
+                                class="booking-action-link booking-action-link--detail">{{ booking.history_action_label }}</a>
                             {% endif %}
-                            {% if booking.can_cancel %}
+                            {% if booking.history_detail_url and booking.history_action_type != 'detail' %}
+                            <a href="{{ booking.history_detail_url }}"
+                                class="booking-action-link booking-action-link--detail">Chi tiết</a>
+                            {% endif %}
+                            {% if booking.history_can_cancel %}
                             <form method="post" action="{% url 'bookings:booking_cancel' booking.pk %}"
                                 class="booking-action-cancel-form"
                                 onsubmit="return confirm('Bạn có chắc muốn hủy lượt đặt sân này?');">
@@ -510,14 +529,15 @@
             doFilter();
         };
 
-        // Row click -> booking detail. Scoped to this table only. Ignores clicks
-        // on interactive elements (links, buttons, forms) so the action buttons
-        // keep their own behaviour. The "Chi tiết" link is the no-JS fallback.
+        // Row click -> the row's primary target (checkout for payable, invoice for
+        // paid, otherwise detail). Scoped to this table only. Ignores clicks on
+        // interactive elements so the action controls keep their own behaviour;
+        // the visible action links are the no-JS fallback.
         tbody.addEventListener('click', function (event) {
-            const row = event.target.closest('tr[data-detail-url]');
+            const row = event.target.closest('tr[data-target-url]');
             if (!row || !tbody.contains(row)) return;
-            if (event.target.closest('a, button, form, input, select, label')) return;
-            const url = row.getAttribute('data-detail-url');
+            if (event.target.closest('a, button, form, input, select, textarea, label')) return;
+            const url = row.getAttribute('data-target-url');
             if (url) window.location.href = url;
         });
     })();

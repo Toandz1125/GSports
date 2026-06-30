@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Case, Count, IntegerField, Value, When
@@ -19,27 +20,35 @@ from apps.bookings.permissions import (
     user_has_role,
 )
 from apps.core.models import AuditLog
+from apps.services.models import ServiceItem
 from .forms import (
     AdminVenueForm,
     FieldCreateForm,
+    FieldForm,
     FieldPriceRuleForm,
     ManualFieldPriceRuleFormSet,
     PriceRuleModeForm,
     VenueCreateForm,
     VenueFieldFormSet,
 )
-from .models import Field, FieldPriceRule, FieldType, OwnerVenueRequest, Venue
+from .models import Field, FieldCreationRequest, FieldPriceRule, FieldType, OwnerVenueRequest, Venue
 from .pricing import (
     PRICING_MODE_DEFAULT,
     PRICING_MODE_MANUAL,
+    apply_field_prices,
     get_default_price_rule_payloads,
+    get_field_pricing_blocks,
+    parse_price,
     resolve_pricing_payload_rules,
     validate_price_rule_payloads,
 )
 from .services import (
     VENUE_REQUEST_NOTIFICATION_ENTITIES,
     ensure_owner_account,
+    notify_admins_about_field_creation_request,
     notify_admins_about_owner_venue_request,
+    notify_owner_field_request_approved,
+    notify_owner_field_request_rejected,
     notify_owner_venue_request_approved,
     notify_owner_venue_request_rejected,
 )
@@ -262,6 +271,69 @@ class AdminRegistrationRequestListView(AdminRequiredMixin, ListView):
                 ),
             )
         return super().render_to_response(context, **response_kwargs)
+
+
+class AdminRequestListView(AdminRequiredMixin, ListView):
+    template_name = 'venues/admin_request_list.html'
+    context_object_name = 'venue_requests'
+    paginate_by = 50
+
+    def get_queryset(self):
+        queryset = OwnerVenueRequest.objects.select_related(
+            'requested_by',
+            'requested_by__owner_profile',
+            'reviewed_by',
+            'target_venue',
+        )
+        status = (self.request.GET.get('status') or '').strip()
+        valid_statuses = {value for value, _ in OwnerVenueRequest.STATUS_CHOICES}
+        if status in valid_statuses:
+            queryset = queryset.filter(status=status)
+            self.active_status = status
+        else:
+            self.active_status = ''
+
+        pending_first = Case(
+            When(status=OwnerVenueRequest.PENDING, then=Value(0)),
+            default=Value(1),
+            output_field=IntegerField(),
+        )
+        return queryset.order_by(pending_first, '-created_at')
+
+    def get_field_requests(self):
+        queryset = FieldCreationRequest.objects.select_related(
+            'owner',
+            'owner__user',
+            'venue',
+            'field_type',
+            'field_type__sport',
+            'reviewed_by',
+        )
+        active_status = getattr(self, 'active_status', '')
+        if active_status:
+            queryset = queryset.filter(status=active_status)
+        pending_first = Case(
+            When(status=FieldCreationRequest.PENDING, then=Value(0)),
+            default=Value(1),
+            output_field=IntegerField(),
+        )
+        return queryset.order_by(pending_first, '-created_at')[:50]
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        active_status = getattr(self, 'active_status', '')
+        field_requests = self.get_field_requests()
+        context['field_requests'] = field_requests
+        context['status_choices'] = OwnerVenueRequest.STATUS_CHOICES
+        context['active_status'] = active_status
+        context['status_filter'] = active_status
+        context['pending_venue_request_count'] = OwnerVenueRequest.objects.filter(
+            status=OwnerVenueRequest.PENDING,
+        ).count()
+        context['pending_field_request_count'] = FieldCreationRequest.objects.filter(
+            status=FieldCreationRequest.PENDING,
+        ).count()
+        return context
 
 
 class AdminRegistrationRequestDetailView(AdminRequiredMixin, DetailView):
@@ -585,9 +657,12 @@ class AdminRegistrationRequestApproveView(AdminRequiredMixin, View):
             registration_request=venue_request,
         )
         payload = venue_request.payload or {}
-        price_rule_payloads = validate_price_rule_payloads(
-            resolve_pricing_payload_rules(payload.get('pricing')),
-        )
+        field_payloads = payload.get('fields') or []
+        price_rule_payloads = []
+        if field_payloads:
+            price_rule_payloads = validate_price_rule_payloads(
+                resolve_pricing_payload_rules(payload.get('pricing')),
+            )
         venue_kwargs = {
             'owner': owner_profile,
             'name': (payload.get('name') or '').strip(),
@@ -600,9 +675,6 @@ class AdminRegistrationRequestApproveView(AdminRequiredMixin, View):
             if value not in (None, ''):
                 venue_kwargs[field_name] = value
         venue = Venue.objects.create(**venue_kwargs)
-        field_payloads = payload.get('fields') or []
-        if not field_payloads:
-            raise PermissionDenied('Yêu cầu tạo cơ sở cần có ít nhất 1 sân con.')
         for field_payload in field_payloads:
             field_type = FieldType.objects.get(pk=field_payload['field_type'])
             field = Field(
@@ -662,17 +734,9 @@ class OwnerVenueListView(OwnerProfileContextMixin, ListView):
         return context
 
 
-class OwnerVenueCreateView(OwnerProfileContextMixin, VenueFieldFormSetCreateMixin, FormView):
+class OwnerVenueCreateView(OwnerProfileContextMixin, FormView):
     template_name = 'venues/owner_venue_form.html'
     form_class = VenueCreateForm
-
-    def get_pricing_form(self):
-        data = self.request.POST if self.request.method == 'POST' else None
-        return build_price_rule_mode_form(data=data)
-
-    def get_manual_price_rule_formset(self):
-        data = self.request.POST if self.request.method == 'POST' else None
-        return build_manual_price_rule_formset(data=data)
 
     def get(self, request, *args, **kwargs):
         self.require_owner_profile()
@@ -681,30 +745,12 @@ class OwnerVenueCreateView(OwnerProfileContextMixin, VenueFieldFormSetCreateMixi
     def post(self, request, *args, **kwargs):
         self.require_owner_profile()
         form = self.get_form()
-        field_formset = self.get_field_formset()
-        pricing_form = self.get_pricing_form()
-        price_rule_formset = self.get_manual_price_rule_formset()
-        pricing_is_valid, price_rule_payloads = validate_pricing_submission(
-            pricing_form,
-            price_rule_formset,
-        )
-        if form.is_valid() and field_formset.is_valid() and pricing_is_valid:
-            return self.forms_valid(
-                form,
-                field_formset,
-                pricing_form,
-                price_rule_formset,
-                price_rule_payloads,
-            )
-        return self.forms_invalid(form, field_formset, pricing_form, price_rule_formset)
+        if form.is_valid():
+            return self.form_valid(form)
+        return self.form_invalid(form)
 
-    def forms_valid(self, form, field_formset, pricing_form, price_rule_formset, price_rule_payloads):
+    def form_valid(self, form):
         payload = form.to_payload()
-        payload['fields'] = field_formset.to_payload()
-        payload['pricing'] = {
-            'mode': pricing_form.cleaned_data['pricing_mode'],
-            'rules': price_rule_payloads,
-        }
         with transaction.atomic():
             venue_request = OwnerVenueRequest(
                 requested_by=self.request.user,
@@ -714,25 +760,14 @@ class OwnerVenueCreateView(OwnerProfileContextMixin, VenueFieldFormSetCreateMixi
             venue_request.full_clean()
             venue_request.save()
             notify_admins_about_owner_venue_request(venue_request)
-        messages.success(self.request, 'Yêu cầu tạo sân đã được gửi và đang chờ admin duyệt.')
+        messages.success(self.request, 'Yêu cầu tạo cơ sở đã được gửi và đang chờ admin duyệt.')
         return redirect('venues:owner_venue_list')
-
-    def forms_invalid(self, form, field_formset, pricing_form=None, price_rule_formset=None):
-        return self.render_to_response(
-            self.get_context_data(
-                form=form,
-                field_formset=field_formset,
-                pricing_form=pricing_form,
-                price_rule_formset=price_rule_formset,
-            ),
-        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['show_field_formset'] = True
-        context.setdefault('pricing_form', self.get_pricing_form())
-        context.setdefault('price_rule_formset', self.get_manual_price_rule_formset())
-        context['default_price_rules'] = get_default_price_rule_payloads()
+        context['page_title'] = 'Tạo cơ sở mới'
+        context['submit_label'] = 'Gửi yêu cầu duyệt'
+        context['back_url'] = reverse('venues:owner_venue_list')
         return context
 
 
@@ -742,6 +777,10 @@ class OwnerFieldListView(OwnerProfileContextMixin, ListView):
 
     def dispatch(self, request, *args, **kwargs):
         self.set_owner_profile(request)
+        # Let the auth/role mixins handle anonymous users first (login redirect)
+        # instead of raising 403 before the login check runs.
+        if not request.user.is_authenticated:
+            return super().dispatch(request, *args, **kwargs)
         self.require_owner_profile()
         self.venue = get_object_or_404(
             Venue.objects.filter(owner=self.owner_profile, is_deleted=False),
@@ -799,13 +838,19 @@ class OwnerFieldCreateView(OwnerProfileContextMixin, FormView):
 
     def forms_valid(self, form, pricing_form, price_rule_formset, price_rule_payloads):
         with transaction.atomic():
-            field = form.save(commit=False)
-            field.venue = self.venue
-            field.status = field.status or 'ACTIVE'
-            field.full_clean()
-            field.save()
-            create_price_rules_for_field(field, price_rule_payloads)
-        messages.success(self.request, f'Đã tạo sân "{field.name}" cùng bảng giá thuê sân.')
+            field_request = FieldCreationRequest(
+                owner=self.owner_profile,
+                venue=self.venue,
+                pricing_payload={
+                    'mode': pricing_form.cleaned_data['pricing_mode'],
+                    'rules': price_rule_payloads,
+                },
+                **form.to_request_kwargs(),
+            )
+            field_request.full_clean()
+            field_request.save()
+            notify_admins_about_field_creation_request(field_request)
+        messages.success(self.request, f'Yêu cầu tạo sân "{field_request.name}" đã được gửi và đang chờ admin duyệt.')
         return redirect('venues:owner_field_list', venue_pk=self.venue.pk)
 
     def get_context_data(self, **kwargs):
@@ -813,7 +858,7 @@ class OwnerFieldCreateView(OwnerProfileContextMixin, FormView):
         context['venue'] = self.venue
         context['page_title'] = 'Tạo sân mới'
         context['eyebrow'] = 'Chủ sân'
-        context['submit_label'] = 'Tạo sân'
+        context['submit_label'] = 'Gửi yêu cầu duyệt'
         context['back_url'] = reverse('venues:owner_field_list', kwargs={'venue_pk': self.venue.pk})
         context.setdefault('pricing_form', self.get_pricing_form())
         context.setdefault('price_rule_formset', self.get_manual_price_rule_formset())
@@ -1046,8 +1091,14 @@ class OwnerPriceRuleListView(OwnerProfileContextMixin, ListView):
     template_name = 'venues/owner_price_rule_list.html'
     context_object_name = 'price_rules'
 
+    DAY_NAMES = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật']
+
     def dispatch(self, request, *args, **kwargs):
         self.set_owner_profile(request)
+        # Let the auth/role mixins redirect anonymous users to login instead of
+        # raising 403 before the login check runs.
+        if not request.user.is_authenticated:
+            return super().dispatch(request, *args, **kwargs)
         self.require_owner_profile()
         self.field = get_object_or_404(
             Field.objects.filter(venue__owner=self.owner_profile, venue__is_deleted=False).select_related('venue'),
@@ -1062,6 +1113,15 @@ class OwnerPriceRuleListView(OwnerProfileContextMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['field'] = self.field
         context['venue'] = self.field.venue
+        rules = list(context['price_rules'])
+        for rule in rules:
+            if rule.day_of_week is None:
+                rule.day_label = 'Tất cả các ngày'
+            elif 0 <= rule.day_of_week < len(self.DAY_NAMES):
+                rule.day_label = self.DAY_NAMES[rule.day_of_week]
+            else:
+                rule.day_label = str(rule.day_of_week)
+        context['price_rules'] = rules
         return context
 
 
@@ -1138,6 +1198,183 @@ class OwnerPriceRuleDeleteView(OwnerProfileContextMixin, View):
         return redirect('venues:owner_price_rule_list', field_pk=field_pk)
 
 
+# ===========================================================================
+# Màn quản lý sân con 3-panel (thông tin / bảng giá / dịch vụ)
+# ===========================================================================
+class OwnerFieldManageMixin(LoginRequiredMixin):
+    """Resolve the managed field for the logged-in owner.
+
+    Permission convention (matches the field management tests):
+      * anonymous          -> LoginRequiredMixin redirects to login
+      * authenticated, but not an owner (no OwnerProfile) -> redirect dashboard
+      * owner accessing a field outside their own venues  -> 403
+    Soft-deleted venues are treated as inaccessible (403).
+    """
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return super().dispatch(request, *args, **kwargs)
+        self.owner_profile = get_owner_profile(request.user)
+        if self.owner_profile is None:
+            messages.error(request, 'Chỉ chủ sân mới có thể quản lý sân con.')
+            return redirect('accounts:dashboard')
+        self.field = get_object_or_404(
+            Field.objects.select_related('venue', 'field_type', 'field_type__sport'),
+            pk=kwargs['pk'],
+        )
+        venue = self.field.venue
+        if venue.owner_id != self.owner_profile.id or getattr(venue, 'is_deleted', False):
+            raise PermissionDenied('Bạn không có quyền quản lý sân thuộc cơ sở khác.')
+        return super().dispatch(request, *args, **kwargs)
+
+    def tab_url(self, tab):
+        return f"{reverse('venues:field_edit', kwargs={'pk': self.field.pk})}?tab={tab}"
+
+    def get_service_items(self):
+        return ServiceItem.objects.filter(venue=self.field.venue).order_by('category', 'name')
+
+    def get_service_item_or_404(self, item_id):
+        # Scope the lookup to the field's venue so foreign items are 404, not 403.
+        return get_object_or_404(ServiceItem, pk=item_id, venue=self.field.venue)
+
+    def render_pricing_panel(self):
+        return render_to_string(
+            'venues/partials/_field_pricing_panel.html',
+            {
+                'field': self.field,
+                'venue': self.field.venue,
+                'pricing_blocks': get_field_pricing_blocks(self.field),
+            },
+            request=self.request,
+        )
+
+    def render_services_panel(self):
+        return render_to_string(
+            'venues/partials/_field_services_panel.html',
+            {
+                'field': self.field,
+                'venue': self.field.venue,
+                'service_items': self.get_service_items(),
+            },
+            request=self.request,
+        )
+
+
+class FieldManageView(OwnerFieldManageMixin, View):
+    """3-panel field management screen at ``/co-so/san/<pk>/sua/``.
+
+    Keeps the ``venues:field_edit`` URL name. GET renders the shell with the
+    active tab (``?tab=info|pricing|services``, default ``info``). POST handles
+    the info form only; pricing/services have their own endpoints.
+    """
+
+    template_name = 'venues/field_manage.html'
+    VALID_TABS = ('info', 'pricing', 'services')
+
+    def get_active_tab(self):
+        tab = (self.request.GET.get('tab') or 'info').strip()
+        return tab if tab in self.VALID_TABS else 'info'
+
+    def build_context(self, form=None, active_tab=None):
+        return {
+            'field': self.field,
+            'venue': self.field.venue,
+            'page_title': f'Quản lý sân: {self.field.name}',
+            'active_tab': active_tab or self.get_active_tab(),
+            'form': form if form is not None else FieldForm(instance=self.field),
+            'pricing_blocks': get_field_pricing_blocks(self.field),
+            'service_items': self.get_service_items(),
+        }
+
+    def get(self, request, *args, **kwargs):
+        return render(request, self.template_name, self.build_context())
+
+    def post(self, request, *args, **kwargs):
+        form = FieldForm(request.POST, instance=self.field)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Đã cập nhật thông tin sân "{self.field.name}".')
+            return redirect(self.tab_url('info'))
+        # Invalid info form: re-render the shell on the info tab with a 400 so the
+        # client can show field errors without losing the other panels.
+        context = self.build_context(form=form, active_tab='info')
+        return render(request, self.template_name, context, status=400)
+
+
+class FieldPricingUpdateView(OwnerFieldManageMixin, View):
+    """POST ``/co-so/san/<pk>/gia/`` — save a price for the selected 30' blocks."""
+
+    def post(self, request, *args, **kwargs):
+        blocks = [value for value in request.POST.getlist('blocks') if value]
+        try:
+            price = parse_price(request.POST.get('price_per_hour'))
+        except ValueError as exc:
+            return self._error(request, str(exc))
+        if not blocks:
+            return self._error(request, 'Vui lòng chọn ít nhất một khung giờ.')
+        try:
+            with transaction.atomic():
+                count = apply_field_prices(self.field, blocks, price)
+        except (ValueError, ValidationError) as exc:
+            return self._error(request, str(exc))
+
+        message = f'Đã lưu giá cho {count} khung giờ đã chọn.'
+        if is_ajax(request):
+            return ajax_response(message, html=self.render_pricing_panel())
+        messages.success(request, message)
+        return redirect(self.tab_url('pricing'))
+
+    def _error(self, request, message):
+        if is_ajax(request):
+            return ajax_response(message, status=400)
+        messages.error(request, message)
+        return redirect(self.tab_url('pricing'))
+
+
+class FieldServicePriceView(OwnerFieldManageMixin, View):
+    """POST ``/co-so/san/<pk>/dich-vu/<item_id>/gia/`` — update a service price."""
+
+    def post(self, request, *args, **kwargs):
+        service = self.get_service_item_or_404(kwargs['item_id'])
+        try:
+            price = parse_price(request.POST.get('price'))
+        except ValueError as exc:
+            if is_ajax(request):
+                return ajax_response(str(exc), status=400)
+            messages.error(request, str(exc))
+            return redirect(self.tab_url('services'))
+
+        service.price = price
+        service.save(update_fields=['price'])
+        message = f'Đã cập nhật giá dịch vụ "{service.name}".'
+        if is_ajax(request):
+            return ajax_response(message, html=self.render_services_panel())
+        messages.success(request, message)
+        return redirect(self.tab_url('services'))
+
+
+class FieldServiceToggleView(OwnerFieldManageMixin, View):
+    """POST ``/co-so/san/<pk>/dich-vu/<item_id>/trang-thai/`` — toggle is_active."""
+
+    def post(self, request, *args, **kwargs):
+        service = self.get_service_item_or_404(kwargs['item_id'])
+        raw = str(request.POST.get('is_active', '')).strip().lower()
+        service.is_active = raw in {'1', 'true', 'yes', 'on'}
+        service.save(update_fields=['is_active'])
+        if service.is_active:
+            message = f'Đã mở bán lại dịch vụ "{service.name}".'
+        else:
+            message = f'Đã tạm ngưng dịch vụ "{service.name}".'
+        if is_ajax(request):
+            return ajax_response(
+                message,
+                is_active=service.is_active,
+                html=self.render_services_panel(),
+            )
+        messages.success(request, message)
+        return redirect(self.tab_url('services'))
+
+
 class AdminRegistrationRequestRejectView(AdminRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         admin_note = (request.POST.get('admin_note') or request.POST.get('rejection_reason') or '').strip()
@@ -1205,3 +1442,115 @@ class AdminRegistrationRequestRejectView(AdminRequiredMixin, View):
 
     def _detail_url(self, venue_request):
         return reverse('venues:admin_venue_request_detail', kwargs={'pk': venue_request.pk})
+
+
+class AdminApproveVenueRequestView(AdminRegistrationRequestApproveView):
+    pass
+
+
+class AdminRejectVenueRequestView(AdminRegistrationRequestRejectView):
+    pass
+
+
+class AdminApproveFieldRequestView(AdminRequiredMixin, View):
+    def post(self, request, *args, **kwargs):
+        with transaction.atomic():
+            field_request = get_object_or_404(
+                FieldCreationRequest.objects.select_for_update().select_related(
+                    'owner',
+                    'owner__user',
+                    'venue',
+                    'field_type',
+                ),
+                pk=kwargs['pk'],
+            )
+            if field_request.status != FieldCreationRequest.PENDING:
+                messages.error(request, 'Yêu cầu này đã được xử lý, không thể duyệt lại.')
+                return redirect('venues:admin_request_list')
+            if getattr(field_request.venue, 'is_deleted', False):
+                messages.error(request, 'Không thể duyệt yêu cầu vì cơ sở đã bị xóa.')
+                return redirect('venues:admin_request_list')
+
+            field = Field(
+                venue=field_request.venue,
+                field_type=field_request.field_type,
+                name=field_request.name,
+                capacity=field_request.capacity,
+                surface_type=field_request.surface_type,
+                length=field_request.length,
+                width=field_request.width,
+                status=field_request.field_status,
+            )
+            field.full_clean()
+            field.save()
+            price_rule_payloads = validate_price_rule_payloads(
+                resolve_pricing_payload_rules(field_request.pricing_payload),
+            )
+            create_price_rules_for_field(field, price_rule_payloads)
+
+            field_request.status = FieldCreationRequest.APPROVED
+            field_request.reviewed_by = request.user
+            field_request.reviewed_at = timezone.now()
+            field_request.save(update_fields=[
+                'status',
+                'reviewed_by',
+                'reviewed_at',
+                'updated_at',
+            ])
+            notify_owner_field_request_approved(field_request, field)
+            AuditLog.objects.create(
+                user=request.user,
+                action='APPROVE',
+                target_type='FieldCreationRequest',
+                target_id=str(field_request.pk),
+                old_value=FieldCreationRequest.PENDING,
+                new_value=f'{FieldCreationRequest.APPROVED}: Field#{field.pk}',
+            )
+
+        messages.success(request, f'Đã duyệt yêu cầu tạo sân "{field.name}".')
+        return redirect('venues:admin_request_list')
+
+
+class AdminRejectFieldRequestView(AdminRequiredMixin, View):
+    def post(self, request, *args, **kwargs):
+        reject_reason = (request.POST.get('reject_reason') or request.POST.get('admin_note') or '').strip()
+        if not reject_reason:
+            messages.error(request, 'Vui lòng nhập lý do từ chối.')
+            return redirect('venues:admin_request_list')
+
+        with transaction.atomic():
+            field_request = get_object_or_404(
+                FieldCreationRequest.objects.select_for_update().select_related(
+                    'owner',
+                    'owner__user',
+                    'venue',
+                ),
+                pk=kwargs['pk'],
+            )
+            if field_request.status != FieldCreationRequest.PENDING:
+                messages.error(request, 'Yêu cầu này đã được xử lý, không thể từ chối lại.')
+                return redirect('venues:admin_request_list')
+
+            field_request.status = FieldCreationRequest.REJECTED
+            field_request.reject_reason = reject_reason
+            field_request.reviewed_by = request.user
+            field_request.reviewed_at = timezone.now()
+            field_request.save(update_fields=[
+                'status',
+                'reject_reason',
+                'reviewed_by',
+                'reviewed_at',
+                'updated_at',
+            ])
+            notify_owner_field_request_rejected(field_request)
+            AuditLog.objects.create(
+                user=request.user,
+                action='REJECT',
+                target_type='FieldCreationRequest',
+                target_id=str(field_request.pk),
+                old_value=FieldCreationRequest.PENDING,
+                new_value=f'{FieldCreationRequest.REJECTED}: {reject_reason}',
+            )
+
+        messages.success(request, f'Đã từ chối yêu cầu tạo sân "{field_request.name}".')
+        return redirect('venues:admin_request_list')

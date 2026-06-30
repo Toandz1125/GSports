@@ -1,4 +1,5 @@
 {% extends 'accounts/dashboard.html' %}
+{% load static %}
 
 {% block title %}Thanh toán booking — GSports{% endblock %}
 
@@ -85,6 +86,50 @@
         font-size: 1.1rem;
         font-weight: 800;
     }
+
+    .checkout-countdown {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        margin-top: 1rem;
+        padding-top: 0.85rem;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .checkout-countdown__label {
+        color: var(--text-muted);
+        font-size: 0.8rem;
+    }
+
+    .booking-countdown {
+        color: var(--primary-600);
+        font-weight: 800;
+        font-size: 1.05rem;
+    }
+
+    .checkout-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 1.25rem;
+    }
+
+    .checkout-status {
+        border-radius: var(--radius-md);
+        padding: 0.6rem 0.9rem;
+        font-weight: 700;
+        font-size: 0.9rem;
+    }
+
+    .checkout-status--paid {
+        background: rgba(16, 185, 129, 0.12);
+        color: var(--success-600, #059669);
+    }
+
+    .checkout-status--cancelled {
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--error-500);
+    }
 </style>
 {% endblock %}
 
@@ -124,7 +169,7 @@
                 </div>
                 <div class="checkout-row">
                     <span>Trạng thái</span>
-                    <strong>{{ booking.get_status_display }}</strong>
+                    <strong data-booking-status-label>{% if booking.status == 'PENDING' or booking.status == 'WAITING' %}Chờ thanh toán{% elif booking.status == 'PAID' %}Đã thanh toán{% elif booking.status == 'CANCELLED' %}Đã huỷ{% else %}{{ booking.get_status_display }}{% endif %}</strong>
                 </div>
             </div>
         </section>
@@ -145,7 +190,46 @@
                 <span>Cần thanh toán</span>
                 <strong>{{ booking.grand_total|floatformat:0 }}đ</strong>
             </div>
+            {% if can_pay_booking and booking.payment_deadline %}
+            <div class="checkout-countdown">
+                <span class="checkout-countdown__label">Thời gian còn lại để thanh toán</span>
+                <strong class="booking-countdown" data-booking-countdown
+                        data-countdown-deadline="{{ booking.payment_deadline|date:'c' }}"
+                        data-booking-status-url="{% url 'bookings:booking_status' booking.pk %}">
+                    Còn --:-- để thanh toán
+                </strong>
+            </div>
+            {% endif %}
+
+            <div class="checkout-actions">
+                {% if can_pay_booking %}
+                <form method="post" action="{% url 'payments:booking_checkout' booking.pk %}" data-payment-action>
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="wallet_pay">
+                    <button type="submit" class="btn btn--primary">Thanh toán bằng ví</button>
+                </form>
+                {% elif booking.status == 'PAID' %}
+                <div class="checkout-status checkout-status--paid">Đã thanh toán</div>
+                {% elif payment_expired %}
+                <div class="checkout-status checkout-status--cancelled">Booking đã bị huỷ do quá hạn thanh toán</div>
+                {% elif booking.status == 'CANCELLED' %}
+                <div class="checkout-status checkout-status--cancelled">Booking đã bị huỷ</div>
+                {% endif %}
+
+                {% if can_cancel_booking %}
+                <form method="post" action="{% url 'bookings:booking_cancel' booking.pk %}"
+                      onsubmit="return confirm('Bạn chắc chắn muốn huỷ booking này?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn--danger">Huỷ booking</button>
+                </form>
+                {% endif %}
+            </div>
         </aside>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script src="{% static 'js/booking-time-blocks.js' %}"></script>
 {% endblock %}

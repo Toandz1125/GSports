@@ -1,4 +1,5 @@
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 
 from .pricing import resolve_pricing_payload_rules, validate_price_rule_payloads
@@ -132,9 +133,9 @@ class OwnerVenueRequest(models.Model):
     UPDATE = 'UPDATE'
     DELETE = 'DELETE'
     REQUEST_TYPE_CHOICES = [
-        (CREATE, 'Tạo sân'),
-        (UPDATE, 'Cập nhật sân'),
-        (DELETE, 'Hủy sân'),
+        (CREATE, 'Tạo cơ sở'),
+        (UPDATE, 'Cập nhật cơ sở'),
+        (DELETE, 'Hủy cơ sở'),
     ]
 
     PENDING = 'PENDING'
@@ -159,7 +160,7 @@ class OwnerVenueRequest(models.Model):
         null=True,
         related_name='owner_venue_requests',
     )
-    payload = models.JSONField(default=dict, blank=True)
+    payload = models.JSONField(default=dict, blank=True, encoder=DjangoJSONEncoder)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=PENDING)
     reason = models.TextField(blank=True)
     admin_note = models.TextField(blank=True)
@@ -226,14 +227,14 @@ class OwnerVenueRequest(models.Model):
                 errors['payload'] = 'Payload phải là object.'
             else:
                 if not (payload.get('name') or '').strip():
-                    errors['payload'] = 'Payload tạo/cập nhật sân cần có tên sân.'
+                    errors['payload'] = 'Payload tạo/cập nhật cơ sở cần có tên cơ sở.'
                 if not (payload.get('address') or '').strip():
-                    errors['payload'] = 'Payload tạo/cập nhật sân cần có địa chỉ.'
-                if self.request_type == self.CREATE:
+                    errors['payload'] = 'Payload tạo/cập nhật cơ sở cần có địa chỉ.'
+                if self.request_type == self.CREATE and payload.get('fields'):
                     field_payloads = payload.get('fields') or []
-                    if not isinstance(field_payloads, list) or not field_payloads:
-                        errors['payload'] = 'Payload tạo cơ sở cần có ít nhất 1 sân con.'
-                    else:
+                    if not isinstance(field_payloads, list):
+                        errors['payload'] = 'Payload sân con không hợp lệ.'
+                    elif field_payloads:
                         for index, field_payload in enumerate(field_payloads, start=1):
                             if not isinstance(field_payload, dict):
                                 errors['payload'] = f'Sân con #{index} không hợp lệ.'
@@ -274,6 +275,95 @@ class OwnerVenueRequest(models.Model):
 
     def __str__(self):
         return f'{self.get_request_type_display()} - {self.venue_name or "Venue"} ({self.status})'
+
+
+class FieldCreationRequest(models.Model):
+    """Owner request that requires admin approval before creating a field."""
+
+    ACTIVE = 'ACTIVE'
+    MAINTENANCE = 'MAINTENANCE'
+    INACTIVE = 'INACTIVE'
+    FIELD_STATUS_CHOICES = [
+        (ACTIVE, 'Hoạt động'),
+        (MAINTENANCE, 'Bảo trì'),
+        (INACTIVE, 'Ngừng hoạt động'),
+    ]
+
+    PENDING = 'PENDING'
+    APPROVED = 'APPROVED'
+    REJECTED = 'REJECTED'
+    STATUS_CHOICES = [
+        (PENDING, 'Đang chờ'),
+        (APPROVED, 'Đã duyệt'),
+        (REJECTED, 'Đã từ chối'),
+    ]
+
+    owner = models.ForeignKey(
+        'accounts.OwnerProfile',
+        on_delete=models.CASCADE,
+        related_name='field_creation_requests',
+    )
+    venue = models.ForeignKey(
+        Venue,
+        on_delete=models.CASCADE,
+        related_name='field_creation_requests',
+    )
+    field_type = models.ForeignKey(
+        'venues.FieldType',
+        on_delete=models.PROTECT,
+        related_name='field_creation_requests',
+    )
+    name = models.CharField(max_length=100)
+    capacity = models.IntegerField(blank=True, null=True)
+    surface_type = models.CharField(max_length=50, blank=True, null=True)
+    length = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
+    width = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)
+    field_status = models.CharField(max_length=20, choices=FIELD_STATUS_CHOICES, default=ACTIVE)
+    pricing_payload = models.JSONField(default=dict, blank=True, encoder=DjangoJSONEncoder)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=PENDING)
+    reject_reason = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='reviewed_field_creation_requests',
+    )
+    reviewed_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'field_creation_request'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['owner', 'status']),
+            models.Index(fields=['venue', 'status']),
+            models.Index(fields=['created_at']),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(field_status__in=['ACTIVE', 'MAINTENANCE', 'INACTIVE']),
+                name='field_creation_request_field_status_valid',
+            ),
+            models.CheckConstraint(
+                check=models.Q(status__in=['PENDING', 'APPROVED', 'REJECTED']),
+                name='field_creation_request_status_valid',
+            ),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.owner_id and self.venue_id and self.venue.owner_id != self.owner_id:
+            errors['venue'] = 'Owner chỉ được gửi yêu cầu tạo sân cho cơ sở thuộc sở hữu của mình.'
+        if self.venue_id and getattr(self.venue, 'is_deleted', False):
+            errors['venue'] = 'Không thể tạo sân cho cơ sở đã bị xóa.'
+        if errors:
+            raise ValidationError(errors)
+
+    def __str__(self):
+        return f'{self.name} - {self.venue.name if self.venue_id else "Venue"} ({self.status})'
 
 
 class VenueOperatingHour(models.Model):

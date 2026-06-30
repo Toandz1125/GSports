@@ -24,14 +24,14 @@ from .permissions import (
     OwnerBookingRequiredMixin,
     StaffRequiredMixin,
     can_manage_booking,
+    can_view_booking,
     get_booking_queryset_for_user,
     get_owner_profile,
 )
 from .services import (
-    calculate_booking_price,
     cancel_expired_booking_if_needed,
     cancel_expired_pending_bookings,
-    create_booking,
+    create_booking_for_slots,
     get_booking_slot_options,
     get_bookable_fields_queryset,
     get_time_blocks_for_field_date,
@@ -41,10 +41,16 @@ from .services import (
 
 FIELD_ACTIVE_STATUS = getattr(Field, 'ACTIVE', 'ACTIVE')
 BOOKING_EXPIRED_MESSAGE = 'Đơn đặt sân đã quá hạn thanh toán và đã bị hủy.'
+# A booking is treated as paid when it is PAID or carries a completed payment.
+COMPLETED_PAYMENT_STATUSES = ('COMPLETED', 'PAID', 'SUCCESS')
 
 
 def _is_ajax(request):
     return request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+
+def _wants_json(request):
+    return _is_ajax(request) or request.headers.get('Accept') == 'application/json'
 
 
 def _booking_detail_partial_context(booking, back_url=None):
@@ -76,6 +82,29 @@ def _validation_error_messages(exc):
                 messages.append(f'{field}: {message}')
         return messages
     return exc.messages if hasattr(exc, 'messages') else [str(exc)]
+
+
+def _booking_json_payload(booking):
+    return {
+        'ok': True,
+        'booking_id': str(booking.pk),
+        'status': booking.status,
+        'status_display': booking.get_status_display(),
+        'redirect_url': reverse('bookings:booking_detail', kwargs={'pk': booking.pk}),
+        'checkout_url': reverse('payments:booking_checkout', kwargs={'booking_pk': booking.pk})
+        if booking.can_pay() else None,
+        'status_url': reverse('bookings:booking_status', kwargs={'pk': booking.pk}),
+        'payment_deadline': booking.payment_deadline.isoformat() if booking.payment_deadline else None,
+        'slots': [
+            {
+                'start_time': slot.start_time.strftime('%H:%M'),
+                'end_time': slot.end_time.strftime('%H:%M'),
+                'price': str(slot.price),
+            }
+            for slot in booking.slots.all().order_by('start_time')
+        ],
+        'total_amount': str(booking.total_amount),
+    }
 
 
 def _parse_booking_date(value):
@@ -147,7 +176,7 @@ class BookingHistoryListView(LoginRequiredMixin, ListView):
         queryset = (
             Booking.objects
             .select_related('booking_package__user', 'venue', 'field')
-            .prefetch_related('slots')
+            .prefetch_related('slots', 'payments')
             .order_by('-created_at')
         )
 
@@ -186,7 +215,73 @@ class BookingHistoryListView(LoginRequiredMixin, ListView):
         else:
             context['page_title'] = 'Lịch sử thuê sân'
         context['show_customer_booking_actions'] = self._is_customer_scope()
+        self._annotate_history_actions(context['bookings'], user, roles)
         return context
+
+    def _annotate_history_actions(self, bookings, user, roles):
+        """Attach a per-booking action (pay / invoice / detail / none) to each row.
+
+        Decided per booking instead of one shared flag, so a paid booking offers
+        an invoice while a payable one offers checkout — without widening role
+        scope. All URLs are resolved with reverse() (no hard-coded paths) and use
+        the prefetched payments to avoid N+1 queries.
+        """
+        if 'ADMIN' in roles:
+            detail_scope = 'admin'
+        elif 'OWNER' in roles:
+            detail_scope = 'owner'
+        elif 'STAFF' in roles:
+            detail_scope = 'staff'
+        else:
+            detail_scope = 'customer'
+
+        for booking in bookings:
+            is_self = booking.booking_package.user_id == user.id
+            has_completed_payment = any(
+                payment.status in COMPLETED_PAYMENT_STATUSES
+                for payment in booking.payments.all()
+            )
+
+            if detail_scope == 'customer':
+                detail_url = reverse('bookings:booking_detail', kwargs={'pk': booking.pk})
+            elif detail_scope == 'owner':
+                detail_url = reverse('bookings:owner_booking_detail', kwargs={'pk': booking.pk})
+            else:
+                # Staff/admin have no per-booking customer detail page they may open.
+                detail_url = None
+
+            if booking.status == Booking.PAID or has_completed_payment:
+                booking.history_action_type = 'invoice'
+                booking.history_action_url = reverse(
+                    'payments:booking_invoice', kwargs={'booking_pk': booking.pk},
+                )
+                booking.history_action_label = 'Xem hóa đơn'
+            elif booking.status == Booking.PENDING and booking.can_pay() and is_self:
+                booking.history_action_type = 'pay'
+                booking.history_action_url = reverse(
+                    'payments:booking_checkout', kwargs={'booking_pk': booking.pk},
+                )
+                booking.history_action_label = 'Tiếp tục thanh toán'
+            elif detail_url:
+                booking.history_action_type = 'detail'
+                booking.history_action_url = detail_url
+                booking.history_action_label = 'Chi tiết'
+            else:
+                booking.history_action_type = 'none'
+                booking.history_action_url = ''
+                booking.history_action_label = ''
+
+            booking.history_detail_url = detail_url
+            # Cancel stays a customer-only, self-owned action (server still re-checks).
+            booking.history_can_cancel = bool(
+                is_self and detail_scope == 'customer' and booking.can_cancel()
+            )
+            # Whole-row click target: primary action, else detail when available.
+            booking.history_target_url = (
+                booking.history_action_url
+                if booking.history_action_type != 'none'
+                else (detail_url or '')
+            )
 
 
 class BookingDetailView(LoginRequiredMixin, DetailView):
@@ -222,6 +317,7 @@ class BookingDetailView(LoginRequiredMixin, DetailView):
 
         # Thống kê & Kiểm tra đánh giá
         from apps.reviews.models import Review
+        booking = self.object
         # Booking hoàn thành khi đã thanh toán (PAID) và ngày thuê bằng hoặc trước hôm nay
         context['is_completed'] = (booking.status == Booking.PAID and booking.booking_date <= timezone.localdate())
         context['existing_review'] = Review.objects.filter(booking=booking).first()
@@ -370,22 +466,15 @@ class BookingCreateView(LoginRequiredMixin, FormView):
 
     def form_valid(self, form):
         data = form.cleaned_data
-        price = getattr(form, 'calculated_price', None)
-        if price is None:
-            price, _ = calculate_booking_price(
-                data['field'],
-                data['booking_date'],
-                data['start_time'],
-                data['end_time'],
-            )
+        slot_ranges = getattr(form, 'selected_slot_ranges', None) or [
+            (data['start_time'], data['end_time']),
+        ]
         try:
-            self.booking = create_booking(
+            self.booking = create_booking_for_slots(
                 user=self.request.user,
                 field=data['field'],
                 booking_date=data['booking_date'],
-                start_time=data['start_time'],
-                end_time=data['end_time'],
-                price=price,
+                slot_ranges=slot_ranges,
                 note=data.get('note', ''),
                 service_quantities=form.service_quantities,
             )
@@ -393,7 +482,7 @@ class BookingCreateView(LoginRequiredMixin, FormView):
             error_messages = _validation_error_messages(exc)
             is_conflict = any('SLOT_CONFLICT' in msg for msg in error_messages)
 
-            if is_conflict and self.request.headers.get('Accept') == 'application/json':
+            if is_conflict and _wants_json(self.request):
                 return JsonResponse({
                     "error": "SLOT_CONFLICT",
                     "message": "Khung giờ này vừa có người khác đặt hoặc giữ chỗ. Vui lòng chọn khung giờ khác."
@@ -404,12 +493,12 @@ class BookingCreateView(LoginRequiredMixin, FormView):
             return self.form_invalid(form)
 
         messages.success(self.request, 'Đặt sân thành công. Vui lòng kiểm tra lịch sử đặt sân của bạn.')
-        if self.request.headers.get('Accept') == 'application/json':
-            return JsonResponse({'redirect_url': self.get_success_url()}, status=201)
+        if _wants_json(self.request):
+            return JsonResponse(_booking_json_payload(self.booking), status=201)
         return redirect(self.get_success_url())
 
     def form_invalid(self, form):
-        if self.request.headers.get('Accept') == 'application/json':
+        if _wants_json(self.request):
             return JsonResponse({'error': 'FORM_INVALID', 'errors': form.errors}, status=400)
         return super().form_invalid(form)
 
@@ -474,6 +563,31 @@ class BookingAvailabilityView(LoginRequiredMixin, View):
         return JsonResponse({
             'time_blocks': time_blocks,
             'unavailable_blocks': unavailable_blocks,
+        })
+
+
+class BookingStatusView(LoginRequiredMixin, View):
+    def get(self, request, *args, **kwargs):
+        booking = get_object_or_404(
+            Booking.objects.select_related('booking_package', 'booking_package__user', 'venue', 'field')
+            .prefetch_related('slots'),
+            pk=kwargs['pk'],
+        )
+        if not can_view_booking(request.user, booking):
+            raise PermissionDenied(BOOKING_MANAGE_DENIED_MESSAGE)
+
+        cancel_expired_booking_if_needed(booking)
+        booking.refresh_from_db()
+        return JsonResponse({
+            'ok': True,
+            'booking_id': str(booking.pk),
+            'status': booking.status,
+            'status_display': booking.get_status_display(),
+            'can_pay': booking.can_pay(),
+            'payment_deadline': booking.payment_deadline.isoformat() if booking.payment_deadline else None,
+            'server_time': timezone.now().isoformat(),
+            'checkout_url': reverse('payments:booking_checkout', kwargs={'booking_pk': booking.pk})
+            if booking.can_pay() else None,
         })
 
 
@@ -772,6 +886,24 @@ class OwnerBookingDetailView(OwnerBookingRequiredMixin, DetailView):
         context['can_pay_booking'] = False
         context['back_url'] = reverse('bookings:owner_booking_list')
         return context
+
+
+class BookingCheckoutView(LoginRequiredMixin, View):
+    """Compatibility route: real checkout lives in apps.payments."""
+
+    def get(self, request, *args, **kwargs):
+        return redirect('payments:booking_checkout', booking_pk=kwargs['booking_pk'])
+
+    def post(self, request, *args, **kwargs):
+        return redirect('payments:booking_checkout', booking_pk=kwargs['booking_pk'])
+
+
+class BookingPayView(LoginRequiredMixin, View):
+    """Compatibility endpoint; bookings no longer performs payment mutation."""
+
+    def post(self, request, *args, **kwargs):
+        messages.error(request, 'Vui lòng thanh toán bằng ví tại trang checkout.')
+        return redirect('payments:booking_checkout', booking_pk=kwargs['booking_pk'])
 
 
 # ===========================================================================

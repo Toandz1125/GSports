@@ -1,9 +1,15 @@
+import json
+from datetime import datetime
+from decimal import Decimal
+
 from django import forms
 from django.core.exceptions import ValidationError
 
 from apps.services.models import ServiceItem
 from apps.venues.models import Field
 from .services import (
+    BOOKING_INVALID_SLOT_ERROR,
+    BOOKING_NO_SLOT_SELECTED_ERROR,
     BOOKING_UNAVAILABLE_ERROR,
     calculate_booking_price,
     generate_time_blocks,
@@ -27,6 +33,7 @@ class BookingCreateForm(forms.Form):
     field = forms.ModelChoiceField(label='Sân', queryset=Field.objects.none())
     booking_date = forms.DateField(label='Ngày đặt', widget=forms.DateInput(attrs={'type': 'date'}))
     start_time = forms.TimeField(
+        required=False,
         input_formats=['%H:%M'],
         error_messages={
             'required': 'Vui lòng chọn giờ bắt đầu.',
@@ -35,6 +42,7 @@ class BookingCreateForm(forms.Form):
         widget=forms.HiddenInput(),
     )
     end_time = forms.TimeField(
+        required=False,
         input_formats=['%H:%M'],
         error_messages={
             'required': 'Vui lòng chọn giờ kết thúc.',
@@ -50,6 +58,8 @@ class BookingCreateForm(forms.Form):
         self.fields['field'].queryset = field_queryset or get_bookable_fields_queryset()
         self.calculated_price = None
         self.price_rule = None
+        self.selected_slot_ranges = []
+        self.slot_prices = []
         self.service_items = self._resolve_service_items()
         self.service_quantities = []
         for service_item in self.service_items:
@@ -114,41 +124,134 @@ class BookingCreateForm(forms.Form):
         for message in exc.messages:
             self.add_error(None, message)
 
+    def _data_getlist(self, key):
+        if not self.is_bound:
+            return []
+        if hasattr(self.data, 'getlist'):
+            return self.data.getlist(key)
+        value = self.data.get(key)
+        return [value] if value else []
+
+    def _raw_slot_values(self):
+        values = []
+        for field_name in ('slots', 'slot', 'selected_slots'):
+            for raw_value in self._data_getlist(self.add_prefix(field_name)):
+                if raw_value in (None, ''):
+                    continue
+                raw_value = str(raw_value).strip()
+                if not raw_value:
+                    continue
+                if raw_value.startswith('['):
+                    try:
+                        parsed_values = json.loads(raw_value)
+                    except json.JSONDecodeError:
+                        values.append(raw_value)
+                    else:
+                        if isinstance(parsed_values, list):
+                            values.extend(str(value).strip() for value in parsed_values if str(value).strip())
+                        else:
+                            values.append(raw_value)
+                else:
+                    values.append(raw_value)
+        return values
+
+    def _parse_slot_value(self, value):
+        separator = '|' if '|' in value else '-'
+        parts = value.split(separator, 1)
+        if len(parts) != 2:
+            raise ValidationError(BOOKING_INVALID_SLOT_ERROR)
+        try:
+            start_time = datetime.strptime(parts[0].strip(), '%H:%M').time()
+            end_time = datetime.strptime(parts[1].strip(), '%H:%M').time()
+        except ValueError as exc:
+            raise ValidationError(BOOKING_INVALID_SLOT_ERROR) from exc
+        return start_time, end_time
+
+    def _build_slot_ranges(self, cleaned_data):
+        raw_slot_values = self._raw_slot_values()
+        if raw_slot_values:
+            return [self._parse_slot_value(value) for value in raw_slot_values]
+
+        start_time = cleaned_data.get('start_time')
+        end_time = cleaned_data.get('end_time')
+        if start_time and end_time:
+            return [(start_time, end_time)]
+        return []
+
     def clean(self):
         cleaned_data = super().clean()
         field = cleaned_data.get('field')
         booking_date = cleaned_data.get('booking_date')
-        start_time = cleaned_data.get('start_time')
-        end_time = cleaned_data.get('end_time')
+        slot_ranges = []
 
         booking_request_is_valid = True
-        if start_time and end_time:
+        try:
+            slot_ranges = self._build_slot_ranges(cleaned_data)
+        except ValidationError as exc:
+            booking_request_is_valid = False
+            self._add_validation_errors(exc)
+
+        if not slot_ranges and booking_request_is_valid:
+            booking_request_is_valid = False
+            self.add_error(None, BOOKING_NO_SLOT_SELECTED_ERROR)
+
+        if slot_ranges:
+            cleaned_data['start_time'] = slot_ranges[0][0]
+            cleaned_data['end_time'] = slot_ranges[0][1]
+
+        for index, (start_time, end_time) in enumerate(slot_ranges):
+            if not booking_request_is_valid:
+                break
             try:
                 validate_booking_time_range(start_time, end_time)
             except ValidationError as exc:
                 booking_request_is_valid = False
                 self._add_validation_errors(exc)
+                break
+            for previous_start, previous_end in slot_ranges[:index]:
+                if previous_start < end_time and start_time < previous_end:
+                    booking_request_is_valid = False
+                    self.add_error(None, BOOKING_UNAVAILABLE_ERROR)
+                    break
 
-        if field and booking_date and start_time and booking_request_is_valid:
+        if field and booking_date and slot_ranges and booking_request_is_valid:
             try:
                 validate_bookable_field(field)
-                validate_booking_not_in_past(booking_date, start_time)
+                for start_time, _ in slot_ranges:
+                    validate_booking_not_in_past(booking_date, start_time)
             except ValidationError as exc:
                 booking_request_is_valid = False
                 self._add_validation_errors(exc)
 
-        if field and booking_date and start_time and end_time and booking_request_is_valid:
-            if not is_time_range_available(field, booking_date, start_time, end_time):
-                raise ValidationError(BOOKING_UNAVAILABLE_ERROR)
-            try:
-                self.calculated_price, self.price_rule = calculate_booking_price(
-                    field,
-                    booking_date,
-                    start_time,
-                    end_time,
-                )
-            except ValidationError as exc:
-                self._add_validation_errors(exc)
+        if field and booking_date and slot_ranges and booking_request_is_valid:
+            total_price = Decimal('0.00')
+            slot_prices = []
+            for start_time, end_time in slot_ranges:
+                if not is_time_range_available(field, booking_date, start_time, end_time):
+                    booking_request_is_valid = False
+                    self.add_error(None, BOOKING_UNAVAILABLE_ERROR)
+                    break
+                try:
+                    price, price_rule = calculate_booking_price(
+                        field,
+                        booking_date,
+                        start_time,
+                        end_time,
+                    )
+                except ValidationError as exc:
+                    booking_request_is_valid = False
+                    self._add_validation_errors(exc)
+                    break
+                total_price += price
+                slot_prices.append((start_time, end_time, price))
+                self.price_rule = price_rule
+            if booking_request_is_valid:
+                self.calculated_price = total_price
+                self.slot_prices = slot_prices
+                self.selected_slot_ranges = [
+                    (start_time, end_time)
+                    for start_time, end_time, _ in slot_prices
+                ]
 
         # Strict server-side guard: reject any submitted service quantity that is
         # not part of the active, same-venue service list. The dynamic form only

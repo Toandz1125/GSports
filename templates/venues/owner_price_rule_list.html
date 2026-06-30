@@ -1,0 +1,289 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}Quản lý giá sân — {{ field.name }} — GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .prl-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--text-muted);
+        font-weight: 500;
+        font-size: 0.875rem;
+        margin-bottom: 0.75rem;
+        transition: color var(--transition-fast);
+    }
+
+    .prl-back:hover {
+        color: var(--primary-600);
+    }
+
+    .prl-back svg {
+        width: 1.1rem;
+        height: 1.1rem;
+    }
+
+    .prl-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .prl-header__title h1 {
+        font-size: 1.75rem;
+        font-weight: 800;
+        color: var(--text-main);
+    }
+
+    .prl-header__title p {
+        color: var(--text-muted);
+        font-size: 0.875rem;
+        margin-top: 0.35rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .prl-badge {
+        display: inline-block;
+        padding: 0.125rem 0.55rem;
+        border-radius: var(--radius-full);
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .prl-badge--active {
+        background-color: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+    }
+
+    .prl-badge--inactive,
+    .prl-badge--maintenance {
+        background-color: rgba(245, 158, 11, 0.1);
+        color: #f59e0b;
+    }
+
+    .prl-section {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 2rem;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .prl-section__head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 0.85rem;
+        margin-bottom: 1.25rem;
+        flex-wrap: wrap;
+    }
+
+    .prl-section__head h2 {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--text-main);
+    }
+
+    .prl-table-wrapper {
+        overflow-x: auto;
+    }
+
+    .prl-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+        font-size: 0.88rem;
+    }
+
+    .prl-table th {
+        padding: 0.85rem 1rem;
+        border-bottom: 2px solid var(--border-color);
+        color: var(--text-muted);
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.72rem;
+        letter-spacing: 0.05em;
+        white-space: nowrap;
+    }
+
+    .prl-table td {
+        padding: 0.95rem 1rem;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-main);
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    .prl-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .prl-price {
+        font-weight: 700;
+        color: var(--primary-600);
+    }
+
+    .prl-flag {
+        display: inline-block;
+        padding: 0.1rem 0.5rem;
+        border-radius: var(--radius-full);
+        font-size: 0.7rem;
+        font-weight: 600;
+        background-color: rgba(245, 158, 11, 0.12);
+        color: #f59e0b;
+    }
+
+    .prl-actions {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .prl-actions form {
+        display: inline;
+    }
+
+    .prl-link-danger {
+        background: none;
+        border: 1px solid rgba(239, 68, 68, 0.4);
+        color: var(--error-500);
+        padding: 0.4rem 0.75rem;
+        border-radius: var(--radius-md);
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .prl-link-danger:hover {
+        background-color: rgba(239, 68, 68, 0.06);
+    }
+
+    .prl-empty {
+        padding: 3rem 1.5rem;
+        text-align: center;
+        color: var(--text-muted);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .prl-empty svg {
+        width: 3.25rem;
+        height: 3.25rem;
+        color: var(--border-color);
+    }
+
+    .prl-empty h4 {
+        color: var(--text-main);
+        font-size: 1.1rem;
+        font-weight: 600;
+    }
+
+    .prl-empty p {
+        font-size: 0.85rem;
+        max-width: 440px;
+        margin: 0 auto;
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div>
+    <a href="{% url 'venues:owner_field_list' venue.pk %}" class="prl-back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        <span>Danh sách sân</span>
+    </a>
+</div>
+
+<div class="prl-header">
+    <div class="prl-header__title">
+        <h1>Quản lý giá sân</h1>
+        <p>
+            <strong style="color: var(--text-main);">{{ field.name }}</strong>
+            <span>· {{ venue.name }}</span>
+            <span>· {{ field.field_type }}</span>
+            <span class="prl-badge prl-badge--{{ field.status|lower }}">{{ field.status }}</span>
+        </p>
+    </div>
+    <a href="{% url 'venues:owner_price_rule_create' field.pk %}" class="btn btn--primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px; height:18px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        <span>Thêm giá</span>
+    </a>
+</div>
+
+<div class="prl-section">
+    <div class="prl-section__head">
+        <h2>Bảng giá hiện có</h2>
+        <span style="color: var(--text-muted); font-size: 0.85rem;">{{ price_rules|length }} mức giá</span>
+    </div>
+
+    {% if price_rules %}
+    <div class="prl-table-wrapper">
+        <table class="prl-table">
+            <thead>
+                <tr>
+                    <th>Ngày áp dụng</th>
+                    <th>Giờ bắt đầu</th>
+                    <th>Giờ kết thúc</th>
+                    <th>Giá/giờ</th>
+                    <th>Ưu tiên</th>
+                    <th>Hiệu lực</th>
+                    <th>Lễ / Sự kiện</th>
+                    <th style="width: 150px;">Hành động</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rule in price_rules %}
+                <tr>
+                    <td>{{ rule.day_label }}</td>
+                    <td>{{ rule.start_time|time:"H:i" }}</td>
+                    <td>{{ rule.end_time|time:"H:i" }}</td>
+                    <td class="prl-price">{{ rule.price_per_hour|floatformat:0 }}đ</td>
+                    <td>{{ rule.priority }}</td>
+                    <td>
+                        {% if rule.start_date or rule.end_date %}
+                        {{ rule.start_date|date:"d/m/Y"|default:"…" }} – {{ rule.end_date|date:"d/m/Y"|default:"…" }}
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>
+                        {% if rule.is_holiday %}<span class="prl-flag">Ngày lễ</span>{% endif %}
+                        {% if rule.special_event %}<span class="prl-flag">{{ rule.special_event }}</span>{% endif %}
+                        {% if not rule.is_holiday and not rule.special_event %}—{% endif %}
+                    </td>
+                    <td>
+                        <div class="prl-actions">
+                            <a href="{% url 'venues:owner_price_rule_edit' rule.pk %}" class="btn btn--secondary" style="padding: 0.4rem 0.75rem; font-size: 0.78rem;">Sửa</a>
+                            <form method="post" action="{% url 'venues:owner_price_rule_delete' rule.pk %}" onsubmit="return confirm('Xoá mức giá này?');">
+                                {% csrf_token %}
+                                <button type="submit" class="prl-link-danger">Xoá</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="prl-empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <h4>Chưa có bảng giá riêng</h4>
+        <p>Sân này chưa có mức giá riêng. Hệ thống sẽ dùng bảng giá mặc định khi đặt sân cho tới khi bạn thêm giá riêng. Bấm "Thêm giá" để tạo mức giá đầu tiên.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

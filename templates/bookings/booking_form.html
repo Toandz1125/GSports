@@ -105,6 +105,13 @@
         }
     }
 
+    /* Holder for JS-injected hidden slot inputs. Must not be a visible grid
+       item, otherwise it consumes the first grid cell and pushes the slot
+       panel into the narrow right column. */
+    [data-selected-slot-inputs] {
+        display: none;
+    }
+
     .slot-toolbar {
         display: flex;
         align-items: center;
@@ -125,6 +132,53 @@
     .slot-toolbar span {
         color: var(--text-muted);
         font-size: 0.85rem;
+    }
+
+    .slot-toolbar__actions {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .slot-toolbar__count {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        white-space: nowrap;
+    }
+
+    .booking-inline-error,
+    .booking-result {
+        margin-bottom: 1rem;
+        border-radius: var(--radius-md);
+        padding: 0.75rem 0.9rem;
+        font-size: 0.875rem;
+    }
+
+    .booking-inline-error {
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        background: rgba(239, 68, 68, 0.08);
+        color: var(--error-500);
+    }
+
+    .booking-result {
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        background: rgba(16, 185, 129, 0.08);
+        color: var(--text-main);
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+    }
+
+    .booking-result__actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .booking-countdown {
+        font-weight: 800;
+        color: var(--primary-600);
     }
 
     .slot-grid {
@@ -148,6 +202,12 @@
     .slot-card--available {
         border-color: rgba(16, 185, 129, 0.35);
         background: rgba(16, 185, 129, 0.06);
+    }
+
+    .slot-card--selected {
+        border-color: var(--primary-500);
+        background: rgba(99, 102, 241, 0.12);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
     }
 
     .slot-card--disabled {
@@ -191,6 +251,12 @@
         color: var(--text-muted);
         background: var(--bg-surface);
         border-color: var(--border-color);
+    }
+
+    .slot-booking-button--selected {
+        color: var(--primary-700);
+        background: var(--bg-surface);
+        border-color: var(--primary-500);
     }
 
     .service-panel {
@@ -274,12 +340,13 @@
     {% endif %}
 
     {% if selected_field %}
-    <form method="post" class="booking-layout" data-slot-booking-form>
+    <form method="post" class="booking-layout" data-slot-booking-form data-availability-url="{% url 'bookings:booking_availability' %}">
         {% csrf_token %}
         <input type="hidden" name="field" value="{{ selected_field.pk }}">
         <input type="hidden" name="booking_date" value="{{ selected_date|date:'Y-m-d' }}">
         <input type="hidden" name="start_time" value="">
         <input type="hidden" name="end_time" value="">
+        <div data-selected-slot-inputs></div>
 
         <section class="booking-panel">
             <div class="slot-toolbar">
@@ -287,13 +354,20 @@
                     <h2>{{ selected_field.venue.name }} — {{ selected_field.name }}</h2>
                     <span>{{ selected_date|date:"d/m/Y" }}</span>
                 </div>
-                <span>{{ slot_options|length }} khung giờ</span>
+                <div class="slot-toolbar__actions">
+                    <button type="submit" class="btn btn--primary" data-booking-submit>Đặt sân</button>
+                    <span class="slot-toolbar__count" data-slot-count>{{ slot_options|length }} khung giờ</span>
+                </div>
+            </div>
+            <div class="booking-inline-error" data-booking-error hidden></div>
+            <div class="booking-result" data-booking-result hidden>
+                <div data-booking-result-message></div>
             </div>
 
             {% if slot_options %}
             <div class="slot-grid">
                 {% for slot in slot_options %}
-                <div class="slot-card {% if slot.is_bookable %}slot-card--available{% else %}slot-card--disabled{% endif %}">
+                <div class="slot-card {% if slot.is_bookable %}slot-card--available{% else %}slot-card--disabled{% endif %}" data-slot-card data-slot-value="{{ slot.value }}" data-slot-start="{{ slot.start_label }}">
                     <div class="slot-card__time">
                         <strong>{{ slot.start_label }}-{{ slot.end_label }}</strong>
                         {% if slot.price %}
@@ -303,8 +377,8 @@
                         {% endif %}
                     </div>
                     {% if slot.is_bookable %}
-                    <button type="submit" name="slot" value="{{ slot.start_label }}|{{ slot.end_label }}" data-time="{{ slot.start_label }}" class="btn btn--primary slot-booking-button time-block">
-                        Đặt sân
+                    <button type="submit" name="slot" value="{{ slot.value }}" data-slot-toggle data-time="{{ slot.start_label }}" class="btn btn--primary slot-booking-button time-block">
+                        Chọn
                     </button>
                     {% else %}
                     <button type="button" data-time="{{ slot.start_label }}" class="slot-booking-button slot-booking-button--disabled time-block is-unavailable" disabled aria-disabled="true">

@@ -61,21 +61,10 @@
             </a>
             {% endif %}
 
-            {% if user|can_manage_owner_services %}
-            <a href="{% url 'services:owner_serviceitem_list' %}" class="sidebar__link {% if request.resolver_match.app_name == 'services' and request.resolver_match.url_name == 'owner_serviceitem_list' %}sidebar__link--active{% endif %}" id="nav-services">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-                <span>Quản lý dịch vụ</span>
-            </a>
-            {% endif %}
-
             {% if user.owner_profile %}
             <a href="{% url 'accounts:staff_list' %}" class="sidebar__link {% if request.resolver_match.url_name in 'staff_list staff_create staff_edit' %}sidebar__link--active{% endif %}" id="nav-staff-list">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                 <span>Quản lý nhân viên</span>
-            </a>
-            <a href="{% url 'services:owner_serviceitem_list' %}" class="sidebar__link {% if request.resolver_match.app_name == 'services' %}sidebar__link--active{% endif %}" id="nav-owner-services">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 2l1.5 1.5M21 2l-1.5 1.5"/><path d="M5 7h14l-1 13a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/><path d="M9 11v6M15 11v6M12 11v6"/></svg>
-                <span>Quản lý dịch vụ</span>
             </a>
             {% endif %}
 
@@ -87,9 +76,9 @@
             {% endif %}
 
             {% if user|can_manage_venue_requests %}
-            <a href="{% url 'venues:admin_venue_request_list' %}" class="sidebar__link {% if request.resolver_match.app_name == 'venues' and request.resolver_match.url_name == 'admin_venue_request_list' %}sidebar__link--active{% endif %}" id="nav-admin-venue-requests">
+            <a href="{% url 'venues:admin_request_list' %}" class="sidebar__link {% if request.resolver_match.app_name == 'venues' and request.resolver_match.url_name in 'admin_request_list admin_request_venue_approve admin_request_venue_reject admin_request_field_approve admin_request_field_reject admin_venue_request_list' %}sidebar__link--active{% endif %}" id="nav-admin-venue-requests">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                <span>Yêu cầu duyệt cơ sở</span>
+                <span>Duyệt yêu cầu</span>
             </a>
             {% endif %}
 
@@ -101,10 +90,6 @@
             {% endif %}
 
             {% if not request.user.is_admin %}
-            <a href="{% url 'bookings:booking_create' %}" class="sidebar__link {% if request.resolver_match.url_name == 'booking_create' %}sidebar__link--active{% endif %}" id="nav-booking-create">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
-                <span>{% if user.owner_profile or user.staff_profile %}Đặt sân cho khách{% else %}Đặt sân trực tuyến{% endif %}</span>
-            </a>
             <a href="{% url 'bookings:booking_history' %}" class="sidebar__link {% if request.resolver_match.url_name == 'booking_history' %}sidebar__link--active{% endif %}" id="nav-bookings">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                 <span>{% if user.owner_profile or user.staff_profile %}Lịch sử cho thuê sân{% else %}Lịch sử thuê sân{% endif %}</span>

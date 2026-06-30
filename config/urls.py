@@ -28,6 +28,7 @@ urlpatterns = [
     path('co-so/', include('apps.venues.urls')),
     path('dat-san/', include('apps.bookings.urls')),
     path('dich-vu/', include('apps.services.urls')),
+    path('payments/', include('apps.payments.urls')),
 ]
 
 # Phục vụ media files (avatar, uploads) trong chế độ DEBUG

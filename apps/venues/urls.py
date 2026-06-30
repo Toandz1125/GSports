@@ -1,6 +1,11 @@
 from django.urls import path
 
 from .views import (
+    AdminApproveFieldRequestView,
+    AdminApproveVenueRequestView,
+    AdminRejectFieldRequestView,
+    AdminRejectVenueRequestView,
+    AdminRequestListView,
     AdminRegistrationRequestApproveView,
     AdminRegistrationRequestDetailView,
     AdminRegistrationRequestListView,
@@ -17,6 +22,10 @@ from .views import (
     AdminVenueRestoreView,
     AdminVenueSoftDeleteView,
     AdminVenueUpdateView,
+    FieldManageView,
+    FieldPricingUpdateView,
+    FieldServicePriceView,
+    FieldServiceToggleView,
     OwnerFieldCreateView,
     OwnerFieldListView,
     OwnerPriceRuleCreateView,
@@ -30,6 +39,27 @@ from .views import (
 app_name = 'venues'
 
 urlpatterns = [
+    path('admin/requests/', AdminRequestListView.as_view(), name='admin_request_list'),
+    path(
+        'admin/requests/venues/<int:pk>/approve/',
+        AdminApproveVenueRequestView.as_view(),
+        name='admin_request_venue_approve',
+    ),
+    path(
+        'admin/requests/venues/<int:pk>/reject/',
+        AdminRejectVenueRequestView.as_view(),
+        name='admin_request_venue_reject',
+    ),
+    path(
+        'admin/requests/fields/<int:pk>/approve/',
+        AdminApproveFieldRequestView.as_view(),
+        name='admin_request_field_approve',
+    ),
+    path(
+        'admin/requests/fields/<int:pk>/reject/',
+        AdminRejectFieldRequestView.as_view(),
+        name='admin_request_field_reject',
+    ),
     path('admin/venues/', AdminVenueListView.as_view(), name='admin_venue_list'),
     path('admin/venues/create/', AdminVenueCreateView.as_view(), name='admin_venue_create'),
     path(
@@ -161,5 +191,18 @@ urlpatterns = [
         'owner/price-rules/<int:pk>/delete/',
         OwnerPriceRuleDeleteView.as_view(),
         name='owner_price_rule_delete',
+    ),
+    # 3-panel field management screen (info / pricing / services).
+    path('san/<int:pk>/sua/', FieldManageView.as_view(), name='field_edit'),
+    path('san/<int:pk>/gia/', FieldPricingUpdateView.as_view(), name='field_pricing_update'),
+    path(
+        'san/<int:pk>/dich-vu/<int:item_id>/gia/',
+        FieldServicePriceView.as_view(),
+        name='field_service_price',
+    ),
+    path(
+        'san/<int:pk>/dich-vu/<int:item_id>/trang-thai/',
+        FieldServiceToggleView.as_view(),
+        name='field_service_toggle',
     ),
 ]

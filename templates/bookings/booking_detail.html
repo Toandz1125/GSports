@@ -1,4 +1,5 @@
 {% extends 'accounts/dashboard.html' %}
+{% load static %}
 
 {% block title %}Chi tiết booking — GSports{% endblock %}
 
@@ -46,4 +47,9 @@
 
     {% include 'bookings/partials/_booking_detail_content.html' %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script src="{% static 'js/booking-time-blocks.js' %}"></script>
 {% endblock %}

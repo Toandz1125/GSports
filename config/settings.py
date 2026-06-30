@@ -91,7 +91,7 @@ DATABASES = {
         'PASSWORD': '',
         'OPTIONS': {
             'driver': 'ODBC Driver 18 for SQL Server',
-            'extra_params': 'Trusted_Connection=yes;TrustServerCertificate=yes',
+            'extra_params': 'TrustServerCertificate=yes;Encrypt=no',
         },
     }
 }
@@ -146,6 +146,9 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Avoid stale ODBC pooled connections during local development/server reloads.
+DATABASE_CONNECTION_POOLING = False
 
 
 # Authentication redirects

@@ -1,0 +1,153 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }} — GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .request-shell {
+        max-width: 860px;
+        margin: 0 auto;
+    }
+
+    .request-heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+    }
+
+    .request-heading h1 {
+        color: var(--text-main);
+        font-size: 1.75rem;
+        font-weight: 800;
+        margin: 0;
+    }
+
+    .request-heading p {
+        color: var(--text-muted);
+        margin-top: 0.35rem;
+        font-size: 0.9rem;
+    }
+
+    .request-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 1.75rem;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.2rem;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .form-group label {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        font-weight: 700;
+    }
+
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        background: var(--bg-main);
+        color: var(--text-main);
+        padding: 0.8rem 0.95rem;
+        font-size: 0.9rem;
+    }
+
+    .form-group textarea {
+        min-height: 120px;
+        resize: vertical;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+        border-color: var(--primary-500);
+        outline: none;
+    }
+
+    .form-error {
+        color: var(--error-500);
+        font-size: 0.78rem;
+    }
+
+    .request-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        margin-top: 1.75rem;
+        padding-top: 1.25rem;
+        border-top: 1px solid var(--border-color);
+        flex-wrap: wrap;
+    }
+
+    .btn--secondary {
+        background: var(--bg-main);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="request-shell">
+    <div class="request-heading">
+        <div>
+            <p class="eyebrow">Chủ sân</p>
+            <h1>{{ page_title }}</h1>
+            <p>Thông tin cơ sở sẽ được gửi tới admin duyệt trước khi xuất hiện trong hệ thống.</p>
+        </div>
+        <a href="{{ back_url }}" class="btn btn--secondary">Quay lại</a>
+    </div>
+
+    <div class="request-card">
+        <form method="post" novalidate>
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+                <div class="form-group">
+                    {% for error in form.non_field_errors %}
+                        <span class="form-error">{{ error }}</span>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <div class="form-grid">
+                {% for field in form %}
+                    <div class="form-group">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}<span class="muted">{{ field.help_text }}</span>{% endif %}
+                        {% for error in field.errors %}
+                            <span class="form-error">{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+            </div>
+
+            <div class="request-actions">
+                <a href="{{ back_url }}" class="btn btn--secondary">Hủy</a>
+                <button type="submit" class="btn btn--primary">{{ submit_label }}</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

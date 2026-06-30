@@ -75,6 +75,11 @@
         padding-bottom: 0.6rem;
         font-size: 0.875rem;
     }
+
+    .booking-countdown {
+        color: var(--primary-600);
+        font-weight: 800;
+    }
 </style>
 
 <div class="booking-detail-grid">
@@ -94,8 +99,16 @@
             </div>
             <div class="booking-info-item">
                 <span>Trạng thái</span>
-                <strong>{{ booking.get_status_display }}</strong>
+                <strong data-booking-status-label>{{ booking.get_status_display }}</strong>
             </div>
+            {% if can_pay_booking and booking.payment_deadline %}
+            <div class="booking-info-item">
+                <span>Thời hạn thanh toán</span>
+                <strong class="booking-countdown" data-booking-countdown data-countdown-deadline="{{ booking.payment_deadline|date:'c' }}" data-booking-status-url="{% url 'bookings:booking_status' booking.pk %}">
+                    Còn --:-- để thanh toán
+                </strong>
+            </div>
+            {% endif %}
             <div class="booking-info-item">
                 <span>Khung giờ</span>
                 <strong>
@@ -117,8 +130,11 @@
         </div>
 
         <div class="booking-detail-actions">
-            {% if can_pay_booking %}
-            <a href="{% url 'bookings:booking_checkout' booking.pk %}" class="btn btn--primary">Thanh toán</a>
+            {% if can_pay_booking and booking.booking_package.user_id == request.user.id %}
+            <a href="{% url 'payments:booking_checkout' booking.pk %}" class="btn btn--primary" data-payment-action>Thanh toán</a>
+            {% endif %}
+            {% if booking.status == 'PAID' %}
+            <a href="{% url 'payments:booking_invoice' booking.pk %}" class="btn btn--secondary">Xem hóa đơn</a>
             {% endif %}
             {% if can_cancel_booking %}
             <form method="post" action="{% url 'bookings:booking_cancel' booking.pk %}">
