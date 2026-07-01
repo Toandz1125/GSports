@@ -28,15 +28,14 @@ class CreateReviewView(LoginRequiredMixin, View):
                 return JsonResponse({'ok': False, 'error': 'Số sao không hợp lệ (0-5).'}, status=400)
             return redirect('venues:venue_detail', pk=venue.pk)
 
-        # Tạo mới hoặc cập nhật đánh giá của user đối với cơ sở này
-        review, created = Review.objects.update_or_create(
+        # Tạo mới đánh giá của user đối với cơ sở này để không bị ghi đè
+        review = Review.objects.create(
             user=request.user,
             venue=venue,
-            defaults={
-                'rating': rating,
-                'comment': comment_val
-            }
+            rating=rating,
+            comment=comment_val
         )
+        created = True
 
         if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.content_type == 'application/json':
             return JsonResponse({

@@ -581,3 +581,263 @@
     .dashboard__main { margin-left: 250px; }
     .topbar__toggle { display: none !important; }
 }
+
+/* ==========================================================================
+   Chart Card — unified container for all charts (dark/light adaptive)
+   ========================================================================== */
+.chart-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem 1.5rem 1rem;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--transition-fast);
+}
+.chart-card:hover {
+    box-shadow: var(--shadow-md);
+}
+.chart-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.875rem;
+}
+.chart-card__title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin: 0;
+}
+.chart-card__title-icon {
+    font-size: 1rem;
+}
+.chart-card__subtitle {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin: 0;
+}
+.chart-card canvas {
+    max-width: 100%;
+}
+
+/* Stat card icon color variants — dark mode aware */
+.stat-card__icon--red    { background-color: rgba(239, 68, 68, 0.1);   color: #ef4444; }
+.stat-card__icon--pink   { background-color: rgba(236, 72, 153, 0.1);  color: #ec4899; }
+.stat-card__icon--cyan   { background-color: rgba(6, 182, 212, 0.1);   color: #06b2d4; }
+.stat-card__icon--indigo { background-color: rgba(99, 102, 241, 0.1);  color: #6366f1; }
+.stat-card__icon--teal   { background-color: rgba(20, 184, 166, 0.1);  color: #14b8a6; }
+.stat-card__icon--yellow { background-color: rgba(234, 179, 8, 0.1);   color: #ca8a04; }
+
+[data-theme="dark"] .stat-card__icon--blue   { background-color: rgba(59, 130, 246, 0.15); }
+[data-theme="dark"] .stat-card__icon--green  { background-color: rgba(16, 185, 129, 0.15); }
+[data-theme="dark"] .stat-card__icon--purple { background-color: rgba(139, 92, 246, 0.15); }
+[data-theme="dark"] .stat-card__icon--orange { background-color: rgba(249, 115, 22, 0.15); }
+[data-theme="dark"] .stat-card__icon--red    { background-color: rgba(239, 68, 68, 0.15);  }
+[data-theme="dark"] .stat-card__icon--pink   { background-color: rgba(236, 72, 153, 0.15); }
+[data-theme="dark"] .stat-card__icon--cyan   { background-color: rgba(6, 182, 212, 0.15);  }
+[data-theme="dark"] .stat-card__icon--indigo { background-color: rgba(99, 102, 241, 0.15); }
+[data-theme="dark"] .stat-card__icon--teal   { background-color: rgba(20, 184, 166, 0.15); }
+[data-theme="dark"] .stat-card__icon--yellow { background-color: rgba(234, 179, 8, 0.15);  }
+
+/* ==========================================================================
+   Bootstrap Grid Compatibility Layer (replaces Bootstrap CDN)
+   ========================================================================== */
+.row { display: flex; flex-wrap: wrap; margin: -0.75rem; }
+.row.g-3 { margin: -0.75rem; }
+.row.g-3 > * { padding: 0.75rem; }
+.row.mb-4 { margin-bottom: 1.5rem !important; }
+.col-12 { flex: 0 0 100%; max-width: 100%; box-sizing: border-box; }
+.col-6  { flex: 0 0 50%;  max-width: 50%;  box-sizing: border-box; }
+@media (min-width: 576px) {
+    .col-sm-6 { flex: 0 0 50%; max-width: 50%; }
+}
+@media (min-width: 768px) {
+    .col-md-4 { flex: 0 0 33.333%; max-width: 33.333%; }
+    .col-md-6 { flex: 0 0 50%; max-width: 50%; }
+}
+@media (min-width: 992px) {
+    .col-lg-3  { flex: 0 0 25%;    max-width: 25%;    }
+    .col-lg-4  { flex: 0 0 33.333%; max-width: 33.333%; }
+    .col-lg-6  { flex: 0 0 50%;    max-width: 50%;    }
+    .col-lg-8  { flex: 0 0 66.667%; max-width: 66.667%; }
+    .col-lg-12 { flex: 0 0 100%;   max-width: 100%;   }
+}
+@media (min-width: 1200px) {
+    .col-xl    { flex: 1 0 0%; min-width: 0; max-width: 100%; }
+    .col-xl-4  { flex: 0 0 33.333%; max-width: 33.333%; }
+    .col-xl-6  { flex: 0 0 50%;    max-width: 50%;    }
+    .col-xl-8  { flex: 0 0 66.667%; max-width: 66.667%; }
+}
+.h-100 { height: 100%; box-sizing: border-box; }
+.d-flex { display: flex !important; }
+.align-items-center { align-items: center !important; }
+.justify-content-between { justify-content: space-between !important; }
+.justify-content-center { justify-content: center !important; }
+.flex-column { flex-direction: column !important; }
+.fw-bold { font-weight: 700 !important; }
+.mb-0 { margin-bottom: 0 !important; }
+.p-3 { padding: 0.75rem !important; }
+.px-3 { padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
+.pt-3 { padding-top: 0.75rem !important; }
+.py-4 { padding-top: 1.5rem !important; padding-bottom: 1.5rem !important; }
+.border-0 { border: none !important; }
+.text-center { text-align: center; }
+.text-muted { color: var(--text-muted) !important; }
+.shadow-sm { box-shadow: var(--shadow-sm) !important; }
+
+/* ==========================================================================
+   Dark Mode — ADMIN, OWNER, STAFF, CUSTOMER inline card overrides
+   ========================================================================== */
+
+/* Card backgrounds */
+[data-theme="dark"] .ad-card-stat,
+[data-theme="dark"] .ow-card-stat,
+[data-theme="dark"] .sf-card-stat,
+[data-theme="dark"] .cs-card-stat {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* Table headers */
+[data-theme="dark"] .ad-table th {
+    background: rgba(255,255,255,0.04) !important;
+    color: var(--text-muted) !important;
+    border-color: var(--border-color) !important;
+}
+[data-theme="dark"] .ad-table td {
+    border-color: var(--border-color) !important;
+    color: var(--text-main) !important;
+}
+
+/* Panel cards */
+[data-theme="dark"] .ad-panel-card,
+[data-theme="dark"] .ow-panel-card,
+[data-theme="dark"] .sf-panel-card,
+[data-theme="dark"] .cs-panel-card {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+}
+[data-theme="dark"] .ad-panel-hdr {
+    background: rgba(255,255,255,0.03) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* Icon backgrounds dark */
+[data-theme="dark"] .ad-ic-users   { background: rgba(37, 99, 235, 0.15)  !important; }
+[data-theme="dark"] .ad-ic-owners  { background: rgba(79, 70, 229, 0.15)  !important; }
+[data-theme="dark"] .ad-ic-staffs  { background: rgba(124, 58, 237, 0.15) !important; }
+[data-theme="dark"] .ad-ic-custs   { background: rgba(219, 39, 119, 0.15) !important; }
+[data-theme="dark"] .ad-ic-venues  { background: rgba(22, 163, 74, 0.15)  !important; }
+[data-theme="dark"] .ad-ic-revenue { background: rgba(217, 119, 6, 0.15)  !important; }
+[data-theme="dark"] .ad-ic-txs     { background: rgba(8, 145, 178, 0.15)  !important; }
+
+[data-theme="dark"] .ow-ic-today   { background: rgba(37, 99, 235, 0.15)  !important; }
+[data-theme="dark"] .ow-ic-week    { background: rgba(79, 70, 229, 0.15)  !important; }
+[data-theme="dark"] .ow-ic-month   { background: rgba(124, 58, 237, 0.15) !important; }
+[data-theme="dark"] .ow-ic-year    { background: rgba(219, 39, 119, 0.15) !important; }
+[data-theme="dark"] .ow-ic-bktoday { background: rgba(22, 163, 74, 0.15)  !important; }
+[data-theme="dark"] .ow-ic-bkmonth { background: rgba(8, 145, 178, 0.15)  !important; }
+[data-theme="dark"] .ow-ic-occupy  { background: rgba(234, 88, 12, 0.15)  !important; }
+[data-theme="dark"] .ow-ic-custs   { background: rgba(225, 29, 72, 0.15)  !important; }
+[data-theme="dark"] .ow-ic-retcust { background: rgba(21, 128, 61, 0.15)  !important; }
+[data-theme="dark"] .ow-ic-reviews { background: rgba(75, 85, 99, 0.2)    !important; }
+
+/* Badge dark mode */
+[data-theme="dark"] .ad-badge--pending { background: rgba(234, 88, 12, 0.15)  !important; }
+[data-theme="dark"] .ad-badge--active  { background: rgba(22, 163, 74, 0.15)  !important; }
+[data-theme="dark"] .ad-badge--inactive{ background: rgba(100, 116, 139, 0.2) !important; color: var(--text-muted) !important; }
+[data-theme="dark"] .ad-badge--danger  { background: rgba(225, 29, 72, 0.15)  !important; }
+
+/* Bootstrap card dark override */
+[data-theme="dark"] .card {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-main) !important;
+}
+[data-theme="dark"] .card-header {
+    background: transparent !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-main) !important;
+}
+
+/* ==========================================================================
+   Dashboard Compression & Compact UI Adjustments
+   ========================================================================== */
+
+/* Compact Welcome Banner */
+.ad-welcome, .ow-welcome, .sf-welcome, .cs-welcome {
+    padding: 1.25rem 1.75rem !important;
+    margin-bottom: 1.25rem !important;
+}
+.ad-welcome h1, .ow-welcome h1, .sf-welcome h1, .cs-welcome h1 {
+    font-size: 1.35rem !important;
+    margin-bottom: 0.25rem !important;
+}
+.ad-welcome p, .ow-welcome p, .sf-welcome p, .cs-welcome p {
+    font-size: 0.85rem !important;
+}
+
+/* Compact Stats Cards */
+.ad-card-stat, .ow-card-stat, .sf-card-stat, .cs-card-stat, .stat-card {
+    padding: 0.75rem 1rem !important;
+    gap: 0.75rem !important;
+}
+.ad-stat-icon, .ow-stat-icon, .sf-stat-icon, .cs-stat-icon, .stat-card__icon {
+    width: 2.25rem !important;
+    height: 2.25rem !important;
+    font-size: 1.1rem !important;
+    border-radius: 0.5rem !important;
+}
+.ad-stat-label, .ow-stat-label, .sf-stat-label, .cs-stat-label, .stat-card__label {
+    font-size: 0.65rem !important;
+    margin-bottom: 0.1rem !important;
+}
+.ad-stat-value, .ow-stat-value, .sf-stat-value, .cs-stat-value, .stat-card__value {
+    font-size: 1.1rem !important;
+}
+
+/* Compact Tables Rows & Padding */
+.ad-table th, .ow-table th, .sf-table th, .cs-table th,
+.ad-table td, .ow-table td, .sf-table td, .cs-table td {
+    padding: 0.45rem 0.75rem !important;
+    font-size: 0.8rem !important;
+}
+.ad-table th, .ow-table th, .sf-table th, .cs-table th {
+    font-size: 0.68rem !important;
+}
+.ad-panel-hdr, .ow-panel-hdr, .sf-panel-hdr, .cs-panel-hdr {
+    padding: 0.6rem 0.875rem !important;
+    font-size: 0.825rem !important;
+}
+
+/* Chart Canvas Max-height limits */
+.dashboard__content canvas {
+    max-height: 155px !important;
+    width: 100% !important;
+}
+
+/* Specific circular charts (Doughnuts/Pies) need to be smaller */
+#owTopFieldsChart {
+    max-height: 125px !important;
+    margin: 0 auto;
+}
+
+/* Spacing between grid columns */
+.row.g-3 {
+    margin: -0.5rem;
+}
+.row.g-3 > * {
+    padding: 0.5rem;
+}
+.row.mb-4 {
+    margin-bottom: 1rem !important;
+}
+.ow-panel-card, .ad-panel-card, .sf-panel-card, .cs-panel-card {
+    margin-bottom: 1rem !important;
+}
+
+
+

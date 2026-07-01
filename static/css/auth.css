@@ -334,3 +334,51 @@
 
 .auth-card__divider-text::before { right: 100%; }
 .auth-card__divider-text::after { left: 100%; }
+
+/* ── Password Eye Toggle ── */
+.password-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+.password-wrapper input {
+    width: 100%;
+    padding-right: 3rem !important;
+    flex: 1;
+}
+.password-toggle-btn {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2rem;
+    height: 2rem;
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted, #64748b);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s ease;
+    z-index: 5;
+    flex-shrink: 0;
+}
+.password-toggle-btn:hover {
+    color: var(--primary-600, #4f46e5);
+    background: transparent !important;
+    background-color: transparent !important;
+}
+.password-toggle-btn:focus-visible {
+    outline: none;
+}
+.password-toggle-btn.is-active {
+    color: var(--primary-600, #4f46e5);
+}
+.password-toggle-btn svg {
+    width: 1.1rem;
+    height: 1.1rem;
+    pointer-events: none;
+}

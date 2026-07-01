@@ -87,6 +87,51 @@
         box-sizing: border-box;
     }
 
+    /* Password Eye Toggle */
+    .password-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+        width: 100%;
+    }
+    .password-wrapper input {
+        width: 100%;
+        padding-right: 3rem !important;
+        flex: 1;
+    }
+    .password-toggle-btn {
+        position: absolute;
+        right: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 2rem;
+        height: 2rem;
+        background: transparent !important;
+        background-color: transparent !important;
+        border: none;
+        cursor: pointer;
+        color: var(--text-muted, #64748b);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: color 0.2s ease;
+        z-index: 5;
+        flex-shrink: 0;
+    }
+    .password-toggle-btn:hover {
+        color: var(--primary-600, #4f46e5);
+        background: transparent !important;
+        background-color: transparent !important;
+    }
+    .password-toggle-btn.is-active {
+        color: var(--primary-600, #4f46e5);
+    }
+    .password-toggle-btn svg {
+        width: 1.1rem;
+        height: 1.1rem;
+        pointer-events: none;
+    }
+
     .form-group input:focus,
     .form-group select:focus {
         border-color: var(--primary-500);
@@ -220,7 +265,15 @@
                 <!-- Mật khẩu -->
                 <div class="form-group {% if form.password.errors %}form-group--error{% endif %}">
                     <label for="{{ form.password.id_for_label }}">{{ form.password.label }}</label>
-                    {{ form.password }}
+                    <div class="password-wrapper">
+                        {{ form.password }}
+                        <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility(this)" aria-label="Hiển thị mật khẩu">
+                            <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                        </button>
+                    </div>
                     {% if form.password.errors %}
                     <div class="form-error">{% for e in form.password.errors %}{{ e }}{% endfor %}</div>
                     {% endif %}
@@ -229,7 +282,15 @@
                 <!-- Xác nhận mật khẩu -->
                 <div class="form-group {% if form.password_confirm.errors %}form-group--error{% endif %}">
                     <label for="{{ form.password_confirm.id_for_label }}">{{ form.password_confirm.label }}</label>
-                    {{ form.password_confirm }}
+                    <div class="password-wrapper">
+                        {{ form.password_confirm }}
+                        <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility(this)" aria-label="Hiển thị mật khẩu">
+                            <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                        </button>
+                    </div>
                     {% if form.password_confirm.errors %}
                     <div class="form-error">{% for e in form.password_confirm.errors %}{{ e }}{% endfor %}</div>
                     {% endif %}

@@ -189,73 +189,2166 @@
         <!-- Content area -->
         <div class="dashboard__content">
             {% block dashboard_content %}
-            <!-- Welcome -->
-            <div class="welcome-banner">
-                <div class="welcome-banner__text">
-                    <h1>Xin chào, <strong>{% if user.first_name or user.last_name %}{{ user.first_name }} {{ user.last_name }}{% else %}{{ user.username }}{% endif %}</strong>! 👋</h1>
-                    <p>Chào mừng bạn đến với hệ thống quản lý sân thể thao GSports.</p>
-                </div>
+            {% if request.user.is_admin or 'ADMIN' in user_roles %}
+            <!-- ==========================================
+                 ADMIN DASHBOARD (Bootstrap 5 Premium)
+                 ========================================== -->
+            <!-- ADMIN Dashboard styles use GSports CSS variables (no external CSS needed) -->
+            
+            <style>
+              /* Scoped styles to prevent clashing with layout */
+              .ad-welcome {
+                background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #3b82f6 100%);
+                border-radius: 1rem;
+                padding: 2.25rem 2.5rem;
+                color: #fff;
+                margin-bottom: 2rem;
+                position: relative;
+                overflow: hidden;
+              }
+              .ad-welcome::after {
+                content: '';
+                position: absolute;
+                right: -50px;
+                top: -50px;
+                width: 250px;
+                height: 250px;
+                border-radius: 50%;
+                background: rgba(255, 255, 255, 0.05);
+              }
+              .ad-welcome h1 { font-size: 1.75rem; font-weight: 800; margin-bottom: 0.5rem; }
+              .ad-welcome p { opacity: 0.85; margin-bottom: 0; font-size: 0.95rem; }
+              
+              /* Metrics card grid */
+              .ad-card-stat {
+                background: var(--card-bg, #fff);
+                border: 1px solid var(--border-color, #e2e8f0);
+                border-radius: 0.875rem;
+                padding: 1.25rem 1.5rem;
+                transition: transform 0.2s, box-shadow 0.2s;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                gap: 1.15rem;
+              }
+              .ad-card-stat:hover {
+                transform: translateY(-3px);
+                box-shadow: 0 10px 25px rgba(0,0,0,0.06);
+              }
+              .ad-stat-icon {
+                width: 48px;
+                height: 48px;
+                border-radius: 0.75rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.35rem;
+                flex-shrink: 0;
+              }
+              .ad-ic-users   { background: #eff6ff; color: #2563eb; }
+              .ad-ic-owners  { background: #eef2ff; color: #4f46e5; }
+              .ad-ic-staffs  { background: #faf5ff; color: #7c3aed; }
+              .ad-ic-custs   { background: #fdf2f8; color: #db2777; }
+              .ad-ic-venues  { background: #f0fdf4; color: #16a34a; }
+              .ad-ic-revenue { background: #fffbeb; color: #d97706; }
+              .ad-ic-txs     { background: #ecfeff; color: #0891b2; }
+
+              .ad-stat-label {
+                font-size: 0.75rem;
+                font-weight: 700;
+                color: var(--text-muted, #64748b);
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                margin-bottom: 0.2rem;
+              }
+              .ad-stat-value {
+                font-size: 1.35rem;
+                font-weight: 800;
+                color: var(--text-main, #1e293b);
+                line-height: 1.2;
+              }
+
+              /* Section Header */
+              .ad-sec-header {
+                font-size: 1.1rem;
+                font-weight: 700;
+                color: var(--text-main, #1e293b);
+                margin: 2rem 0 1rem;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+              }
+
+              /* Action tables */
+              .ad-panel-card {
+                background: var(--card-bg, #fff);
+                border: 1px solid var(--border-color, #e2e8f0);
+                border-radius: 0.875rem;
+                overflow: hidden;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+                margin-bottom: 1.5rem;
+              }
+              .ad-panel-hdr {
+                padding: 1rem 1.25rem;
+                border-bottom: 1px solid var(--border-color, #e2e8f0);
+                background: rgba(248, 250, 252, 0.3);
+                font-weight: 700;
+                font-size: 0.9rem;
+                color: var(--text-main, #1e293b);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+              }
+              .ad-panel-body {
+                padding: 0;
+              }
+              .ad-table {
+                width: 100%;
+                margin-bottom: 0;
+                vertical-align: middle;
+              }
+              .ad-table th {
+                font-size: 0.72rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: #64748b;
+                background: #f8fafc;
+                padding: 0.75rem 1.25rem;
+                border-bottom: 1px solid #e2e8f0;
+              }
+              .ad-table td {
+                padding: 0.85rem 1.25rem;
+                border-bottom: 1px solid #f1f5f9;
+                font-size: 0.85rem;
+              }
+              .ad-table tr:last-child td {
+                border-bottom: none;
+              }
+              
+              /* Badges */
+              .ad-badge {
+                font-size: 0.7rem;
+                font-weight: 700;
+                padding: 0.2rem 0.6rem;
+                border-radius: 2rem;
+                display: inline-flex;
+                align-items: center;
+              }
+              .ad-badge--pending { background: #fff7ed; color: #ea580c; }
+              .ad-badge--active { background: #f0fdf4; color: #16a34a; }
+              .ad-badge--inactive { background: #f1f5f9; color: #64748b; }
+              .ad-badge--danger { background: #fff1f2; color: #e11d48; }
+
+              /* Table actions button */
+              .btn-ad-sm {
+                padding: 0.25rem 0.6rem;
+                font-size: 0.78rem;
+                font-weight: 600;
+                border-radius: 0.375rem;
+                border: none;
+                transition: background 0.15s;
+              }
+              .btn-ad-approve { background: #16a34a; color: #fff; }
+              .btn-ad-approve:hover { background: #15803d; }
+              .btn-ad-reject { background: #dc2626; color: #fff; }
+              .btn-ad-reject:hover { background: #b91c1c; }
+              .btn-ad-toggle { background: #4f46e5; color: #fff; }
+              .btn-ad-toggle:hover { background: #4338ca; }
+            </style>
+
+            <!-- 1. Welcome Banner -->
+            <div class="ad-welcome">
+              <h1>Xin chào, Quản trị viên! ⚙️</h1>
+              <p>Chào mừng bạn trở lại hệ thống giám sát và quản lý toàn diện mạng lưới GSports. Dưới đây là các dữ liệu thống kê tổng hợp trực tiếp từ hệ thống.</p>
             </div>
 
-            <!-- Stats cards -->
-            <div class="stats-grid">
-                <div class="stat-card" id="stat-email">
-                    <div class="stat-card__icon stat-card__icon--blue">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 4l-10 8L2 4"/></svg>
-                    </div>
-                    <div class="stat-card__info">
-                        <span class="stat-card__label">Email</span>
-                        <span class="stat-card__value">{{ user.email }}</span>
-                    </div>
+            <!-- 2. System Metrics cards -->
+            <div class="row g-3 mb-4">
+              <!-- Users -->
+              <div class="col-6 col-md-4 col-lg-3 col-xl">
+                <div class="ad-card-stat">
+                  <div class="ad-stat-icon ad-ic-users">👥</div>
+                  <div>
+                    <div class="ad-stat-label">Tổng Users</div>
+                    <div class="ad-stat-value">{{ total_users }}</div>
+                  </div>
                 </div>
-
-                <div class="stat-card" id="stat-role">
-                    <div class="stat-card__icon stat-card__icon--green">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    </div>
-                    <div class="stat-card__info">
-                        <span class="stat-card__label">Vai trò</span>
-                        <span class="stat-card__value">
-                            {% for role in user_roles %}
-                                <span class="role-badge role-badge--{{ role|lower }}">{{ role }}</span>
-                            {% empty %}
-                                <span class="role-badge">Chưa gán</span>
-                            {% endfor %}
-                        </span>
-                    </div>
+              </div>
+              <!-- Owners -->
+              <div class="col-6 col-md-4 col-lg-3 col-xl">
+                <div class="ad-card-stat">
+                  <div class="ad-stat-icon ad-ic-owners">🏢</div>
+                  <div>
+                    <div class="ad-stat-label">Chủ sân (Owners)</div>
+                    <div class="ad-stat-value">{{ total_owners }}</div>
+                  </div>
                 </div>
-
-                <div class="stat-card" id="stat-wallet">
-                    <div class="stat-card__icon stat-card__icon--purple">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
-                    </div>
-                    <div class="stat-card__info">
-                        <span class="stat-card__label">Số dư ví</span>
-                        <span class="stat-card__value">
-                            {% if wallet %}{{ wallet.balance|floatformat:0 }} VNĐ{% else %}—{% endif %}
-                        </span>
-                    </div>
+              </div>
+              <!-- Staffs -->
+              <div class="col-6 col-md-4 col-lg-3 col-xl">
+                <div class="ad-card-stat">
+                  <div class="ad-stat-icon ad-ic-staffs">👔</div>
+                  <div>
+                    <div class="ad-stat-label">Nhân viên</div>
+                    <div class="ad-stat-value">{{ total_staffs }}</div>
+                  </div>
                 </div>
-
-                <div class="stat-card" id="stat-joined">
-                    <div class="stat-card__icon stat-card__icon--orange">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-                    </div>
-                    <div class="stat-card__info">
-                        <span class="stat-card__label">Ngày tham gia</span>
-                        <span class="stat-card__value">{{ user.date_joined|date:"d/m/Y" }}</span>
-                    </div>
+              </div>
+              <!-- Customers -->
+              <div class="col-6 col-md-4 col-lg-3 col-xl">
+                <div class="ad-card-stat">
+                  <div class="ad-stat-icon ad-ic-custs">⚽</div>
+                  <div>
+                    <div class="ad-stat-label">Khách hàng</div>
+                    <div class="ad-stat-value">{{ total_customers }}</div>
+                  </div>
                 </div>
+              </div>
+              <!-- Venues -->
+              <div class="col-6 col-md-4 col-lg-3 col-xl">
+                <div class="ad-card-stat">
+                  <div class="ad-stat-icon ad-ic-venues">🏟️</div>
+                  <div>
+                    <div class="ad-stat-label">Cơ sở</div>
+                    <div class="ad-stat-value">{{ total_venues }}</div>
+                  </div>
+                </div>
+              </div>
+              <!-- Total system revenue -->
+              <div class="col-6 col-md-4 col-lg-3 col-xl">
+                <div class="ad-card-stat">
+                  <div class="ad-stat-icon ad-ic-revenue">💵</div>
+                  <div>
+                    <div class="ad-stat-label">Doanh thu hệ thống</div>
+                    <div class="ad-stat-value" style="font-size: 1.15rem;">{{ total_revenue|floatformat:0 }}đ</div>
+                  </div>
+                </div>
+              </div>
+              <!-- Total transaction count -->
+              <div class="col-6 col-md-4 col-lg-3 col-xl">
+                <div class="ad-card-stat">
+                  <div class="ad-stat-icon ad-ic-txs">💳</div>
+                  <div>
+                    <div class="ad-stat-label">Tổng giao dịch</div>
+                    <div class="ad-stat-value">{{ total_transactions }}</div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <!-- Placeholder sections -->
-            <div class="placeholder-section">
-                <div class="placeholder-section__icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></svg>
+            <!-- 3. System Charts -->
+            <div class="row g-3 mb-4">
+              <!-- Doanh thu & Booking theo thời gian -->
+              <div class="col-12 col-xl-8">
+                <div class="card h-100 border-0 shadow-sm" style="border-radius: 0.875rem;">
+                  <div class="card-header bg-transparent border-0 pt-3 px-3 d-flex align-items-center justify-content-between">
+                    <h6 class="mb-0 fw-bold">📉 Thống kê hoạt động hệ thống (30 ngày gần nhất)</h6>
+                  </div>
+                  <div class="card-body p-3">
+                    <canvas id="adTimelineChart" height="180"></canvas>
+                  </div>
                 </div>
-                <h3>Sắp ra mắt</h3>
-                <p>Các tính năng đặt sân, quản lý lịch, thanh toán sẽ sớm được cập nhật tại đây.</p>
+              </div>
+              <!-- Top cơ sở doanh thu cao nhất -->
+              <div class="col-12 col-xl-4">
+                <div class="card h-100 border-0 shadow-sm" style="border-radius: 0.875rem;">
+                  <div class="card-header bg-transparent border-0 pt-3 px-3">
+                    <h6 class="mb-0 fw-bold">🏆 Top cơ sở doanh thu cao nhất</h6>
+                  </div>
+                  <div class="card-body p-3 d-flex flex-column align-items-center justify-content-center">
+                    {% if top_venues_names %}
+                    <canvas id="adTopVenuesChart" height="220"></canvas>
+                    {% else %}
+                    <div class="text-center text-muted py-4">Chưa có cơ sở nào phát sinh doanh thu.</div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
             </div>
+
+            <!-- 4. Administrative tables -->
+            <div class="row g-3">
+              <!-- Owner Chờ xác minh -->
+              <div class="col-12 col-lg-6">
+                <div class="ad-panel-card">
+                  <div class="ad-panel-hdr">
+                    <span>📝 Yêu cầu xác minh Owner chờ duyệt</span>
+                    <span class="badge bg-danger rounded-pill">{{ pending_owners|length }}</span>
+                  </div>
+                  <div class="ad-panel-body table-responsive">
+                    <table class="ad-table table">
+                      <thead>
+                        <tr>
+                          <th>Thông tin đăng ký</th>
+                          <th>Tên doanh nghiệp</th>
+                          <th>Hành động</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for req in pending_owners %}
+                        <tr>
+                          <td>
+                            <strong>{{ req.first_name }} {{ req.last_name }}</strong><br>
+                            <span class="text-muted" style="font-size:0.75rem;">{{ req.email }} | {{ req.phone|default:"Chưa cung cấp" }}</span>
+                          </td>
+                          <td>{{ req.business_name }}</td>
+                          <td>
+                            <div class="d-flex gap-1">
+                              <form method="post" action="{% url 'accounts:admin_approve_owner' req.pk %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn-ad-sm btn-ad-approve">Duyệt</button>
+                              </form>
+                              <form method="post" action="{% url 'accounts:admin_reject_owner' req.pk %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn-ad-sm btn-ad-reject" onclick="return confirm('Bạn có chắc muốn từ chối yêu cầu này?')">Từ chối</button>
+                              </form>
+                            </div>
+                          </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                          <td colspan="3" class="text-center text-muted py-4">Không có yêu cầu chờ duyệt nào.</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Cơ sở chờ duyệt (Venue status=PENDING) -->
+              <div class="col-12 col-lg-6">
+                <div class="ad-panel-card">
+                  <div class="ad-panel-hdr">
+                    <span>🏟️ Danh sách cơ sở đang chờ duyệt</span>
+                    <span class="badge bg-warning text-dark rounded-pill">{{ pending_venues|length }}</span>
+                  </div>
+                  <div class="ad-panel-body table-responsive">
+                    <table class="ad-table table">
+                      <thead>
+                        <tr>
+                          <th>Tên cơ sở</th>
+                          <th>Địa chỉ</th>
+                          <th>Hành động</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for vn in pending_venues %}
+                        <tr>
+                          <td>
+                            <strong>{{ vn.name }}</strong><br>
+                            <span class="text-muted" style="font-size:0.75rem;">Chủ: {{ vn.owner.business_name }}</span>
+                          </td>
+                          <td>{{ vn.address }}</td>
+                          <td>
+                            <button class="btn-ad-sm btn-ad-approve" onclick="alert('Duyệt kích hoạt cơ sở thành công!')">Duyệt sân</button>
+                          </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                          <td colspan="3" class="text-center text-muted py-4">Không có cơ sở nào cần phê duyệt.</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Danh sách người dùng mới đăng ký -->
+              <div class="col-12 col-lg-6">
+                <div class="ad-panel-card">
+                  <div class="ad-panel-hdr">
+                    <span>👤 Người dùng mới đăng ký</span>
+                  </div>
+                  <div class="ad-panel-body table-responsive">
+                    <table class="ad-table table">
+                      <thead>
+                        <tr>
+                          <th>Email</th>
+                          <th>Ngày đăng ký</th>
+                          <th>Trạng thái</th>
+                          <th>Hành động</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for usr in recent_registered_users %}
+                        <tr>
+                          <td><strong>{{ usr.email }}</strong></td>
+                          <td>{{ usr.date_joined|date:"d/m/Y H:i" }}</td>
+                          <td>
+                            {% if usr.is_active %}
+                            <span class="ad-badge ad-badge--active">Kích hoạt</span>
+                            {% else %}
+                            <span class="ad-badge ad-badge--inactive">Đang khóa</span>
+                            {% endif %}
+                          </td>
+                          <td>
+                            <form method="post" action="{% url 'accounts:admin_user_toggle_active' usr.pk %}">
+                              {% csrf_token %}
+                              <button type="submit" class="btn-ad-sm btn-ad-toggle">
+                                {% if usr.is_active %}Khóa{% else %}Mở khóa{% endif %}
+                              </button>
+                            </form>
+                          </td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Báo cáo vi phạm (Mockup) -->
+              <div class="col-12 col-lg-6">
+                <div class="ad-panel-card">
+                  <div class="ad-panel-hdr">
+                    <span>⚠️ Danh sách báo cáo vi phạm cần xử lý</span>
+                    <span class="badge bg-danger rounded-pill">{{ violation_reports|length }}</span>
+                  </div>
+                  <div class="ad-panel-body table-responsive">
+                    <table class="ad-table table">
+                      <thead>
+                        <tr>
+                          <th>Người báo cáo</th>
+                          <th>Đối tượng báo cáo</th>
+                          <th>Lý do vi phạm</th>
+                          <th>Hành động</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for rep in violation_reports %}
+                        <tr id="rep-row-{{ rep.id }}">
+                          <td>{{ rep.reporter }}</td>
+                          <td>
+                            <span class="badge bg-secondary">{{ rep.target_type }}</span><br>
+                            <small class="fw-bold">{{ rep.target_name }}</small>
+                          </td>
+                          <td><span class="text-wrap">{{ rep.reason }}</span></td>
+                          <td>
+                            <div class="d-flex gap-1">
+                              <button class="btn-ad-sm btn-ad-approve" onclick="alert('Báo cáo đã được ghi nhận xử lý thành công!'); document.getElementById('rep-row-{{ rep.id }}').remove();">Xử lý</button>
+                              <button class="btn-ad-sm btn-ad-reject" onclick="document.getElementById('rep-row-{{ rep.id }}').remove();">Bỏ qua</button>
+                            </div>
+                          </td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ChartJS scripts -->
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <script>
+              document.addEventListener("DOMContentLoaded", function () {
+                window.gsportsCharts = window.gsportsCharts || [];
+
+                // ── Adaptive colors based on active theme ──
+                const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+                let gridC  = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
+                let tickC  = isDark ? '#94a3b8' : '#64748b';
+                let tipBg  = isDark ? '#1e293b' : '#ffffff';
+                let tipTxt = isDark ? '#f8fafc'  : '#0f172a';
+
+                Chart.defaults.color = tickC;
+                Chart.defaults.borderColor = gridC;
+
+                const sharedScales = {
+                  x: { grid: { color: gridC }, ticks: { color: tickC, maxTicksLimit: 8 } },
+                  y: { grid: { color: gridC }, ticks: { color: tickC } }
+                };
+                const sharedTooltip = {
+                  backgroundColor: tipBg, titleColor: tipTxt, bodyColor: tickC,
+                  borderColor: gridC, borderWidth: 1, cornerRadius: 8, padding: 10
+                };
+
+                const rs = getComputedStyle(document.documentElement);
+                const accent = rs.getPropertyValue('--primary-600').trim() || '#3b82f6';
+                const accentLight = rs.getPropertyValue('--primary-200').trim() || '#93c5fd';
+
+                // Chart 1: Doanh thu & Booking theo thời gian
+                const timelineCtx = document.getElementById('adTimelineChart');
+                if (timelineCtx) {
+                  const chart1 = new Chart(timelineCtx, {
+                    type: 'line',
+                    data: {
+                      labels: {{ chart_dates|safe }},
+                      datasets: [
+                        {
+                          label: 'Doanh thu (nghìn đồng)',
+                          data: {{ chart_revenue_data|safe }}.map(v => v / 1000),
+                          borderColor: '#2563eb',
+                          backgroundColor: 'rgba(37, 99, 235, 0.05)',
+                          borderWidth: 2.5,
+                          tension: 0.3,
+                          fill: true,
+                          yAxisID: 'y'
+                        },
+                        {
+                          label: 'Lượt Booking',
+                          data: {{ chart_bookings_data|safe }},
+                          borderColor: '#10b981',
+                          backgroundColor: 'transparent',
+                          borderWidth: 2.5,
+                          tension: 0.3,
+                          yAxisID: 'y1'
+                        }
+                      ]
+                    },
+                    options: {
+                      responsive: true,
+                      maintainAspectRatio: true,
+                      aspectRatio: 2.6,
+                      plugins: {
+                        legend: { labels: { color: tickC, boxWidth: 12, padding: 14 } },
+                        tooltip: sharedTooltip
+                      },
+                      scales: {
+                        x: sharedScales.x,
+                        y: {
+                          type: 'linear', display: true, position: 'left',
+                          grid: { color: gridC }, ticks: { color: tickC },
+                          title: { display: true, text: 'Doanh thu (kđ)', color: tickC }
+                        },
+                        y1: {
+                          type: 'linear', display: true, position: 'right',
+                          grid: { drawOnChartArea: false }, ticks: { color: tickC, stepSize: 1 },
+                          title: { display: true, text: 'Lượt đặt', color: tickC }
+                        }
+                      }
+                    }
+                  });
+                  window.gsportsCharts.push(chart1);
+                }
+
+                // Chart 2: Top cơ sở có doanh thu cao nhất
+                const topCtx = document.getElementById('adTopVenuesChart');
+                if (topCtx) {
+                  const chart2 = new Chart(topCtx, {
+                    type: 'bar',
+                    data: {
+                      labels: {{ top_venues_names|safe }},
+                      datasets: [{
+                        label: 'Doanh thu (đ)',
+                        data: {{ top_venues_revs|safe }},
+                        backgroundColor: ['#2563eb', '#4f46e5', '#7c3aed', '#10b981', '#f59e0b'],
+                        borderRadius: 6
+                      }]
+                    },
+                    options: {
+                      responsive: true,
+                      maintainAspectRatio: true,
+                      aspectRatio: 1.8,
+                      plugins: {
+                        legend: { display: false },
+                        tooltip: sharedTooltip
+                      },
+                      scales: {
+                        x: sharedScales.x,
+                        y: { beginAtZero: true, grid: { color: gridC }, ticks: { color: tickC } }
+                      }
+                    }
+                  });
+                  window.gsportsCharts.push(chart2);
+                }
+
+                // ── Dynamic theme update listener ──
+                window.addEventListener('gsports-theme-changed', function (e) {
+                  const isDark = e.detail.theme === 'dark';
+                  gridC  = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
+                  tickC  = isDark ? '#94a3b8' : '#64748b';
+                  tipBg  = isDark ? '#1e293b' : '#ffffff';
+                  tipTxt = isDark ? '#f8fafc'  : '#0f172a';
+
+                  Chart.defaults.color = tickC;
+                  Chart.defaults.borderColor = gridC;
+
+                  window.gsportsCharts.forEach(chart => {
+                    if (chart.options.scales) {
+                      if (chart.options.scales.x) {
+                        chart.options.scales.x.grid.color = gridC;
+                        chart.options.scales.x.ticks.color = tickC;
+                      }
+                      if (chart.options.scales.y) {
+                        chart.options.scales.y.grid.color = gridC;
+                        chart.options.scales.y.ticks.color = tickC;
+                        if (chart.options.scales.y.title) chart.options.scales.y.title.color = tickC;
+                      }
+                      if (chart.options.scales.y1) {
+                        chart.options.scales.y1.ticks.color = tickC;
+                        if (chart.options.scales.y1.title) chart.options.scales.y1.title.color = tickC;
+                      }
+                    }
+                    if (chart.options.plugins) {
+                      if (chart.options.plugins.legend && chart.options.plugins.legend.labels) {
+                        chart.options.plugins.legend.labels.color = tickC;
+                      }
+                      if (chart.options.plugins.tooltip) {
+                        chart.options.plugins.tooltip.backgroundColor = tipBg;
+                        chart.options.plugins.tooltip.titleColor = tipTxt;
+                        chart.options.plugins.tooltip.bodyColor = tickC;
+                        chart.options.plugins.tooltip.borderColor = gridC;
+                      }
+                    }
+                    chart.update();
+                  });
+                });
+              });
+            </script>
+            {% elif request.user.owner_profile or 'OWNER' in user_roles %}
+            <!-- ==========================================
+                 OWNER DASHBOARD (Bootstrap 5 Premium)
+                 ========================================== -->
+            <!-- OWNER Dashboard styles use GSports CSS variables (no external CSS needed) -->
+            
+            <style>
+              /* Scoped styles to prevent clashing with layout */
+              .ow-welcome {
+                background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #60a5fa 100%);
+                border-radius: 1rem;
+                padding: 2rem 2.25rem;
+                color: #fff;
+                margin-bottom: 2rem;
+                position: relative;
+                overflow: hidden;
+              }
+              .ow-welcome::after {
+                content: '';
+                position: absolute;
+                right: -30px;
+                top: -30px;
+                width: 200px;
+                height: 200px;
+                border-radius: 50%;
+                background: rgba(255, 255, 255, 0.08);
+              }
+              .ow-welcome h1 { font-size: 1.65rem; font-weight: 800; margin-bottom: 0.5rem; }
+              .ow-welcome p { opacity: 0.9; margin-bottom: 0; font-size: 0.95rem; }
+              
+              /* Metrics card grid */
+              .ow-card-stat {
+                background: var(--card-bg, #fff);
+                border: 1px solid var(--border-color, #e2e8f0);
+                border-radius: 0.875rem;
+                padding: 1.15rem 1.35rem;
+                transition: transform 0.2s, box-shadow 0.2s;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+              }
+              .ow-card-stat:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+              }
+              .ow-stat-icon {
+                width: 44px;
+                height: 44px;
+                border-radius: 0.75rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.25rem;
+                flex-shrink: 0;
+              }
+              .ow-ic-today   { background: #eff6ff; color: #2563eb; }
+              .ow-ic-week    { background: #eef2ff; color: #4f46e5; }
+              .ow-ic-month   { background: #faf5ff; color: #7c3aed; }
+              .ow-ic-year    { background: #fdf2f8; color: #db2777; }
+              .ow-ic-bktoday { background: #f0fdf4; color: #16a34a; }
+              .ow-ic-bkmonth { background: #ecfeff; color: #0891b2; }
+              .ow-ic-occupy  { background: #fff7ed; color: #ea580c; }
+              .ow-ic-custs   { background: #fff1f2; color: #e11d48; }
+              .ow-ic-retcust { background: #f0fdf4; color: #15803d; }
+              .ow-ic-reviews { background: #f5f5f5; color: #4b5563; }
+
+              .ow-stat-label {
+                font-size: 0.72rem;
+                font-weight: 700;
+                color: var(--text-muted, #64748b);
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                margin-bottom: 0.15rem;
+              }
+              .ow-stat-value {
+                font-size: 1.25rem;
+                font-weight: 800;
+                color: var(--text-main, #1e293b);
+                line-height: 1.2;
+              }
+
+              /* Section Header */
+              .ow-sec-header {
+                font-size: 1.05rem;
+                font-weight: 700;
+                color: var(--text-main, #1e293b);
+                margin: 1.80rem 0 0.95rem;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+              }
+
+              /* Action tables */
+              .ow-panel-card {
+                background: var(--card-bg, #fff);
+                border: 1px solid var(--border-color, #e2e8f0);
+                border-radius: 0.875rem;
+                overflow: hidden;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+                margin-bottom: 1.5rem;
+              }
+              .ow-panel-hdr {
+                padding: 0.95rem 1.15rem;
+                border-bottom: 1px solid var(--border-color, #e2e8f0);
+                background: rgba(248, 250, 252, 0.3);
+                font-weight: 700;
+                font-size: 0.88rem;
+                color: var(--text-main, #1e293b);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+              }
+              .ow-panel-body {
+                padding: 0;
+              }
+              .ow-table {
+                width: 100%;
+                margin-bottom: 0;
+                vertical-align: middle;
+              }
+              .ow-table th {
+                font-size: 0.7rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: #64748b;
+                background: #f8fafc;
+                padding: 0.7rem 1.15rem;
+                border-bottom: 1px solid #e2e8f0;
+              }
+              .ow-table td {
+                padding: 0.8rem 1.15rem;
+                border-bottom: 1px solid #f1f5f9;
+                font-size: 0.83rem;
+              }
+              .ow-table tr:last-child td {
+                border-bottom: none;
+              }
+              
+              /* Badges */
+              .ow-badge {
+                font-size: 0.68rem;
+                font-weight: 700;
+                padding: 0.15rem 0.55rem;
+                border-radius: 2rem;
+                display: inline-flex;
+                align-items: center;
+              }
+              .ow-badge--pending { background: #fff7ed; color: #ea580c; }
+              .ow-badge--completed { background: #f0fdf4; color: #16a34a; }
+              .ow-badge--cancelled { background: #fff1f2; color: #e11d48; }
+
+              /* Star Rating visual fix */
+              .ow-stars {
+                color: #f59e0b;
+                font-size: 0.85rem;
+                letter-spacing: 0.05rem;
+              }
+            </style>
+
+            <!-- 1. Welcome Banner -->
+            <div class="ow-welcome">
+              <h1>Xin chào, {% if user.first_name or user.last_name %}{{ user.first_name }} {{ user.last_name }}{% else %}{{ user.username }}{% endif %}! 🏟️</h1>
+              <p>Chào mừng bạn trở lại trang quản trị chủ sân. Dưới đây là thông số vận hành và doanh thu của các cơ sở thể thao thuộc sở hữu của bạn.</p>
+            </div>
+
+            <!-- 2. OWNER Metrics cards (10 Cards) -->
+            <div class="row g-3 mb-4">
+              <!-- Doanh thu hôm nay -->
+              <div class="col-6 col-md-4 col-xl-2.4">
+                <div class="ow-card-stat">
+                  <div class="ow-stat-icon ow-ic-today">💵</div>
+                  <div>
+                    <div class="ow-stat-label">Doanh thu hôm nay</div>
+                    <div class="ow-stat-value" style="font-size: 1.15rem;">{{ owner_rev_today|floatformat:0 }}đ</div>
+                  </div>
+                </div>
+              </div>
+              <!-- Doanh thu tuần -->
+              <div class="col-6 col-md-4 col-xl-2.4">
+                <div class="ow-card-stat">
+                  <div class="ow-stat-icon ow-ic-week">📅</div>
+                  <div>
+                    <div class="ow-stat-label">Doanh thu tuần</div>
+                    <div class="ow-stat-value" style="font-size: 1.15rem;">{{ owner_rev_week|floatformat:0 }}đ</div>
+                  </div>
+                </div>
+              </div>
+              <!-- Doanh thu tháng -->
+              <div class="col-6 col-md-4 col-xl-2.4">
+                <div class="ow-card-stat">
+                  <div class="ow-stat-icon ow-ic-month">📊</div>
+                  <div>
+                    <div class="ow-stat-label">Doanh thu tháng</div>
+                    <div class="ow-stat-value" style="font-size: 1.15rem;">{{ owner_rev_month|floatformat:0 }}đ</div>
+                  </div>
+                </div>
+              </div>
+              <!-- Doanh thu năm -->
+              <div class="col-6 col-md-4 col-xl-2.4">
+                <div class="ow-card-stat">
+                  <div class="ow-stat-icon ow-ic-year">🏆</div>
+                  <div>
+                    <div class="ow-stat-label">Doanh thu năm</div>
+                    <div class="ow-stat-value" style="font-size: 1.15rem;">{{ owner_rev_year|floatformat:0 }}đ</div>
+                  </div>
+                </div>
+              </div>
+              <!-- Booking hôm nay -->
+              <div class="col-6 col-md-4 col-xl-2.4">
+                <div class="ow-card-stat">
+                  <div class="ow-stat-icon ow-ic-bktoday">🎯</div>
+                  <div>
+                    <div class="ow-stat-label">Booking hôm nay</div>
+                    <div class="ow-stat-value">{{ owner_booking_today }}</div>
+                  </div>
+                </div>
+              </div>
+              <!-- Booking tháng -->
+              <div class="col-6 col-md-4 col-xl-2.4">
+                <div class="ow-card-stat">
+                  <div class="ow-stat-icon ow-ic-bkmonth">📈</div>
+                  <div>
+                    <div class="ow-stat-label">Booking tháng</div>
+                    <div class="ow-stat-value">{{ owner_booking_month }}</div>
+                  </div>
+                </div>
+              </div>
+              <!-- Tỷ lệ lấp đầy sân -->
+              <div class="col-6 col-md-4 col-xl-2.4">
+                <div class="ow-card-stat">
+                  <div class="ow-stat-icon ow-ic-occupy">⚡</div>
+                  <div>
+                    <div class="ow-stat-label">Tỷ lệ lấp đầy sân</div>
+                    <div class="ow-stat-value">{{ owner_occupancy_rate }}%</div>
+                  </div>
+                </div>
+              </div>
+              <!-- Tổng khách hàng -->
+              <div class="col-6 col-md-4 col-xl-2.4">
+                <div class="ow-card-stat">
+                  <div class="ow-stat-icon ow-ic-custs">👥</div>
+                  <div>
+                    <div class="ow-stat-label">Tổng khách hàng</div>
+                    <div class="ow-stat-value">{{ owner_total_customers }}</div>
+                  </div>
+                </div>
+              </div>
+              <!-- Khách quay lại -->
+              <div class="col-6 col-md-4 col-xl-2.4">
+                <div class="ow-card-stat">
+                  <div class="ow-stat-icon ow-ic-retcust">♻️</div>
+                  <div>
+                    <div class="ow-stat-label">Khách quay lại</div>
+                    <div class="ow-stat-value">{{ owner_returning_customers }}</div>
+                  </div>
+                </div>
+              </div>
+              <!-- Tổng đánh giá -->
+              <div class="col-6 col-md-4 col-xl-2.4">
+                <div class="ow-card-stat">
+                  <div class="ow-stat-icon ow-ic-reviews">⭐</div>
+                  <div>
+                    <div class="ow-stat-label">Tổng đánh giá</div>
+                    <div class="ow-stat-value">{{ owner_total_reviews }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. OWNER Charts Grid (4 Charts) -->
+            <div class="row g-3 mb-4">
+              <!-- Doanh thu & Booking theo thời gian -->
+              <div class="col-12 col-xl-7">
+                <div class="card border-0 shadow-sm" style="border-radius: 0.875rem;">
+                  <div class="card-header bg-transparent border-0 pt-3 px-3">
+                    <h6 class="mb-0 fw-bold">📉 Doanh thu & Lượt đặt sân (30 ngày qua)</h6>
+                  </div>
+                  <div class="card-body p-3">
+                    <canvas id="owTimelineChart" height="150"></canvas>
+                  </div>
+                </div>
+              </div>
+              <!-- Top sân được thuê nhiều nhất -->
+              <div class="col-12 col-md-6 col-xl-5">
+                <div class="card border-0 shadow-sm" style="border-radius: 0.875rem; height: 100%;">
+                  <div class="card-header bg-transparent border-0 pt-3 px-3">
+                    <h6 class="mb-0 fw-bold">🏆 Tỷ lệ đặt giữa các sân (Top lượt thuê)</h6>
+                  </div>
+                  <div class="card-body p-3 d-flex flex-column align-items-center justify-content-center">
+                    {% if owner_fields_labels %}
+                    <canvas id="owTopFieldsChart" height="180"></canvas>
+                    {% else %}
+                    <div class="text-center text-muted py-4">Chưa có dữ liệu đặt sân.</div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+              <!-- Hiệu suất từng sân con -->
+              <div class="col-12 col-md-6 col-xl-6">
+                <div class="card border-0 shadow-sm" style="border-radius: 0.875rem; height: 100%;">
+                  <div class="card-header bg-transparent border-0 pt-3 px-3">
+                    <h6 class="mb-0 fw-bold">🏟️ Tổng số giờ thuê theo sân (Tháng này)</h6>
+                  </div>
+                  <div class="card-body p-3">
+                    {% if owner_fields_labels %}
+                    <canvas id="owFieldsPerfChart" height="160"></canvas>
+                    {% else %}
+                    <div class="text-center text-muted py-4">Chưa có dữ liệu sân.</div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+              <!-- Khung giờ đông khách & ít khách -->
+              <div class="col-12 col-xl-6">
+                <div class="card border-0 shadow-sm" style="border-radius: 0.875rem; height: 100%;">
+                  <div class="card-header bg-transparent border-0 pt-3 px-3">
+                    <h6 class="mb-0 fw-bold">⏰ Thống kê lượng khách đặt theo khung giờ</h6>
+                  </div>
+                  <div class="card-body p-3">
+                    <canvas id="owPeakHoursChart" height="160"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4. OWNER Tables Grid -->
+            <div class="row g-3">
+              <!-- Thống kê chi tiết từng sân con -->
+              <div class="col-12 col-lg-6">
+                <div class="ow-panel-card">
+                  <div class="ow-panel-hdr">
+                    <span>📊 Thống kê hiệu suất hoạt động từng sân</span>
+                    <span class="badge bg-primary rounded-pill">{{ owner_fields_stats|length }} sân</span>
+                  </div>
+                  <div class="ow-panel-body table-responsive">
+                    <table class="ow-table table">
+                      <thead>
+                        <tr>
+                          <th>Tên sân</th>
+                          <th>Tổng giờ (tháng)</th>
+                          <th>Doanh thu</th>
+                          <th>Tỷ lệ sử dụng</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for stat in owner_fields_stats %}
+                        <tr>
+                          <td>
+                            <strong>{{ stat.name }}</strong><br>
+                            <small class="text-muted">{{ stat.venue_name }}</small>
+                          </td>
+                          <td>{{ stat.hours }}h</td>
+                          <td><strong>{{ stat.revenue|floatformat:0 }}đ</strong></td>
+                          <td>
+                            <div class="d-flex align-items-center gap-2">
+                              <span>{{ stat.use_rate }}%</span>
+                              <div class="progress flex-grow-1" style="height: 6px; width: 60px;">
+                                <div class="progress-bar {% if stat.use_rate > 50 %}bg-success{% else %}bg-warning{% endif %}" role="progressbar" style="width: {{ stat.use_rate }}%"></div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                          <td colspan="4" class="text-center text-muted py-4">Chưa có thông tin thống kê sân.</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Booking gần đây -->
+              <div class="col-12 col-lg-6">
+                <div class="ow-panel-card">
+                  <div class="ow-panel-hdr">
+                    <span>📅 Danh sách Booking gần đây</span>
+                  </div>
+                  <div class="ow-panel-body table-responsive">
+                    <table class="ow-table table">
+                      <thead>
+                        <tr>
+                          <th>Khách hàng</th>
+                          <th>Sân đặt / Ngày</th>
+                          <th>Tổng tiền</th>
+                          <th>Trạng thái</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for bk in owner_recent_bookings %}
+                        <tr>
+                          <td>
+                            <strong>{{ bk.user.first_name }} {{ bk.user.last_name }}</strong><br>
+                            <small class="text-muted">{{ bk.user.email }}</small>
+                          </td>
+                          <td>
+                            <strong>{{ bk.field.name }}</strong><br>
+                            <span class="text-muted" style="font-size: 0.75rem;">{{ bk.booking_date|date:"d/m/Y" }}</span>
+                          </td>
+                          <td><strong>{{ bk.total_price|floatformat:0 }}đ</strong></td>
+                          <td>
+                            <span class="ow-badge {% if bk.status == 'COMPLETED' or bk.status == 'PAID' %}ow-badge--completed{% elif bk.status == 'CANCELLED' %}ow-badge--cancelled{% else %}ow-badge--pending{% endif %}">
+                              {{ bk.get_status_display }}
+                            </span>
+                          </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                          <td colspan="4" class="text-center text-muted py-4">Chưa có lượt đặt sân nào gần đây.</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Đánh giá mới nhất -->
+              <div class="col-12">
+                <div class="ow-panel-card">
+                  <div class="ow-panel-hdr">
+                    <span>💬 Đánh giá nhận xét mới nhất</span>
+                  </div>
+                  <div class="ow-panel-body table-responsive">
+                    <table class="ow-table table">
+                      <thead>
+                        <tr>
+                          <th>Khách hàng</th>
+                          <th>Cơ sở</th>
+                          <th>Điểm đánh giá</th>
+                          <th>Nội dung bình luận</th>
+                          <th>Thời gian</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for rev in owner_recent_reviews %}
+                        <tr>
+                          <td><strong>{{ rev.user.email }}</strong></td>
+                          <td>{{ rev.venue.name }}</td>
+                          <td>
+                            <!-- Fixed dynamic rating stars representation -->
+                            <span class="ow-stars">
+                              {% if rev.rating >= 1 %}★{% else %}☆{% endif %}{% if rev.rating >= 2 %}★{% else %}☆{% endif %}{% if rev.rating >= 3 %}★{% else %}☆{% endif %}{% if rev.rating >= 4 %}★{% else %}☆{% endif %}{% if rev.rating >= 5 %}★{% else %}☆{% endif %}
+                            </span>
+                          </td>
+                          <td><span class="text-wrap">{{ rev.comment|default:"Không có nội dung bình luận." }}</span></td>
+                          <td><small class="text-muted">{{ rev.created_at|date:"d/m/Y H:i" }}</small></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                          <td colspan="5" class="text-center text-muted py-4">Chưa có đánh giá nhận xét nào từ khách hàng.</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ChartJS scripts for OWNER -->
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <script>
+              document.addEventListener("DOMContentLoaded", function () {
+                window.gsportsCharts = window.gsportsCharts || [];
+
+                // ── Adaptive colors based on active theme ──
+                const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+                let gridC  = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
+                let tickC  = isDark ? '#94a3b8' : '#64748b';
+                let tipBg  = isDark ? '#1e293b' : '#ffffff';
+                let tipTxt = isDark ? '#f8fafc'  : '#0f172a';
+
+                Chart.defaults.color = tickC;
+                Chart.defaults.borderColor = gridC;
+
+                const sharedScales = {
+                  x: { grid: { color: gridC }, ticks: { color: tickC, maxTicksLimit: 8 } },
+                  y: { grid: { color: gridC }, ticks: { color: tickC } }
+                };
+                const sharedTooltip = {
+                  backgroundColor: tipBg, titleColor: tipTxt, bodyColor: tickC,
+                  borderColor: gridC, borderWidth: 1, cornerRadius: 8, padding: 10
+                };
+
+                // 1. Chart Doanh thu & Booking theo thời gian
+                const timelineCtx = document.getElementById('owTimelineChart');
+                if (timelineCtx) {
+                  const chart1 = new Chart(timelineCtx, {
+                    type: 'line',
+                    data: {
+                      labels: {{ owner_chart_dates|safe }},
+                      datasets: [
+                        {
+                          label: 'Doanh thu (nghìn đồng)',
+                          data: {{ owner_chart_rev_data|safe }}.map(v => v / 1000),
+                          borderColor: '#2563eb',
+                          backgroundColor: 'rgba(37, 99, 235, 0.05)',
+                          borderWidth: 2,
+                          tension: 0.3,
+                          fill: true,
+                          yAxisID: 'y'
+                        },
+                        {
+                          label: 'Lượt Booking',
+                          data: {{ owner_chart_bookings_data|safe }},
+                          borderColor: '#10b981',
+                          backgroundColor: 'transparent',
+                          borderWidth: 2,
+                          tension: 0.3,
+                          yAxisID: 'y1'
+                        }
+                      ]
+                    },
+                    options: {
+                      responsive: true,
+                      maintainAspectRatio: true,
+                      aspectRatio: 2.5,
+                      plugins: {
+                        legend: { labels: { color: tickC, boxWidth: 12, padding: 14 } },
+                        tooltip: sharedTooltip
+                      },
+                      scales: {
+                        x: sharedScales.x,
+                        y: {
+                          type: 'linear', display: true, position: 'left',
+                          grid: { color: gridC }, ticks: { color: tickC },
+                          title: { display: true, text: 'Doanh thu (kđ)', color: tickC }
+                        },
+                        y1: {
+                          type: 'linear', display: true, position: 'right',
+                          grid: { drawOnChartArea: false }, ticks: { color: tickC, stepSize: 1 },
+                          title: { display: true, text: 'Lượt đặt', color: tickC }
+                        }
+                      }
+                    }
+                  });
+                  window.gsportsCharts.push(chart1);
+                }
+
+                // 2. Chart Tỷ lệ đặt giữa các sân (Top sân)
+                const topCtx = document.getElementById('owTopFieldsChart');
+                if (topCtx) {
+                  const chart2 = new Chart(topCtx, {
+                    type: 'doughnut',
+                    data: {
+                      labels: {{ owner_fields_labels|safe }},
+                      datasets: [{
+                        data: {{ owner_fields_bookings|safe }},
+                        backgroundColor: ['#2563eb', '#4f46e5', '#7c3aed', '#10b981', '#f59e0b', '#db2777'],
+                        borderWidth: 1
+                      }]
+                    },
+                    options: {
+                      responsive: true,
+                      maintainAspectRatio: true,
+                      aspectRatio: 1.5,
+                      plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, color: tickC } },
+                        tooltip: sharedTooltip
+                      }
+                    }
+                  });
+                  window.gsportsCharts.push(chart2);
+                }
+
+                // 3. Chart Hiệu suất từng sân con
+                const perfCtx = document.getElementById('owFieldsPerfChart');
+                if (perfCtx) {
+                  const chart3 = new Chart(perfCtx, {
+                    type: 'bar',
+                    data: {
+                      labels: {{ owner_fields_labels|safe }},
+                      datasets: [{
+                        label: 'Số giờ đặt',
+                        data: {{ owner_fields_perf|safe }},
+                        backgroundColor: '#4f46e5',
+                        borderRadius: 4
+                      }]
+                    },
+                    options: {
+                      responsive: true,
+                      maintainAspectRatio: true,
+                      aspectRatio: 2.0,
+                      plugins: {
+                        legend: { display: false },
+                        tooltip: sharedTooltip
+                      },
+                      scales: {
+                        x: sharedScales.x,
+                        y: { beginAtZero: true, grid: { color: gridC }, ticks: { color: tickC },
+                          title: { display: true, text: 'Số giờ', color: tickC } }
+                      }
+                    }
+                  });
+                  window.gsportsCharts.push(chart3);
+                }
+
+                // 4. Chart Khung giờ cao điểm
+                const peakCtx = document.getElementById('owPeakHoursChart');
+                if (peakCtx) {
+                  const chart4 = new Chart(peakCtx, {
+                    type: 'line',
+                    data: {
+                      labels: {{ owner_chart_hours|safe }},
+                      datasets: [{
+                        label: 'Số lượt đặt sân',
+                        data: {{ owner_chart_hour_counts|safe }},
+                        borderColor: '#ea580c',
+                        backgroundColor: 'rgba(234, 88, 12, 0.05)',
+                        borderWidth: 2.5,
+                        tension: 0.3,
+                        fill: true
+                      }]
+                    },
+                    options: {
+                      responsive: true,
+                      maintainAspectRatio: true,
+                      aspectRatio: 2.8,
+                      plugins: {
+                        legend: { display: false },
+                        tooltip: sharedTooltip
+                      },
+                      scales: {
+                        x: sharedScales.x,
+                        y: { beginAtZero: true, grid: { color: gridC }, ticks: { color: tickC, stepSize: 1 } }
+                      }
+                    }
+                  });
+                  window.gsportsCharts.push(chart4);
+                }
+              });
+            </script>
+            {% elif request.user.staff_profile or 'STAFF' in user_roles %}
+            <!-- ==========================================
+                 STAFF DASHBOARD (Bootstrap 5 Premium)
+                 ========================================== -->
+            <!-- STAFF Dashboard styles use GSports CSS variables (no external CSS needed) -->
+            
+            <style>
+              /* Scoped styles to prevent clashing with layout */
+              .sf-welcome {
+                background: linear-gradient(135deg, #0f766e 0%, #14b8a6 50%, #5eead4 100%);
+                border-radius: 1rem;
+                padding: 1.75rem 2.25rem;
+                color: #fff;
+                margin-bottom: 2rem;
+                position: relative;
+                overflow: hidden;
+              }
+              .sf-welcome::after {
+                content: '';
+                position: absolute;
+                right: -40px;
+                top: -40px;
+                width: 180px;
+                height: 180px;
+                border-radius: 50%;
+                background: rgba(255, 255, 255, 0.08);
+              }
+              .sf-welcome h1 { font-size: 1.55rem; font-weight: 800; margin-bottom: 0.5rem; }
+              .sf-welcome p { opacity: 0.9; margin-bottom: 0; font-size: 0.95rem; }
+              
+              /* Metrics card grid */
+              .sf-card-stat {
+                background: var(--card-bg, #fff);
+                border: 1px solid var(--border-color, #e2e8f0);
+                border-radius: 0.875rem;
+                padding: 1.15rem 1.35rem;
+                transition: transform 0.2s, box-shadow 0.2s;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+              }
+              .sf-card-stat:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+              }
+              .sf-stat-icon {
+                width: 44px;
+                height: 44px;
+                border-radius: 0.75rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.25rem;
+                flex-shrink: 0;
+              }
+              .sf-ic-today   { background: #eff6ff; color: #2563eb; }
+              .sf-ic-playing { background: #f0fdf4; color: #16a34a; }
+              .sf-ic-inuse   { background: #eef2ff; color: #4f46e5; }
+              .sf-ic-starting{ background: #fff7ed; color: #ea580c; }
+              .sf-ic-ending  { background: #fff1f2; color: #e11d48; }
+              .sf-ic-services{ background: #faf5ff; color: #7c3aed; }
+
+              .sf-stat-label {
+                font-size: 0.72rem;
+                font-weight: 700;
+                color: var(--text-muted, #64748b);
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                margin-bottom: 0.15rem;
+              }
+              .sf-stat-value {
+                font-size: 1.25rem;
+                font-weight: 800;
+                color: var(--text-main, #1e293b);
+                line-height: 1.2;
+              }
+
+              /* Action tables */
+              .sf-panel-card {
+                background: var(--card-bg, #fff);
+                border: 1px solid var(--border-color, #e2e8f0);
+                border-radius: 0.875rem;
+                overflow: hidden;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+                margin-bottom: 1.5rem;
+              }
+              .sf-panel-hdr {
+                padding: 0.95rem 1.15rem;
+                border-bottom: 1px solid var(--border-color, #e2e8f0);
+                background: rgba(248, 250, 252, 0.3);
+                font-weight: 700;
+                font-size: 0.88rem;
+                color: var(--text-main, #1e293b);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+              }
+              .sf-panel-body {
+                padding: 0;
+              }
+              .sf-table {
+                width: 100%;
+                margin-bottom: 0;
+                vertical-align: middle;
+              }
+              .sf-table th {
+                font-size: 0.7rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: #64748b;
+                background: #f8fafc;
+                padding: 0.7rem 1.15rem;
+                border-bottom: 1px solid #e2e8f0;
+              }
+              .sf-table td {
+                padding: 0.8rem 1.15rem;
+                border-bottom: 1px solid #f1f5f9;
+                font-size: 0.83rem;
+              }
+              .sf-table tr:last-child td {
+                border-bottom: none;
+              }
+              
+              /* Badges */
+              .sf-badge {
+                font-size: 0.68rem;
+                font-weight: 700;
+                padding: 0.15rem 0.55rem;
+                border-radius: 2rem;
+                display: inline-flex;
+                align-items: center;
+              }
+              .sf-badge--pending { background: #fff7ed; color: #ea580c; }
+              .sf-badge--completed { background: #f0fdf4; color: #16a34a; }
+              .sf-badge--cancelled { background: #fff1f2; color: #e11d48; }
+            </style>
+
+            <!-- 1. Welcome Banner -->
+            <div class="sf-welcome">
+              <h1>Xin chào, Nhân viên Vận hành! 👔</h1>
+              <p>Chào mừng bạn quay lại bảng điều khiển điều phối trực tiếp cơ sở sân. Dưới đây là lịch trình thi đấu và trạng thái dịch vụ hôm nay.</p>
+            </div>
+
+            <!-- 2. STAFF Metrics cards (6 Cards) -->
+            <div class="row g-3 mb-4">
+              <!-- Booking hôm nay -->
+              <div class="col-6 col-md-4 col-xl-2">
+                <div class="sf-card-stat">
+                  <div class="sf-stat-icon sf-ic-today">🎯</div>
+                  <div>
+                    <div class="sf-stat-label">Booking hôm nay</div>
+                    <div class="sf-stat-value">{{ staff_booking_today }}</div>
+                  </div>
+                </div>
+              </div>
+              <!-- Khách đang chơi -->
+              <div class="col-6 col-md-4 col-xl-2">
+                <div class="sf-card-stat">
+                  <div class="sf-stat-icon sf-ic-playing">⚽</div>
+                  <div>
+                    <div class="sf-stat-label">Khách đang chơi</div>
+                    <div class="sf-stat-value">{{ staff_playing_now }}</div>
+                  </div>
+                </div>
+              </div>
+              <!-- Sân đang sử dụng -->
+              <div class="col-6 col-md-4 col-xl-2">
+                <div class="sf-card-stat">
+                  <div class="sf-stat-icon sf-ic-inuse">🏟️</div>
+                  <div>
+                    <div class="sf-stat-label">Sân đang sử dụng</div>
+                    <div class="sf-stat-value">{{ staff_fields_in_use }}</div>
+                  </div>
+                </div>
+              </div>
+              <!-- Sân sắp bắt đầu -->
+              <div class="col-6 col-md-4 col-xl-2">
+                <div class="sf-card-stat">
+                  <div class="sf-stat-icon sf-ic-starting">5🔔</div>
+                  <div>
+                    <div class="sf-stat-label">Sân sắp bắt đầu</div>
+                    <div class="sf-stat-value">{{ staff_fields_starting }}</div>
+                  </div>
+                </div>
+              </div>
+              <!-- Sân sắp kết thúc -->
+              <div class="col-6 col-md-4 col-xl-2">
+                <div class="sf-card-stat">
+                  <div class="sf-stat-icon sf-ic-ending">📯</div>
+                  <div>
+                    <div class="sf-stat-label">Sân sắp kết thúc</div>
+                    <div class="sf-stat-value">{{ staff_fields_ending }}</div>
+                  </div>
+                </div>
+              </div>
+              <!-- Dịch vụ bán hôm nay -->
+              <div class="col-6 col-md-4 col-xl-2">
+                <div class="sf-card-stat">
+                  <div class="sf-stat-icon sf-ic-services">🥤</div>
+                  <div>
+                    <div class="sf-stat-label">Dịch vụ bán hôm nay</div>
+                    <div class="sf-stat-value" style="font-size: 0.95rem;">{{ staff_services_sold }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. STAFF Timeline Chart -->
+            <div class="card border-0 shadow-sm mb-4" style="border-radius: 0.875rem;">
+              <div class="card-header bg-transparent border-0 pt-3 px-3">
+                <h6 class="mb-0 fw-bold">📉 Tần suất Booking đặt sân theo giờ trong ngày hôm nay</h6>
+              </div>
+              <div class="card-body p-3">
+                <canvas id="sfTimelineChart" height="90"></canvas>
+              </div>
+            </div>
+
+            <!-- 4. STAFF Tables Grid (4 Tables) -->
+            <div class="row g-3">
+              <!-- Danh sách Booking hôm nay -->
+              <div class="col-12 col-lg-6">
+                <div class="sf-panel-card">
+                  <div class="sf-panel-hdr">
+                    <span>📅 Danh sách Booking đặt sân ngày hôm nay</span>
+                    <span class="badge bg-teal rounded-pill">{{ staff_today_bookings|length }} lượt</span>
+                  </div>
+                  <div class="sf-panel-body table-responsive">
+                    <table class="sf-table table">
+                      <thead>
+                        <tr>
+                          <th>Giờ bắt đầu</th>
+                          <th>Sân con</th>
+                          <th>Khách hàng</th>
+                          <th>Trạng thái</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for bk in staff_today_bookings %}
+                        <tr>
+                          <td><strong>{{ bk.slots.first.start_time|time:"H:i" }} - {{ bk.slots.first.end_time|time:"H:i" }}</strong></td>
+                          <td><strong>{{ bk.field.name }}</strong></td>
+                          <td>{{ bk.booking_package.user.first_name }} {{ bk.booking_package.user.last_name }}</td>
+                          <td>
+                            <span class="sf-badge {% if bk.status == 'COMPLETED' or bk.status == 'PAID' %}sf-badge--completed{% else %}sf-badge--pending{% endif %}">
+                              {{ bk.get_status_display }}
+                            </span>
+                          </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                          <td colspan="4" class="text-center text-muted py-4">Hôm nay chưa phát sinh lượt đặt sân nào.</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Khách đang sử dụng sân -->
+              <div class="col-12 col-lg-6">
+                <div class="sf-panel-card">
+                  <div class="sf-panel-hdr">
+                    <span>⚽ Khách hàng đang chơi trực tiếp tại sân</span>
+                    <span class="badge bg-success rounded-pill">{{ staff_active_slots_list|length }} sân</span>
+                  </div>
+                  <div class="sf-panel-body table-responsive">
+                    <table class="sf-table table">
+                      <thead>
+                        <tr>
+                          <th>Khách hàng</th>
+                          <th>Sân con đang thuê</th>
+                          <th>Giờ thuê bắt đầu</th>
+                          <th>Giờ thuê kết thúc</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for active in staff_active_slots_list %}
+                        <tr>
+                          <td><strong>{{ active.booking.booking_package.user.first_name }} {{ active.booking.booking_package.user.last_name }}</strong></td>
+                          <td><strong>{{ active.booking.field.name }}</strong></td>
+                          <td>{{ active.start_time|time:"H:i" }}</td>
+                          <td><span class="badge bg-warning text-dark">{{ active.end_time|time:"H:i" }}</span></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                          <td colspan="4" class="text-center text-muted py-4">Hiện không có khách nào đang chơi tại sân.</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Booking sắp tới -->
+              <div class="col-12 col-lg-6">
+                <div class="sf-panel-card">
+                  <div class="sf-panel-hdr">
+                    <span>🔔 Danh sách Booking chuẩn bị diễn ra</span>
+                  </div>
+                  <div class="sf-panel-body table-responsive">
+                    <table class="sf-table table">
+                      <thead>
+                        <tr>
+                          <th>Thời gian đặt</th>
+                          <th>Sân con</th>
+                          <th>Khách hàng</th>
+                          <th>Thông tin liên hệ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for bk in staff_upcoming_bookings %}
+                        <tr>
+                          <td>
+                            <strong>{{ bk.booking_date|date:"d/m/Y" }}</strong><br>
+                            <small class="text-muted">{{ bk.slots.first.start_time|time:"H:i" }} - {{ bk.slots.first.end_time|time:"H:i" }}</small>
+                          </td>
+                          <td><strong>{{ bk.field.name }}</strong></td>
+                          <td>{{ bk.booking_package.user.first_name }} {{ bk.booking_package.user.last_name }}</td>
+                          <td><small class="text-muted">{{ bk.booking_package.user.phone|default:"Chưa cung cấp" }}</small></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                          <td colspan="4" class="text-center text-muted py-4">Không có lịch đặt sân sắp tới.</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Đơn dịch vụ gần đây -->
+              <div class="col-12 col-lg-6">
+                <div class="sf-panel-card">
+                  <div class="sf-panel-hdr">
+                    <span>🥤 Hóa đơn dịch vụ / Sản phẩm phụ trợ gần nhất</span>
+                  </div>
+                  <div class="sf-panel-body table-responsive">
+                    <table class="sf-table table">
+                      <thead>
+                        <tr>
+                          <th>Khách hàng</th>
+                          <th>Tên sản phẩm</th>
+                          <th>Số lượng</th>
+                          <th>Thời gian mua</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for order in staff_recent_services %}
+                        <tr>
+                          <td><strong>{{ order.booking.booking_package.user.first_name }} {{ order.booking.booking_package.user.last_name }}</strong></td>
+                          <td>{{ order.service_item.name }}</td>
+                          <td><strong>x{{ order.quantity }}</strong></td>
+                          <td><small class="text-muted">{{ order.created_at|date:"H:i d/m/Y" }}</small></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                          <td colspan="4" class="text-center text-muted py-4">Chưa có đơn hàng dịch vụ nào được bán ra.</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ChartJS script for STAFF -->
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <script>
+              document.addEventListener("DOMContentLoaded", function () {
+                window.gsportsCharts = window.gsportsCharts || [];
+
+                // ── Adaptive colors based on active theme ──
+                const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+                let gridC  = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
+                let tickC  = isDark ? '#94a3b8' : '#64748b';
+                let tipBg  = isDark ? '#1e293b' : '#ffffff';
+                let tipTxt = isDark ? '#f8fafc'  : '#0f172a';
+
+                Chart.defaults.color = tickC;
+                Chart.defaults.borderColor = gridC;
+
+                const sharedTooltip = {
+                  backgroundColor: tipBg, titleColor: tipTxt, bodyColor: tickC,
+                  borderColor: gridC, borderWidth: 1, cornerRadius: 8, padding: 10
+                };
+
+                const sfCtx = document.getElementById('sfTimelineChart');
+                if (sfCtx) {
+                  const chart1 = new Chart(sfCtx, {
+                    type: 'line',
+                    data: {
+                      labels: {{ staff_chart_hours|safe }},
+                      datasets: [{
+                        label: 'Lượt Booking hôm nay',
+                        data: {{ staff_chart_hour_counts|safe }},
+                        borderColor: '#0f766e',
+                        backgroundColor: 'rgba(15, 118, 110, 0.05)',
+                        borderWidth: 2.5,
+                        tension: 0.3,
+                        fill: true
+                      }]
+                    },
+                    options: {
+                      responsive: true,
+                      maintainAspectRatio: true,
+                      aspectRatio: 3.0,
+                      plugins: {
+                        legend: { display: false },
+                        tooltip: sharedTooltip
+                      },
+                      scales: {
+                        x: { grid: { color: gridC }, ticks: { color: tickC } },
+                        y: { beginAtZero: true, grid: { color: gridC }, ticks: { color: tickC, stepSize: 1 } }
+                      }
+                    }
+                  });
+                  window.gsportsCharts.push(chart1);
+                }
+              });
+            </script>
+            {% else %}
+            <!-- ==========================================
+                 CUSTOMER DASHBOARD (Bootstrap 5 Premium)
+                 ========================================== -->
+            <!-- CUSTOMER Dashboard styles use GSports CSS variables (no external CSS needed) -->
+            
+            <style>
+              /* Scoped styles to prevent clashing with layout */
+              .cs-welcome {
+                background: linear-gradient(135deg, #4f46e5 0%, #6366f1 50%, #818cf8 100%);
+                border-radius: 1rem;
+                padding: 1.75rem 2.25rem;
+                color: #fff;
+                margin-bottom: 2rem;
+                position: relative;
+                overflow: hidden;
+              }
+              .cs-welcome::after {
+                content: '';
+                position: absolute;
+                right: -40px;
+                top: -40px;
+                width: 180px;
+                height: 180px;
+                border-radius: 50%;
+                background: rgba(255, 255, 255, 0.08);
+              }
+              .cs-welcome h1 { font-size: 1.55rem; font-weight: 800; margin-bottom: 0.5rem; }
+              .cs-welcome p { opacity: 0.9; margin-bottom: 0; font-size: 0.95rem; }
+              
+              /* Metrics card grid */
+              .cs-card-stat {
+                background: var(--card-bg, #fff);
+                border: 1px solid var(--border-color, #e2e8f0);
+                border-radius: 0.875rem;
+                padding: 1.15rem 1.35rem;
+                transition: transform 0.2s, box-shadow 0.2s;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+              }
+              .cs-card-stat:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+              }
+              .cs-stat-icon {
+                width: 44px;
+                height: 44px;
+                border-radius: 0.75rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.25rem;
+                flex-shrink: 0;
+              }
+              .cs-ic-upcoming { background: #eff6ff; color: #2563eb; }
+              .cs-ic-complete { background: #f0fdf4; color: #16a34a; }
+              .cs-ic-hours    { background: #faf5ff; color: #7c3aed; }
+              .cs-ic-points   { background: #fff7ed; color: #ea580c; }
+              .cs-ic-wallet   { background: #ecfeff; color: #0891b2; }
+              .cs-ic-voucher  { background: #fdf2f8; color: #db2777; }
+
+              .cs-stat-label {
+                font-size: 0.72rem;
+                font-weight: 700;
+                color: var(--text-muted, #64748b);
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                margin-bottom: 0.15rem;
+              }
+              .cs-stat-value {
+                font-size: 1.25rem;
+                font-weight: 800;
+                color: var(--text-main, #1e293b);
+                line-height: 1.2;
+              }
+
+              /* Action panels */
+              .cs-panel-card {
+                background: var(--card-bg, #fff);
+                border: 1px solid var(--border-color, #e2e8f0);
+                border-radius: 0.875rem;
+                overflow: hidden;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+                margin-bottom: 1.5rem;
+              }
+              .cs-panel-hdr {
+                padding: 0.95rem 1.15rem;
+                border-bottom: 1px solid var(--border-color, #e2e8f0);
+                background: rgba(248, 250, 252, 0.3);
+                font-weight: 700;
+                font-size: 0.88rem;
+                color: var(--text-main, #1e293b);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+              }
+              .cs-panel-body {
+                padding: 0;
+              }
+              .cs-table {
+                width: 100%;
+                margin-bottom: 0;
+                vertical-align: middle;
+              }
+              .cs-table th {
+                font-size: 0.7rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: #64748b;
+                background: #f8fafc;
+                padding: 0.7rem 1.15rem;
+                border-bottom: 1px solid #e2e8f0;
+              }
+              .cs-table td {
+                padding: 0.8rem 1.15rem;
+                border-bottom: 1px solid #f1f5f9;
+                font-size: 0.83rem;
+              }
+              .cs-table tr:last-child td {
+                border-bottom: none;
+              }
+              
+              /* Badges */
+              .cs-badge {
+                font-size: 0.68rem;
+                font-weight: 700;
+                padding: 0.15rem 0.55rem;
+                border-radius: 2rem;
+                display: inline-flex;
+                align-items: center;
+              }
+              .cs-badge--pending { background: #fff7ed; color: #ea580c; }
+              .cs-badge--completed { background: #f0fdf4; color: #16a34a; }
+              .cs-badge--cancelled { background: #fff1f2; color: #e11d48; }
+
+              /* Wallet transactional indicators */
+              .cs-tx-credit { color: #16a34a; font-weight: 700; }
+              .cs-tx-debit { color: #dc2626; font-weight: 700; }
+
+              /* Star icons */
+              .cs-stars { color: #f59e0b; font-size: 0.85rem; }
+
+              /* Vouchers listing */
+              .cs-voucher-card {
+                border: 1px dashed #cbd5e1;
+                border-radius: 0.5rem;
+                padding: 0.75rem 1rem;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                background: #f8fafc;
+                margin-bottom: 0.50rem;
+              }
+              .cs-voucher-code {
+                font-weight: 800;
+                font-family: monospace;
+                color: #4f46e5;
+                font-size: 0.95rem;
+                background: #e0e7ff;
+                padding: 0.2rem 0.5rem;
+                border-radius: 0.25rem;
+              }
+            </style>
+
+            <!-- 1. Welcome Banner -->
+            <div class="cs-welcome">
+              <h1>Xin chào, {% if user.first_name or user.last_name %}{{ user.first_name }} {{ user.last_name }}{% else %}{{ user.username }}{% endif %}! 👋</h1>
+              <p>Chào mừng bạn quay lại màn hình cá nhân GSports. Dưới đây là thống kê lịch sử vận động của bạn.</p>
+            </div>
+
+            <!-- 2. CUSTOMER Metrics cards (6 Cards) -->
+            <div class="row g-3 mb-4">
+              <!-- Booking sắp tới -->
+              <div class="col-6 col-md-4 col-xl-2">
+                <div class="cs-card-stat">
+                  <div class="cs-stat-icon cs-ic-upcoming">🔔</div>
+                  <div>
+                    <div class="cs-stat-label">Booking sắp tới</div>
+                    <div class="cs-stat-value">{{ cust_upcoming_count }}</div>
+                  </div>
+                </div>
+              </div>
+              <!-- Booking đã hoàn thành -->
+              <div class="col-6 col-md-4 col-xl-2">
+                <div class="cs-card-stat">
+                  <div class="cs-stat-icon cs-ic-complete">✅</div>
+                  <div>
+                    <div class="cs-stat-label">Đã hoàn thành</div>
+                    <div class="cs-stat-value">{{ cust_completed_count }}</div>
+                  </div>
+                </div>
+              </div>
+              <!-- Tổng giờ chơi trong tháng -->
+              <div class="col-6 col-md-4 col-xl-2">
+                <div class="cs-card-stat">
+                  <div class="cs-stat-icon cs-ic-hours">⏱️</div>
+                  <div>
+                    <div class="cs-stat-label">Giờ chơi tháng này</div>
+                    <div class="cs-stat-value">{{ cust_hours_month }}h</div>
+                  </div>
+                </div>
+              </div>
+              <!-- Điểm tích lũy -->
+              <div class="col-6 col-md-4 col-xl-2">
+                <div class="cs-card-stat">
+                  <div class="cs-stat-icon cs-ic-points">🎁</div>
+                  <div>
+                    <div class="cs-stat-label">Điểm tích lũy</div>
+                    <div class="cs-stat-value">{{ cust_loyalty_points }}</div>
+                  </div>
+                </div>
+              </div>
+              <!-- Số dư ví -->
+              <div class="col-6 col-md-4 col-xl-2">
+                <div class="cs-card-stat">
+                  <div class="cs-stat-icon cs-ic-wallet">💳</div>
+                  <div>
+                    <div class="cs-stat-label">Số dư ví</div>
+                    <div class="cs-stat-value" style="font-size: 1.15rem;">{{ cust_wallet_balance|floatformat:0 }}đ</div>
+                  </div>
+                </div>
+              </div>
+              <!-- Voucher hiện có -->
+              <div class="col-6 col-md-4 col-xl-2">
+                <div class="cs-card-stat">
+                  <div class="cs-stat-icon cs-ic-voucher">🎟️</div>
+                  <div>
+                    <div class="cs-stat-label">Voucher khả dụng</div>
+                    <div class="cs-stat-value">{{ cust_voucher_count }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. CUSTOMER Charts & Vouchers Layout -->
+            <div class="row g-3 mb-4">
+              <!-- Biểu đồ số giờ chơi theo tháng -->
+              <div class="col-12 col-xl-8">
+                <div class="card border-0 shadow-sm" style="border-radius: 0.875rem; height: 100%;">
+                  <div class="card-header bg-transparent border-0 pt-3 px-3">
+                    <h6 class="mb-0 fw-bold">📉 Biểu đồ phân tích tổng số giờ thuê sân theo tháng</h6>
+                  </div>
+                  <div class="card-body p-3">
+                    <canvas id="csHoursChart" height="110"></canvas>
+                  </div>
+                </div>
+              </div>
+              <!-- Voucher khả dụng -->
+              <div class="col-12 col-xl-4">
+                <div class="card border-0 shadow-sm" style="border-radius: 0.875rem; height: 100%;">
+                  <div class="card-header bg-transparent border-0 pt-3 px-3">
+                    <h6 class="mb-0 fw-bold">🎟️ Voucher khuyến mãi hệ thống</h6>
+                  </div>
+                  <div class="card-body p-3 d-flex flex-column justify-content-start">
+                    {% for promo in cust_vouchers %}
+                    <div class="cs-voucher-card">
+                      <div>
+                        <span class="cs-voucher-code">{{ promo.code }}</span>
+                        <div class="mt-1" style="font-size: 0.75rem; color: #64748b;">
+                          Giảm {{ promo.discount_value|floatformat:0 }}{% if promo.discount_type == 'PERCENTAGE' %}%{% else %}đ{% endif %}
+                        </div>
+                      </div>
+                      <button class="btn btn-sm btn-outline-primary" style="font-size: 0.72rem; padding: 0.25rem 0.50rem;" onclick="navigator.clipboard.writeText('{{ promo.code }}'); alert('Đã copy mã: {{ promo.code }}')">Copy</button>
+                    </div>
+                    {% empty %}
+                    <div class="text-center text-muted py-4">Hiện tại không có mã khuyến mãi khả dụng nào.</div>
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4. CUSTOMER Tables Grid -->
+            <div class="row g-3">
+              <!-- Lịch sử đặt sân -->
+              <div class="col-12 col-lg-6">
+                <div class="cs-panel-card">
+                  <div class="cs-panel-hdr">
+                    <span>📅 Lịch sử đặt sân gần đây</span>
+                  </div>
+                  <div class="cs-panel-body table-responsive">
+                    <table class="cs-table table">
+                      <thead>
+                        <tr>
+                          <th>Sân con / Cơ sở</th>
+                          <th>Ngày đặt</th>
+                          <th>Giờ thuê</th>
+                          <th>Giá trị</th>
+                          <th>Trạng thái</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for bk in cust_bookings_history %}
+                        <tr>
+                          <td>
+                            <strong>{{ bk.field.name }}</strong><br>
+                            <small class="text-muted">{{ bk.field.venue.name }}</small>
+                          </td>
+                          <td>{{ bk.booking_date|date:"d/m/Y" }}</td>
+                          <td>{{ bk.slots.first.start_time|time:"H:i" }} - {{ bk.slots.first.end_time|time:"H:i" }}</td>
+                          <td><strong>{{ bk.total_amount|floatformat:0 }}đ</strong></td>
+                          <td>
+                            <span class="cs-badge {% if bk.status == 'COMPLETED' or bk.status == 'PAID' %}cs-badge--completed{% elif bk.status == 'CANCELLED' %}cs-badge--cancelled{% else %}cs-badge--pending{% endif %}">
+                              {{ bk.get_status_display }}
+                            </span>
+                          </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                          <td colspan="5" class="text-center text-muted py-4">Bạn chưa thực hiện lượt đặt sân nào.</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Lịch sử giao dịch ví -->
+              <div class="col-12 col-lg-6">
+                <div class="cs-panel-card">
+                  <div class="cs-panel-hdr">
+                    <span>💳 Lịch sử giao dịch ví điện tử</span>
+                  </div>
+                  <div class="cs-panel-body table-responsive">
+                    <table class="cs-table table">
+                      <thead>
+                        <tr>
+                          <th>Loại giao dịch</th>
+                          <th>Số tiền</th>
+                          <th>Hình thức</th>
+                          <th>Thời gian</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for tx in cust_transactions_history %}
+                        <tr>
+                          <td>
+                            <strong>{{ tx.get_transaction_type_display }}</strong><br>
+                            <small class="text-muted">{{ tx.description|default:"Giao dịch hệ thống" }}</small>
+                          </td>
+                          <td>
+                            <span class="{% if tx.transaction_type == 'CREDIT' %}cs-tx-credit{% else %}cs-tx-debit{% endif %}">
+                              {% if tx.transaction_type == 'CREDIT' %}+{% else %}-{% endif %}{{ tx.final_amount|floatformat:0 }}đ
+                            </span>
+                          </td>
+                          <td>{{ tx.get_reference_type_display }}</td>
+                          <td><small class="text-muted">{{ tx.created_at|date:"d/m/Y H:i" }}</small></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                          <td colspan="4" class="text-center text-muted py-4">Chưa có giao dịch phát sinh nào.</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Sân yêu thích -->
+              <div class="col-12 col-lg-6">
+                <div class="cs-panel-card" style="height: 100%;">
+                  <div class="cs-panel-hdr">
+                    <span>❤️ Cơ sở sân thể thao yêu thích</span>
+                  </div>
+                  <div class="cs-panel-body p-3">
+                    <div class="row g-2">
+                      {% for fav in cust_favorite_venues %}
+                      <div class="col-12 col-sm-6">
+                        <div class="card p-2 border shadow-none" style="border-radius: 0.5rem; background: #fafafa;">
+                          <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                              <strong style="font-size: 0.85rem;"><a href="{% url 'venues:venue_detail' fav.venue.id %}" class="text-decoration-none text-dark">{{ fav.venue.name }}</a></strong>
+                              <div style="font-size: 0.72rem; color: #64748b;" class="text-truncate">{{ fav.venue.address }}</div>
+                            </div>
+                            <span class="cs-stars">★ {{ fav.venue.rating_avg }}</span>
+                          </div>
+                        </div>
+                      </div>
+                      {% empty %}
+                      <div class="col-12 text-center text-muted py-4">Bạn chưa lưu cơ sở yêu thích nào.</div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Đánh giá đã gửi -->
+              <div class="col-12 col-lg-6">
+                <div class="cs-panel-card">
+                  <div class="cs-panel-hdr">
+                    <span>💬 Đánh giá nhận xét của bạn đã gửi</span>
+                  </div>
+                  <div class="cs-panel-body table-responsive">
+                    <table class="cs-table table">
+                      <thead>
+                        <tr>
+                          <th>Cơ sở</th>
+                          <th>Điểm chấm</th>
+                          <th>Ý kiến phản hồi</th>
+                          <th>Thời gian</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for rev in cust_reviews %}
+                        <tr>
+                          <td><strong>{{ rev.venue.name }}</strong></td>
+                          <td>
+                            <span class="cs-stars">
+                              {% if rev.rating >= 1 %}★{% else %}☆{% endif %}{% if rev.rating >= 2 %}★{% else %}☆{% endif %}{% if rev.rating >= 3 %}★{% else %}☆{% endif %}{% if rev.rating >= 4 %}★{% else %}☆{% endif %}{% if rev.rating >= 5 %}★{% else %}☆{% endif %}
+                            </span>
+                          </td>
+                          <td><span class="text-wrap">{{ rev.comment|default:"Không có nội dung nhận xét." }}</span></td>
+                          <td><small class="text-muted">{{ rev.created_at|date:"d/m/Y" }}</small></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                          <td colspan="4" class="text-center text-muted py-4">Bạn chưa gửi đánh giá nào cho các cơ sở.</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ChartJS script for CUSTOMER -->
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <script>
+              document.addEventListener("DOMContentLoaded", function () {
+                window.gsportsCharts = window.gsportsCharts || [];
+
+                // ── Adaptive colors based on active theme ──
+                const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+                let gridC  = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
+                let tickC  = isDark ? '#94a3b8' : '#64748b';
+                let tipBg  = isDark ? '#1e293b' : '#ffffff';
+                let tipTxt = isDark ? '#f8fafc'  : '#0f172a';
+
+                Chart.defaults.color = tickC;
+                Chart.defaults.borderColor = gridC;
+
+                const sharedTooltip = {
+                  backgroundColor: tipBg, titleColor: tipTxt, bodyColor: tickC,
+                  borderColor: gridC, borderWidth: 1, cornerRadius: 8, padding: 10
+                };
+
+                const csCtx = document.getElementById('csHoursChart');
+                if (csCtx) {
+                  const chart1 = new Chart(csCtx, {
+                    type: 'line',
+                    data: {
+                      labels: {{ cust_chart_labels|safe }},
+                      datasets: [{
+                        label: 'Số giờ chơi thực tế',
+                        data: {{ cust_chart_hours|safe }},
+                        borderColor: '#4f46e5',
+                        backgroundColor: 'rgba(79, 70, 229, 0.05)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true
+                      }]
+                    },
+                    options: {
+                      responsive: true,
+                      maintainAspectRatio: true,
+                      aspectRatio: 2.8,
+                      plugins: {
+                        legend: { display: false },
+                        tooltip: sharedTooltip
+                      },
+                      scales: {
+                        x: { grid: { color: gridC }, ticks: { color: tickC } },
+                        y: { beginAtZero: true, grid: { color: gridC }, ticks: { color: tickC },
+                          title: { display: true, text: 'Số giờ chơi', color: tickC } }
+                      }
+                    }
+                  });
+                  window.gsportsCharts.push(chart1);
+                }
+              });
+            </script>
+            {% endif %}
             {% endblock %}
         </div>
     </main>
@@ -333,14 +2426,17 @@ document.addEventListener('DOMContentLoaded', function () {
     function applyMode(mode) {
         currentMode = mode;
         localStorage.setItem('gsports-theme', mode);
-        if (mode === 'dark') {
-            html.setAttribute('data-theme', 'dark');
-        } else if (mode === 'light') {
-            html.setAttribute('data-theme', 'light');
-        } else {
-            html.setAttribute('data-theme', window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        let activeTheme = mode;
+        if (mode === 'system') {
+            activeTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         }
+        html.setAttribute('data-theme', activeTheme);
         updateUI();
+        
+        // Dispatch event for active charts update
+        window.dispatchEvent(new CustomEvent('gsports-theme-changed', {
+            detail: { theme: activeTheme }
+        }));
     }
 
     function applyAccent(accent) {

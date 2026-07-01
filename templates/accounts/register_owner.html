@@ -70,13 +70,29 @@
 
                 <div class="form-row">
                     <div class="form-group {% if form.password.errors %}form-group--error{% endif %}">
-                        <label for="{{ form.password.id_for_label }}" class="form-label">{{ form.password.label }}</label>
-                        {{ form.password }}
+                        <label for="{{ form.password.id_for_label }}">{{ form.password.label }}</label>
+                        <div class="password-wrapper">
+                            {{ form.password }}
+                            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility(this)" aria-label="Hiển thị mật khẩu">
+                                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                            </button>
+                        </div>
                         {% if form.password.errors %}<div class="form-error">{% for e in form.password.errors %}{{ e }}{% endfor %}</div>{% endif %}
                     </div>
                     <div class="form-group {% if form.password_confirm.errors %}form-group--error{% endif %}">
-                        <label for="{{ form.password_confirm.id_for_label }}" class="form-label">{{ form.password_confirm.label }}</label>
-                        {{ form.password_confirm }}
+                        <label for="{{ form.password_confirm.id_for_label }}">{{ form.password_confirm.label }}</label>
+                        <div class="password-wrapper">
+                            {{ form.password_confirm }}
+                            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility(this)" aria-label="Hiển thị mật khẩu">
+                                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                            </button>
+                        </div>
                         {% if form.password_confirm.errors %}<div class="form-error">{% for e in form.password_confirm.errors %}{{ e }}{% endfor %}</div>{% endif %}
                     </div>
                 </div>
