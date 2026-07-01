@@ -13,24 +13,24 @@
     'use strict';
 
     // ─── DOM References ─────────────────────────────────────────
-    const bubble       = document.getElementById('chat-bubble');
-    const badge        = document.getElementById('chat-badge');
-    const panel        = document.getElementById('chat-panel');
-    const backBtn      = document.getElementById('chat-back-btn');
-    const closeBtn     = document.getElementById('chat-close-btn');
-    const headerTitle  = document.getElementById('chat-header-title');
-    const roomList     = document.getElementById('chat-room-list');
+    const bubble = document.getElementById('chat-bubble');
+    const badge = document.getElementById('chat-badge');
+    const panel = document.getElementById('chat-panel');
+    const backBtn = document.getElementById('chat-back-btn');
+    const closeBtn = document.getElementById('chat-close-btn');
+    const headerTitle = document.getElementById('chat-header-title');
+    const roomList = document.getElementById('chat-room-list');
     const roomListContent = document.getElementById('chat-room-list-content');
     const roomListEmpty = document.getElementById('chat-room-list-empty');
-    const roomView     = document.getElementById('chat-room-view');
-    const messagesEl   = document.getElementById('chat-messages');
-    const inputText    = document.getElementById('chat-input-text');
-    const sendBtn      = document.getElementById('chat-send-btn');
+    const roomView = document.getElementById('chat-room-view');
+    const messagesEl = document.getElementById('chat-messages');
+    const inputText = document.getElementById('chat-input-text');
+    const sendBtn = document.getElementById('chat-send-btn');
 
     // ─── State ──────────────────────────────────────────────────
     const userId = window.CHAT_USER_ID;
-    let chatSocket     = null;
-    let currentRoomId  = null;
+    let chatSocket = null;
+    let currentRoomId = null;
     let reconnectTimer = null;
     let reconnectDelay = 1000;
 
@@ -41,18 +41,40 @@
     }
 
     // ─── Toggle Panel ───────────────────────────────────────────
+    var roomListPollTimer = null;
+
+    function startRoomListPolling() {
+        stopRoomListPolling();
+        roomListPollTimer = setInterval(function () {
+            // Chỉ poll khi panel đang mở VÀ đang ở màn danh sách (không ở trong room)
+            if (!panel.classList.contains('chat-panel--hidden') && !currentRoomId) {
+                loadRoomList();
+            }
+        }, 1000);
+    }
+
+    function stopRoomListPolling() {
+        if (roomListPollTimer) {
+            clearInterval(roomListPollTimer);
+            roomListPollTimer = null;
+        }
+    }
+
     function togglePanel() {
         const isHidden = panel.classList.contains('chat-panel--hidden');
         if (isHidden) {
             panel.classList.remove('chat-panel--hidden');
             loadRoomList();
+            startRoomListPolling();
         } else {
             panel.classList.add('chat-panel--hidden');
+            stopRoomListPolling();
         }
     }
 
     function closePanel() {
         panel.classList.add('chat-panel--hidden');
+        stopRoomListPolling();
         if (chatSocket) {
             chatSocket.close();
             chatSocket = null;
@@ -73,9 +95,11 @@
         }
         currentRoomId = null;
         loadRoomList();
+        startRoomListPolling();
     }
 
     function showRoomView(roomId, roomName) {
+        stopRoomListPolling();
         roomList.style.display = 'none';
         roomView.style.display = '';
         backBtn.style.display = '';
@@ -92,13 +116,13 @@
         fetch('/api/chat/rooms/', {
             credentials: 'same-origin',
         })
-        .then(function (res) { return res.json(); })
-        .then(function (data) {
-            renderRoomList(data.rooms || []);
-        })
-        .catch(function (err) {
-            console.error('[Chat] Load rooms error:', err);
-        });
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                renderRoomList(data.rooms || []);
+            })
+            .catch(function (err) {
+                console.error('[Chat] Load rooms error:', err);
+            });
     }
 
     function renderRoomList(rooms) {
@@ -109,6 +133,33 @@
             return;
         }
         roomListEmpty.style.display = 'none';
+
+        // Helper check phòng cần reply
+        function checkNeedsReply(room) {
+            if (!room.last_message) return false;
+            var lastSenderId = room.last_message.sender_id;
+            var isStaffView = (room.customer_id !== userId);
+            if (isStaffView) {
+                return (lastSenderId === room.customer_id);
+            } else {
+                return (lastSenderId !== room.customer_id);
+            }
+        }
+
+        // Sắp xếp: 1. Thời gian mới nhất (last_message_id) xếp lên trước, 2. Cần phản hồi (đỏ) xếp lên trước
+        rooms.sort(function (a, b) {
+            var aMsgId = a.last_message_id || 0;
+            var bMsgId = b.last_message_id || 0;
+            if (aMsgId !== bMsgId) {
+                return bMsgId - aMsgId; // id lớn hơn (mới hơn) lên trước
+            }
+            var aNeeds = checkNeedsReply(a);
+            var bNeeds = checkNeedsReply(b);
+            if (aNeeds !== bNeeds) {
+                return aNeeds ? -1 : 1; // true lên trước
+            }
+            return b.id - a.id; // dự phòng theo room id
+        });
 
         rooms.forEach(function (room) {
             var displayName = room.venue_name;
@@ -125,15 +176,18 @@
                 ? room.last_message.created_at
                 : '';
 
+            var needsReply = checkNeedsReply(room);
+
             var item = document.createElement('div');
-            item.className = 'chat-room-item';
+            item.className = 'chat-room-item' + (needsReply ? ' chat-room-item--needs-reply' : '');
             item.setAttribute('data-room-id', room.id);
             item.innerHTML =
                 '<div class="chat-room-item__avatar">' + initial + '</div>' +
                 '<div class="chat-room-item__info">' +
-                    '<div class="chat-room-item__name">' + escapeHtml(displayName) + '</div>' +
-                    '<div class="chat-room-item__preview">' + escapeHtml(preview) + '</div>' +
+                '<div class="chat-room-item__name">' + escapeHtml(displayName) + '</div>' +
+                '<div class="chat-room-item__preview">' + escapeHtml(preview) + '</div>' +
                 '</div>' +
+                (needsReply ? '<span class="chat-room-item__dot"></span>' : '') +
                 (time ? '<span class="chat-room-item__time">' + escapeHtml(time) + '</span>' : '');
 
             item.addEventListener('click', function () {
@@ -149,14 +203,14 @@
         fetch('/api/chat/rooms/' + roomId + '/messages/', {
             credentials: 'same-origin',
         })
-        .then(function (res) { return res.json(); })
-        .then(function (data) {
-            renderMessages(data.messages || []);
-            scrollToBottom();
-        })
-        .catch(function (err) {
-            console.error('[Chat] Load messages error:', err);
-        });
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                renderMessages(data.messages || []);
+                scrollToBottom();
+            })
+            .catch(function (err) {
+                console.error('[Chat] Load messages error:', err);
+            });
     }
 
     function renderMessages(messages) {
@@ -277,5 +331,34 @@
     });
 
     inputText.addEventListener('input', autoResize);
+
+    // ─── Global Trigger for specific Venue chat ──────────────────
+    window.openChatWithVenue = function (venueId, venueName) {
+        if (!userId) {
+            window.location.href = '/accounts/login/';
+            return;
+        }
+
+        // 1. Show the global panel
+        panel.classList.remove('chat-panel--hidden');
+
+        // 2. Call API to get/create room
+        fetch('/api/chat/rooms/create/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({ venue_id: parseInt(venueId) })
+        })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                // 3. Show room details view
+                showRoomView(data.id, venueName);
+            })
+            .catch(function (err) {
+                console.error('[Chat] openChatWithVenue error:', err);
+            });
+    };
 
 })();

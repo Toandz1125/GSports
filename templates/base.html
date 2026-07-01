@@ -71,9 +71,9 @@
 
     {% comment %} Chat Widget — chỉ hiện khi đã đăng nhập, đặt ngoài block body {% endcomment %}
     {% if user.is_authenticated %}
-        <link rel="stylesheet" href="{% static 'css/chat_widget.css' %}">
+        <link rel="stylesheet" href="{% static 'css/chat_widget.css' %}?v=1.5">
         {% include "chat/chat_widget.html" %}
-        <script src="{% static 'js/chat_widget.js' %}"></script>
+        <script src="{% static 'js/chat_widget.js' %}?v=1.5"></script>
     {% endif %}
 
     {% block extra_js %}{% endblock %}

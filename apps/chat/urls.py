@@ -7,4 +7,5 @@ urlpatterns = [
     path('rooms/', views.room_list, name='room_list'),
     path('rooms/create/', views.room_create, name='room_create'),
     path('rooms/<int:room_id>/messages/', views.room_messages, name='room_messages'),
+    path('rooms/<int:room_id>/messages/send/', views.room_send_message, name='room_send_message'),
 ]
