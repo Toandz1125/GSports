@@ -73,6 +73,7 @@ class BookingCreateForm(forms.Form):
                     'min': 0,
                     'max': service_item.stock,
                     'data-service-quantity': service_item.pk,
+                    'data-service-price': str(service_item.price or 0),
                 }),
             )
 

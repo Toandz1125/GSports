@@ -1,8 +1,10 @@
+import json
+
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Case, Count, IntegerField, Value, When
+from django.db.models import Avg, Case, Count, IntegerField, Value, When
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
@@ -11,7 +13,7 @@ from django.utils import timezone
 from django.views import View
 from django.views.generic import DetailView, FormView, ListView, UpdateView
 
-from apps.accounts.models import Notification, Role
+from apps.accounts.models import FavoriteVenue, Notification, Role
 from apps.bookings.permissions import (
     AdminRequiredMixin,
     OwnerAssetRequiredMixin,
@@ -82,6 +84,37 @@ def ajax_response(message='', status=200, **extra):
         payload['message'] = message
     payload.update(extra)
     return JsonResponse(payload, status=status)
+
+
+def add_rating_display(venue):
+    avg = getattr(venue, 'rating_avg', None) or 0
+    reviews_count = getattr(venue, 'reviews_count', None)
+    avg_float = float(avg)
+    rounded_half = int((avg_float * 2) + 0.5) / 2
+    full_stars = int(rounded_half)
+    has_half_star = rounded_half - full_stars >= 0.5
+    empty_stars = max(0, 5 - full_stars - int(has_half_star))
+
+    venue.rating_avg = round(avg_float, 1)
+    venue.reviews_count = reviews_count or 0
+    venue.stars_list = (
+        ['full'] * full_stars
+        + (['half'] if has_half_star else [])
+        + ['empty'] * empty_stars
+    )
+    return venue
+
+
+def public_venue_queryset():
+    return (
+        Venue.objects.filter(is_deleted=False, status=Venue.ACTIVE)
+        .select_related('owner', 'owner__user')
+        .prefetch_related('fields')
+        .annotate(
+            reviews_count=Count('reviews', distinct=True),
+            rating_avg=Avg('reviews__rating'),
+        )
+    )
 
 
 def admin_venue_queryset():
@@ -214,6 +247,107 @@ class VenueFieldFormSetCreateMixin:
         context = super().get_context_data(**kwargs)
         context.setdefault('field_formset', self.get_field_formset())
         return context
+
+
+class VenueListView(LoginRequiredMixin, ListView):
+    template_name = 'venues/venue_list.html'
+    context_object_name = 'venues'
+
+    def get_queryset(self):
+        venues = list(public_venue_queryset().order_by('name'))
+        for venue in venues:
+            add_rating_display(venue)
+        return venues
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        favorite_venue_ids = set()
+        if self.request.user.is_authenticated:
+            favorite_venue_ids = set(
+                FavoriteVenue.objects.filter(user=self.request.user)
+                .values_list('venue_id', flat=True)
+            )
+        context['favorite_venue_ids'] = favorite_venue_ids
+        return context
+
+
+class VenueDetailView(LoginRequiredMixin, DetailView):
+    model = Venue
+    template_name = 'venues/venue_detail.html'
+    context_object_name = 'venue'
+
+    def get_queryset(self):
+        return public_venue_queryset().prefetch_related('fields__field_type__sport')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        venue = add_rating_display(self.object)
+        reviews = (
+            venue.reviews.select_related('user')
+            .order_by('-created_at')
+        )
+        context['venue'] = venue
+        context['fields'] = (
+            venue.fields.select_related('field_type', 'field_type__sport')
+            .filter(status='ACTIVE')
+            .order_by('name')
+        )
+        context['reviews'] = reviews
+        context['user_review'] = None
+        context['is_favorite'] = False
+        if self.request.user.is_authenticated:
+            context['user_review'] = reviews.filter(user=self.request.user).first()
+            context['is_favorite'] = FavoriteVenue.objects.filter(
+                user=self.request.user,
+                venue=venue,
+            ).exists()
+        return context
+
+
+class FavoriteVenueListApiView(LoginRequiredMixin, View):
+    def get(self, request, *args, **kwargs):
+        favorites = (
+            FavoriteVenue.objects.filter(
+                user=request.user,
+                venue__is_deleted=False,
+                venue__status=Venue.ACTIVE,
+            )
+            .select_related('venue')
+            .order_by('venue__name')
+        )
+        return JsonResponse({
+            'favorites': [
+                {
+                    'id': favorite.venue_id,
+                    'name': favorite.venue.name,
+                    'url': reverse('venues:venue_detail', kwargs={'pk': favorite.venue_id}),
+                }
+                for favorite in favorites
+            ],
+        })
+
+
+class FavoriteVenueToggleApiView(LoginRequiredMixin, View):
+    def post(self, request, *args, **kwargs):
+        payload = {}
+        if request.content_type == 'application/json':
+            try:
+                payload = json.loads(request.body.decode('utf-8') or '{}')
+            except json.JSONDecodeError:
+                return JsonResponse({'ok': False, 'error': 'Dữ liệu không hợp lệ.'}, status=400)
+
+        venue_id = payload.get('venue_id') or request.POST.get('venue_id')
+        if not venue_id:
+            return JsonResponse({'ok': False, 'error': 'Thiếu mã cơ sở.'}, status=400)
+
+        venue = get_object_or_404(Venue, pk=venue_id, is_deleted=False, status=Venue.ACTIVE)
+        favorite, created = FavoriteVenue.objects.get_or_create(
+            user=request.user,
+            venue=venue,
+        )
+        if not created:
+            favorite.delete()
+        return JsonResponse({'ok': True, 'is_favorite': created})
 
 
 class AdminRegistrationRequestListView(AdminRequiredMixin, ListView):
@@ -719,6 +853,14 @@ class OwnerProfileContextMixin(OwnerAssetRequiredMixin):
 class OwnerVenueListView(OwnerProfileContextMixin, ListView):
     template_name = 'venues/owner_venue_list.html'
     context_object_name = 'venues'
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            if is_admin(request.user):
+                return redirect('venues:admin_venue_list')
+            if not user_has_role(request.user, Role.OWNER):
+                return redirect('venues:venue_list')
+        return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
         if not self.owner_profile:
