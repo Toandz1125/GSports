@@ -229,57 +229,7 @@
     <div class="history-card">
 
         {% if 'ADMIN' in user_roles %}
-        <!-- ══════════ ADMIN: Phê duyệt đăng ký chủ sân ══════════ -->
-        {% if pending_owner_requests %}
-        <div class="pending-requests-section" style="margin-bottom: 2rem;">
-            <h3 class="history-card__title" style="margin-top:0;color:var(--primary-600);border-bottom:2px solid var(--border-color);padding-bottom:0.5rem;margin-bottom:1rem;">
-                Yêu cầu đăng ký chủ sân chờ duyệt
-            </h3>
-            <div class="table-responsive">
-                <table class="history-table">
-                    <thead>
-                        <tr>
-                            <th>Thông tin chủ sân</th>
-                            <th>Doanh nghiệp</th>
-                            <th>Ngân hàng</th>
-                            <th style="text-align:right;">Hành động</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for req in pending_owner_requests %}
-                        <tr>
-                            <td>
-                                <div class="user-info">
-                                    <span class="user-info__email">{{ req.email }}</span>
-                                    <span class="user-info__name">{{ req.first_name }} {{ req.last_name }}{% if req.phone %} — {{ req.phone }}{% endif %}</span>
-                                </div>
-                            </td>
-                            <td><strong>{{ req.business_name }}</strong></td>
-                            <td>
-                                {% if req.bank_account_number %}
-                                {{ req.bank_account_number }} ({{ req.bank_name }})
-                                {% else %}<span class="text-muted">—</span>{% endif %}
-                            </td>
-                            <td style="text-align:right;">
-                                <div style="display:inline-flex; gap:0.5rem; justify-content:flex-end;">
-                                    <form action="{% url 'accounts:admin_approve_owner' req.pk %}" method="post" style="margin:0;">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn--primary" style="padding:0.4rem 0.8rem; font-size:0.8rem; background-color:var(--emerald-600); border-color:var(--emerald-600); height:auto; line-height:1;">Duyệt</button>
-                                    </form>
-                                    <form action="{% url 'accounts:admin_reject_owner' req.pk %}" method="post" style="margin:0;">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn--secondary" style="padding:0.4rem 0.8rem; font-size:0.8rem; background-color:var(--rose-600); border-color:var(--rose-600); color:white; height:auto; line-height:1;">Từ chối</button>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        {% endif %}
+        <p class="muted" style="margin-top:0;">Xem yêu cầu chờ duyệt tại <a href="{% url 'venues:admin_request_list' %}">Duyệt yêu cầu</a>.</p>
         {% endif %}
         
         <!-- ══════════ Lịch sử thay đổi tài khoản ══════════ -->

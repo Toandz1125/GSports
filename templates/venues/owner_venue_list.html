@@ -1,0 +1,223 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}Quản lý cơ sở — GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .owner-venue-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+    }
+
+    .owner-venue-header h1 {
+        color: var(--text-main);
+        font-size: 1.75rem;
+        font-weight: 800;
+        margin: 0;
+    }
+
+    .owner-venue-header p {
+        color: var(--text-muted);
+        margin: 0.35rem 0 0;
+        font-size: 0.9rem;
+    }
+
+    .owner-venue-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+        overflow: hidden;
+    }
+
+    .owner-venue-table-wrap {
+        overflow-x: auto;
+    }
+
+    .owner-venue-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+        font-size: 0.9rem;
+    }
+
+    .owner-venue-table th {
+        padding: 0.85rem 1rem;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-muted);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .owner-venue-table td {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-main);
+        vertical-align: middle;
+    }
+
+    .owner-venue-table tr:last-child td {
+        border-bottom: 0;
+    }
+
+    .owner-venue-name {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        min-width: 220px;
+    }
+
+    .owner-venue-name strong {
+        color: var(--text-main);
+        font-weight: 700;
+    }
+
+    .owner-venue-name span {
+        color: var(--text-muted);
+        font-size: 0.82rem;
+    }
+
+    .owner-venue-badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: var(--radius-full);
+        padding: 0.15rem 0.6rem;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .owner-venue-badge--active {
+        background: rgba(16, 185, 129, 0.12);
+        color: #10b981;
+    }
+
+    .owner-venue-badge--inactive,
+    .owner-venue-badge--maintenance {
+        background: rgba(245, 158, 11, 0.12);
+        color: #f59e0b;
+    }
+
+    .owner-venue-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        min-width: 260px;
+    }
+
+    .owner-venue-actions .btn {
+        padding: 0.45rem 0.75rem;
+        font-size: 0.78rem;
+    }
+
+    .btn--secondary {
+        background: var(--bg-main);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+    }
+
+    .owner-venue-empty {
+        padding: 3rem 1.5rem;
+        text-align: center;
+        color: var(--text-muted);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .owner-venue-empty svg {
+        width: 3.25rem;
+        height: 3.25rem;
+        color: var(--border-color);
+    }
+
+    .owner-venue-empty h2 {
+        color: var(--text-main);
+        font-size: 1.1rem;
+        margin: 0;
+    }
+
+    @media (max-width: 768px) {
+        .owner-venue-header .btn {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="owner-venue-header">
+    <div>
+        <h1>Quản lý cơ sở</h1>
+        <p>Quản lý thông tin cơ sở, sân con và dịch vụ bán kèm của bạn.</p>
+    </div>
+    <a href="{% url 'venues:owner_venue_create' %}" class="btn btn--primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span>Tạo cơ sở</span>
+    </a>
+</div>
+
+<div class="owner-venue-card">
+    {% if venues %}
+    <div class="owner-venue-table-wrap">
+        <table class="owner-venue-table">
+            <thead>
+                <tr>
+                    <th>Cơ sở</th>
+                    <th>Trạng thái</th>
+                    <th>Sân con</th>
+                    <th>Dịch vụ</th>
+                    <th>Cập nhật</th>
+                    <th>Hành động</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for venue in venues %}
+                <tr>
+                    <td>
+                        <div class="owner-venue-name">
+                            <strong>{{ venue.name }}</strong>
+                            <span>{{ venue.address }}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="owner-venue-badge owner-venue-badge--{{ venue.status|lower }}">{{ venue.status }}</span>
+                    </td>
+                    <td>{{ venue.fields.count }}</td>
+                    <td>{{ venue.service_items.count }}</td>
+                    <td>{{ venue.updated_at|date:"d/m/Y H:i" }}</td>
+                    <td>
+                        <div class="owner-venue-actions">
+                            <a href="{% url 'venues:venue_detail' venue.pk %}" class="btn btn--secondary">Chi tiết</a>
+                            <a href="{% url 'venues:owner_field_list' venue.pk %}" class="btn btn--primary">Quản lý sân</a>
+                            <a href="{% url 'venues:owner_venue_update' venue.pk %}" class="btn btn--secondary">Sửa cơ sở</a>
+                            <a href="{% url 'venues:owner_field_create' venue.pk %}" class="btn btn--secondary">Thêm sân</a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="owner-venue-empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <h2>Chưa có cơ sở nào</h2>
+        <p>Hãy gửi yêu cầu tạo cơ sở để bắt đầu quản lý sân trên GSports.</p>
+        <a href="{% url 'venues:owner_venue_create' %}" class="btn btn--primary">Tạo cơ sở</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

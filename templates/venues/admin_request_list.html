@@ -176,7 +176,7 @@
         <div>
             <p class="eyebrow">Quản trị</p>
             <h1>Duyệt yêu cầu</h1>
-            <p>Duyệt hoặc từ chối yêu cầu tạo cơ sở và tạo sân do owner gửi.</p>
+            <p>Duyệt hoặc từ chối yêu cầu làm chủ sân, tạo cơ sở và tạo sân.</p>
         </div>
     </section>
 
@@ -193,6 +193,65 @@
         <button type="submit" class="btn btn--primary">Lọc</button>
         <a href="{% url 'venues:admin_request_list' %}" class="btn btn--secondary">Xóa lọc</a>
     </form>
+
+    <section class="request-section">
+        <div class="request-section__head">
+            <h2>Yêu cầu làm chủ sân</h2>
+            <span class="muted">{{ owner_request_count }} yêu cầu</span>
+        </div>
+        <div class="request-table-wrap">
+            <table class="request-table">
+                <thead>
+                    <tr>
+                        <th>Người gửi</th>
+                        <th>Email</th>
+                        <th>Tên cơ sở/doanh nghiệp</th>
+                        <th>Số điện thoại</th>
+                        <th>Ngày gửi</th>
+                        <th>Trạng thái</th>
+                        <th>Người duyệt</th>
+                        <th>Hành động</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in owner_requests %}
+                        <tr>
+                            <td>{{ item.first_name }} {{ item.last_name }}</td>
+                            <td>{{ item.email }}</td>
+                            <td>{{ item.business_name }}</td>
+                            <td>{{ item.phone|default:"-" }}</td>
+                            <td>{{ item.created_at|date:"d/m/Y H:i" }}</td>
+                            <td><span class="status-pill status-pill--{{ item.status|lower }}">{{ item.get_status_display }}</span></td>
+                            <td>
+                                {{ item.reviewed_by.email|default:"-" }}<br>
+                                <span class="muted">{{ item.reviewed_at|date:"d/m/Y H:i"|default:"" }}</span>
+                            </td>
+                            <td>
+                                {% if item.status == 'PENDING' %}
+                                    <div class="request-actions">
+                                        <form method="post" action="{% url 'accounts:admin_approve_owner' item.pk %}">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="next" value="{% url 'venues:admin_request_list' %}?status={{ current_status }}">
+                                            <button type="submit" class="btn btn--primary">Duyệt</button>
+                                        </form>
+                                        <form method="post" action="{% url 'accounts:admin_reject_owner' item.pk %}">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="next" value="{% url 'venues:admin_request_list' %}?status={{ current_status }}">
+                                            <button type="submit" class="btn btn--danger">Từ chối</button>
+                                        </form>
+                                    </div>
+                                {% else %}
+                                    <span class="muted">Đã xử lý</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="8" class="muted">Không có yêu cầu làm chủ sân nào.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
 
     <section class="request-section">
         <div class="request-section__head">

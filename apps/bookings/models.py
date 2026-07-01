@@ -1,4 +1,5 @@
 import uuid
+from datetime import timedelta
 from decimal import Decimal
 from django.conf import settings
 from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
@@ -75,6 +76,7 @@ class BookingRecurrenceDay(models.Model):
 class Booking(models.Model):
     """Đặt sân."""
 
+    PAYMENT_TIMEOUT_MINUTES = 10
     PENDING = 'PENDING'
     PAID = 'PAID'
     WAITING = 'WAITING'
@@ -153,12 +155,20 @@ class Booking(models.Model):
     def can_cancel(self):
         return self.status in self.CANCELLABLE_STATUSES
 
+    def get_effective_payment_deadline(self):
+        if self.payment_deadline:
+            return self.payment_deadline
+        if self.created_at:
+            return self.created_at + timedelta(minutes=self.PAYMENT_TIMEOUT_MINUTES)
+        return None
+
     def can_pay(self):
         if self.status != self.PENDING:
             return False
-        if self.payment_deadline and self.payment_deadline <= timezone.now():
+        deadline = self.get_effective_payment_deadline()
+        if not deadline:
             return False
-        return True
+        return deadline > timezone.now()
 
     def get_cancel_block_message(self):
         if self.status == self.CANCELLED:

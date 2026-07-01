@@ -4,6 +4,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
 from django.shortcuts import redirect
 from django.urls import reverse_lazy
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import CreateView, FormView, TemplateView, UpdateView, ListView
 
@@ -75,20 +76,33 @@ class OwnerRegisterView(CreateView):
 
     def form_valid(self, form):
         from django.contrib.auth.hashers import make_password
+        from django.utils import timezone
         from .models import OwnerRegistrationRequest
 
         cd = form.cleaned_data
         
-        OwnerRegistrationRequest.objects.create(
-            email=cd['email'].lower().strip(),
-            first_name=cd['first_name'],
-            last_name=cd['last_name'],
-            phone=cd.get('phone'),
-            business_name=cd['business_name'],
-            bank_account_number=cd.get('bank_account_number') or None,
-            bank_name=cd.get('bank_name') or None,
-            password_hash=make_password(cd['password'])
-        )
+        email = cd['email'].lower().strip()
+        owner_request = OwnerRegistrationRequest.objects.filter(email=email).first()
+        request_values = {
+            'first_name': cd['first_name'],
+            'last_name': cd['last_name'],
+            'phone': cd.get('phone'),
+            'business_name': cd['business_name'],
+            'bank_account_number': cd.get('bank_account_number') or None,
+            'bank_name': cd.get('bank_name') or None,
+            'password_hash': make_password(cd['password']),
+            'status': OwnerRegistrationRequest.PENDING,
+            'note': None,
+            'created_at': timezone.now(),
+            'reviewed_at': None,
+            'reviewed_by': None,
+        }
+        if owner_request:
+            for field, value in request_values.items():
+                setattr(owner_request, field, value)
+            owner_request.save(update_fields=[*request_values.keys()])
+        else:
+            OwnerRegistrationRequest.objects.create(email=email, **request_values)
 
         messages.success(
             self.request,
@@ -348,13 +362,6 @@ class ProfileView(LoginRequiredMixin, TemplateView):
         # Tải lịch sử thay đổi tài khoản (AuditLog) từ database (cho Owner và các vai trò muốn xem)
         from apps.core.models import AuditLog
         context['user_audit_logs'] = AuditLog.objects.filter(user=user).order_by('-created_at')
-
-        # Nếu là ADMIN, lấy danh sách đăng ký chủ sân chưa duyệt
-        if 'ADMIN' in context['user_roles']:
-            from .models import OwnerRegistrationRequest
-            context['pending_owner_requests'] = OwnerRegistrationRequest.objects.filter(
-                status=OwnerRegistrationRequest.PENDING
-            )
 
         try:
             context['wallet'] = user.wallet
@@ -783,6 +790,17 @@ class StaffDeleteView(OwnerRequiredMixin, View):
 # Duyệt chủ sân (Admin Approval)
 # ---------------------------------------------------------------------------
 
+def redirect_after_owner_request_action(request):
+    next_url = request.POST.get('next') or request.GET.get('next')
+    if next_url and url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return redirect(next_url)
+    return redirect('venues:admin_request_list')
+
+
 class AdminApproveOwnerView(LoginRequiredMixin, View):
     """Admin duyệt yêu cầu đăng ký chủ sân, tạo tài khoản và ví."""
 
@@ -840,7 +858,7 @@ class AdminApproveOwnerView(LoginRequiredMixin, View):
         except Exception as e:
             messages.error(request, f'Lỗi hệ thống: {str(e)}')
 
-        return redirect('accounts:profile')
+        return redirect_after_owner_request_action(request)
 
 
 class AdminRejectOwnerView(LoginRequiredMixin, View):
@@ -853,16 +871,19 @@ class AdminRejectOwnerView(LoginRequiredMixin, View):
             return redirect('accounts:profile')
 
         from .models import OwnerRegistrationRequest
+        from django.utils import timezone
 
         try:
             req = OwnerRegistrationRequest.objects.get(pk=pk, status=OwnerRegistrationRequest.PENDING)
-            # Xóa yêu cầu hoàn toàn để email có thể đăng ký lại nếu muốn
-            req.delete()
+            req.status = OwnerRegistrationRequest.REJECTED
+            req.reviewed_at = timezone.now()
+            req.reviewed_by = request.user
+            req.save(update_fields=['status', 'reviewed_at', 'reviewed_by'])
             messages.success(request, 'Đã từ chối yêu cầu đăng ký chủ sân.')
         except OwnerRegistrationRequest.DoesNotExist:
             messages.error(request, 'Yêu cầu đăng ký không tồn tại hoặc đã được xử lý.')
 
-        return redirect('accounts:profile')
+        return redirect_after_owner_request_action(request)
 
 
 # ---------------------------------------------------------------------------

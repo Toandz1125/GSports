@@ -36,6 +36,7 @@ from .views import (
     OwnerPriceRuleDeleteView,
     OwnerVenueCreateView,
     OwnerVenueListView,
+    OwnerVenueUpdateView,
     VenueDetailView,
     VenueListView,
 )
@@ -44,6 +45,9 @@ app_name = 'venues'
 
 urlpatterns = [
     path('', VenueListView.as_view(), name='venue_list'),
+    path('tao/', OwnerVenueCreateView.as_view(), name='owner_venue_create_short'),
+    path('<int:venue_pk>/san/them/', OwnerFieldCreateView.as_view(), name='field_create'),
+    path('<int:pk>/sua/', OwnerVenueUpdateView.as_view(), name='owner_venue_update'),
     path('<int:pk>/', VenueDetailView.as_view(), name='venue_detail'),
     path('api/favorites/', FavoriteVenueListApiView.as_view(), name='favorite_venue_list_api'),
     path('api/favorites/toggle/', FavoriteVenueToggleApiView.as_view(), name='favorite_venue_toggle_api'),

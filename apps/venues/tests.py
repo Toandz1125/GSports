@@ -3,13 +3,14 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import make_password
 from django.contrib.messages import get_messages
 from django.http import HttpResponse
 from django.shortcuts import resolve_url
 from django.test import TestCase, override_settings
 from django.urls import include, path, reverse
 
-from apps.accounts.models import OwnerProfile, Role, UserRole
+from apps.accounts.models import OwnerProfile, OwnerRegistrationRequest, Role, UserRole
 from apps.services.models import ServiceItem
 from apps.venues.models import (
     Field,
@@ -677,6 +678,26 @@ class PublicVenueRouteTests(TestCase):
             address='1 Public Street',
             status=Venue.ACTIVE,
         )
+        self.other_owner_user = User.objects.create_user(
+            username='public-other-owner',
+            email='public-other-owner@example.com',
+            password='password',
+        )
+        UserRole.objects.update_or_create(
+            user=self.other_owner_user,
+            defaults={'role': self.owner_role},
+        )
+        self.other_owner = OwnerProfile.objects.create(
+            user=self.other_owner_user,
+            business_name='Other Public Owner',
+            is_verified=True,
+        )
+        self.other_venue = Venue.objects.create(
+            owner=self.other_owner,
+            name='Other Owner Venue',
+            address='2 Public Street',
+            status=Venue.ACTIVE,
+        )
 
     def test_public_venue_list_name_uses_public_route(self):
         self.client.force_login(self.customer_user)
@@ -695,6 +716,93 @@ class PublicVenueRouteTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'venues/venue_detail.html')
         self.assertContains(response, 'Public Venue')
+
+    def test_public_venue_detail_shows_booking_cta_for_active_venue(self):
+        self.client.force_login(self.customer_user)
+
+        response = self.client.get(reverse('venues:venue_detail', kwargs={'pk': self.venue.pk}))
+
+        booking_url = f"{reverse('bookings:booking_create')}?venue={self.venue.pk}"
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Đặt sân tại đây')
+        self.assertContains(response, f'href="{booking_url}"')
+
+    def test_public_venue_detail_excludes_inactive_or_deleted_venues(self):
+        self.client.force_login(self.customer_user)
+
+        self.venue.status = Venue.INACTIVE
+        self.venue.save(update_fields=['status'])
+        response = self.client.get(reverse('venues:venue_detail', kwargs={'pk': self.venue.pk}))
+        self.assertEqual(response.status_code, 404)
+
+        self.venue.status = Venue.ACTIVE
+        self.venue.is_deleted = True
+        self.venue.save(update_fields=['status', 'is_deleted'])
+        response = self.client.get(reverse('venues:venue_detail', kwargs={'pk': self.venue.pk}))
+        self.assertEqual(response.status_code, 404)
+
+    def test_owner_root_venue_list_renders_owner_management(self):
+        self.client.force_login(self.owner_user)
+
+        response = self.client.get(reverse('venues:venue_list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'venues/owner_venue_list.html')
+        self.assertContains(response, 'Quản lý cơ sở')
+        self.assertContains(response, 'Public Venue')
+        self.assertNotContains(response, 'Other Owner Venue')
+
+    def test_owner_venue_detail_shows_management_actions_not_booking_cta(self):
+        self.client.force_login(self.owner_user)
+
+        response = self.client.get(reverse('venues:venue_detail', kwargs={'pk': self.venue.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Public Venue')
+        self.assertContains(response, 'Sửa cơ sở')
+        self.assertContains(response, 'Quản lý sân con')
+        self.assertContains(response, 'Thêm sân con')
+        self.assertNotContains(response, 'Đặt sân tại đây')
+
+    def test_owner_cannot_open_other_owners_venue_detail(self):
+        self.client.force_login(self.owner_user)
+
+        response = self.client.get(reverse('venues:venue_detail', kwargs={'pk': self.other_venue.pk}))
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_owner_can_update_own_venue(self):
+        self.client.force_login(self.owner_user)
+        url = reverse('venues:owner_venue_update', kwargs={'pk': self.venue.pk})
+
+        get_response = self.client.get(url)
+        self.assertEqual(get_response.status_code, 200)
+        self.assertTemplateUsed(get_response, 'venues/owner_venue_form.html')
+
+        response = self.client.post(url, {
+            'name': 'Public Venue Updated',
+            'description': 'Updated description',
+            'address': 'Updated Street',
+            'latitude': '',
+            'longitude': '',
+        })
+
+        self.assertRedirects(
+            response,
+            reverse('venues:venue_detail', kwargs={'pk': self.venue.pk}),
+            fetch_redirect_response=False,
+        )
+        self.venue.refresh_from_db()
+        self.assertEqual(self.venue.name, 'Public Venue Updated')
+
+    def test_owner_cannot_update_other_owners_venue(self):
+        self.client.force_login(self.owner_user)
+
+        response = self.client.get(
+            reverse('venues:owner_venue_update', kwargs={'pk': self.other_venue.pk}),
+        )
+
+        self.assertEqual(response.status_code, 404)
 
     def test_owner_venue_list_redirects_non_owner_sessions(self):
         owner_url = reverse('venues:owner_venue_list')
@@ -761,6 +869,19 @@ class VenueFieldApprovalFlowTests(TestCase):
             owner=self.other_owner, name='Cơ sở Owner B', address='2 B Street', status='ACTIVE',
         )
 
+    def create_owner_registration_request(self, email, status=OwnerRegistrationRequest.PENDING):
+        return OwnerRegistrationRequest.objects.create(
+            email=email,
+            first_name='Owner',
+            last_name=email.split('@')[0].replace('-', ' ').title(),
+            phone='0901234567',
+            business_name=f'Business {email}',
+            bank_account_number='123456789',
+            bank_name='Test Bank',
+            password_hash=make_password('Password123!'),
+            status=status,
+        )
+
     # --- 0. Admin request list renders both request tables without 500. ---
     def test_admin_request_list_empty_returns_200(self):
         self.client.force_login(self.admin_user)
@@ -768,8 +889,21 @@ class VenueFieldApprovalFlowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'venues/admin_request_list.html')
+        self.assertContains(response, 'Yêu cầu làm chủ sân')
+        self.assertContains(response, 'Không có yêu cầu làm chủ sân nào.')
         self.assertContains(response, 'Không có yêu cầu tạo cơ sở.')
         self.assertContains(response, 'Không có yêu cầu tạo sân.')
+
+    def test_admin_request_list_with_owner_request_returns_200(self):
+        self.create_owner_registration_request('owner-pending-list@example.com')
+        self.client.force_login(self.admin_user)
+        response = self.client.get(reverse('venues:admin_request_list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Yêu cầu làm chủ sân')
+        self.assertContains(response, 'owner-pending-list@example.com')
+        self.assertContains(response, 'Business owner-pending-list@example.com')
+        self.assertEqual(response.context['owner_request_count'], 1)
 
     def test_admin_request_list_with_venue_request_returns_200(self):
         OwnerVenueRequest.objects.create(
@@ -822,11 +956,59 @@ class VenueFieldApprovalFlowTests(TestCase):
         self.assertEqual(response.context['status_filter'], OwnerVenueRequest.PENDING)
         self.assertEqual(response.context['pending_venue_request_count'], 1)
         self.assertEqual(response.context['pending_field_request_count'], 1)
+        self.assertEqual(response.context['pending_owner_request_count'], 0)
+
+    def test_admin_request_list_filters_owner_requests_by_status(self):
+        pending = self.create_owner_registration_request(
+            'owner-filter-pending@example.com',
+            OwnerRegistrationRequest.PENDING,
+        )
+        approved = self.create_owner_registration_request(
+            'owner-filter-approved@example.com',
+            OwnerRegistrationRequest.APPROVED,
+        )
+        rejected = self.create_owner_registration_request(
+            'owner-filter-rejected@example.com',
+            OwnerRegistrationRequest.REJECTED,
+        )
+        self.client.force_login(self.admin_user)
+
+        cases = [
+            (OwnerRegistrationRequest.PENDING, [pending]),
+            (OwnerRegistrationRequest.APPROVED, [approved]),
+            (OwnerRegistrationRequest.REJECTED, [rejected]),
+        ]
+        for status, expected in cases:
+            with self.subTest(status=status):
+                response = self.client.get(reverse('venues:admin_request_list'), {'status': status})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(list(response.context['owner_requests']), expected)
+                self.assertEqual(response.context['owner_request_count'], 1)
+
+        response = self.client.get(reverse('venues:admin_request_list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertCountEqual(
+            list(response.context['owner_requests']),
+            [pending, approved, rejected],
+        )
+
+        response = self.client.get(reverse('venues:admin_request_list'), {'status': 'all'})
+        self.assertEqual(response.status_code, 200)
+        self.assertCountEqual(
+            list(response.context['owner_requests']),
+            [pending, approved, rejected],
+        )
 
     # --- 1. Owner create form renders (no TemplateDoesNotExist / 500). ---
     def test_owner_venue_create_get_returns_200(self):
         self.client.force_login(self.owner_user)
         response = self.client.get(reverse('venues:owner_venue_create'))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'venues/owner_venue_form.html')
+
+    def test_owner_venue_create_short_alias_returns_200(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(reverse('venues:owner_venue_create_short'))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'venues/owner_venue_form.html')
 
@@ -915,6 +1097,12 @@ class VenueFieldApprovalFlowTests(TestCase):
         return data
 
     # --- 5. Owner submit creates a pending field request, not a real field. ---
+    def test_owner_field_create_short_alias_returns_200(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(reverse('venues:field_create', kwargs={'venue_pk': self.venue.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'venues/owner_field_form.html')
+
     def test_owner_field_create_post_creates_pending_request_only(self):
         self.client.force_login(self.owner_user)
         field_count_before = Field.objects.count()

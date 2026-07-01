@@ -37,7 +37,28 @@ class ServiceItemListView(LoginRequiredMixin, ListView):
     template_name = 'services/serviceitem_list.html'
     context_object_name = 'service_items'
 
+    def get_owner_profile(self):
+        if not hasattr(self, '_owner_profile'):
+            self._owner_profile = get_owner_profile(self.request.user)
+        return self._owner_profile
+
+    def get_template_names(self):
+        if self.get_owner_profile():
+            return ['services/owner_serviceitem_list.html']
+        return [self.template_name]
+
     def get_queryset(self):
+        owner_profile = self.get_owner_profile()
+        if owner_profile:
+            return (
+                ServiceItem.objects.filter(
+                    venue__owner=owner_profile,
+                    venue__is_deleted=False,
+                )
+                .select_related('venue')
+                .order_by('venue__name', 'category', 'name')
+            )
+
         queryset = ServiceItem.objects.filter(is_active=True).select_related('venue')
         venue_id = self.request.GET.get('venue')
         if venue_id:

@@ -45,9 +45,11 @@ def _booking_checkout_context(request, booking):
     wallet = _get_wallet(request.user)
     amount = Decimal(booking.total_amount or Decimal('0.00'))
     can_pay_booking = booking.can_pay()
+    effective_deadline = booking.get_effective_payment_deadline()
     has_sufficient_balance = wallet.balance >= amount
     return {
         'booking': booking,
+        'effective_payment_deadline': effective_deadline,
         'wallet': wallet,
         'wallet_balance': wallet.balance,
         'has_sufficient_balance': has_sufficient_balance,
@@ -56,8 +58,8 @@ def _booking_checkout_context(request, booking):
         'can_cancel_booking': booking.can_cancel(),
         'payment_expired': bool(
             booking.status == Booking.CANCELLED
-            and booking.payment_deadline
-            and booking.payment_deadline <= timezone.now()
+            and effective_deadline
+            and effective_deadline <= timezone.now()
         ),
     }
 
@@ -76,10 +78,11 @@ class BookingCheckoutView(LoginRequiredMixin, View):
             messages.info(request, 'Booking đã được thanh toán')
             return redirect('bookings:booking_detail', pk=booking.pk)
         if not booking.can_pay():
+            effective_deadline = booking.get_effective_payment_deadline()
             if (
                 booking.status == Booking.CANCELLED
-                and booking.payment_deadline
-                and booking.payment_deadline <= timezone.now()
+                and effective_deadline
+                and effective_deadline <= timezone.now()
             ):
                 messages.warning(request, 'Đơn đặt sân đã quá hạn thanh toán và đã bị hủy.')
             else:

@@ -197,10 +197,10 @@
                         {% if booking.status == 'PENDING' %}Chờ thanh toán{% elif booking.status == 'PAID' %}Đã thanh toán{% elif booking.status == 'CANCELLED' %}Đã huỷ{% else %}{{ booking.get_status_display }}{% endif %}
                     </strong>
                 </div>
-                {% if booking.payment_deadline %}
+                {% if effective_payment_deadline %}
                 <div class="checkout-row">
                     <span>Hạn thanh toán</span>
-                    <strong>{{ booking.payment_deadline|date:"d/m/Y H:i" }}</strong>
+                    <strong>{{ effective_payment_deadline|date:"d/m/Y H:i" }}</strong>
                 </div>
                 {% endif %}
             </div>
@@ -240,11 +240,11 @@
                 <strong>{{ booking.grand_total|floatformat:0 }}đ</strong>
             </div>
 
-            {% if can_pay_booking and booking.payment_deadline %}
+            {% if can_pay_booking and effective_payment_deadline %}
             <div class="checkout-countdown">
                 <span class="checkout-countdown__label">Thời gian còn lại để thanh toán</span>
                 <strong class="booking-countdown" data-booking-countdown
-                        data-countdown-deadline="{{ booking.payment_deadline|date:'c' }}"
+                        data-countdown-deadline="{{ effective_payment_deadline|date:'c' }}"
                         data-booking-status-url="{% url 'bookings:booking_status' booking.pk %}">
                     Còn --:-- để thanh toán
                 </strong>
