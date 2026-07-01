@@ -8,3 +8,6 @@ runserver.err.log
 runserver.out.log
 runserver8001.err.log
 runserver8001.out.log
+rf.md
+structure_of_report.md
+config\__pycache__\

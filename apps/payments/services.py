@@ -46,7 +46,8 @@ def get_payable_booking_for_user(user, booking_pk):
     if not user or not user.is_authenticated:
         raise Booking.DoesNotExist
     booking = _booking_queryset().get(pk=booking_pk, booking_package__user=user)
-    cancel_expired_booking_if_needed(booking)
+    if cancel_expired_booking_if_needed(booking):
+        booking.refresh_from_db()
     return booking
 
 

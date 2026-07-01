@@ -1,6 +1,8 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
-from apps.accounts.models import CustomerProfile, OwnerProfile, Role, UserRole, Wallet
+from django.contrib.auth.hashers import make_password
+from django.urls import resolve, reverse
+from apps.accounts.models import CustomerProfile, OwnerProfile, OwnerRegistrationRequest, Role, UserRole, Wallet
 from apps.accounts.forms import CustomerRegistrationForm, OwnerRegistrationForm, ChangePasswordForm, UserProfileForm
 
 
@@ -277,6 +279,243 @@ class AccountsSignalTests(TestCase):
         self.assertEqual(owner_profile.business_name, 'Updated Business Name')
         self.assertEqual(owner_profile.bank_name, 'Updated Bank Name')
         self.assertEqual(owner_profile.bank_account_number, '987654321')
+
+
+class DashboardSidebarTemplateTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.customer_role, _ = Role.objects.get_or_create(name=Role.CUSTOMER)
+        cls.owner_role, _ = Role.objects.get_or_create(name=Role.OWNER)
+        cls.user = User.objects.create_user(
+            username='sidebar_customer',
+            email='sidebar-customer@test.com',
+            password='Password123!',
+        )
+        UserRole.objects.update_or_create(user=cls.user, defaults={'role': cls.customer_role})
+        cls.owner_user = User.objects.create_user(
+            username='sidebar_owner',
+            email='sidebar-owner@test.com',
+            password='Password123!',
+        )
+        UserRole.objects.update_or_create(user=cls.owner_user, defaults={'role': cls.owner_role})
+        OwnerProfile.objects.create(
+            user=cls.owner_user,
+            business_name='Sidebar Owner',
+            is_verified=True,
+        )
+
+    def render_dashboard(self, user=None):
+        self.client.force_login(user or self.user)
+        response = self.client.get(reverse('accounts:dashboard'))
+        self.assertEqual(response.status_code, 200)
+        return response.content.decode()
+
+    def get_profile_nav_html(self, html):
+        marker_index = html.find('id="nav-profile"')
+        self.assertNotEqual(marker_index, -1)
+        anchor_start = html.rfind('<a', 0, marker_index)
+        anchor_end = html.find('</a>', marker_index)
+        self.assertNotEqual(anchor_start, -1)
+        self.assertNotEqual(anchor_end, -1)
+        return html[anchor_start:anchor_end + len('</a>')]
+
+    def test_sidebar_hides_booking_create_nav_but_route_still_exists(self):
+        html = self.render_dashboard()
+
+        self.assertNotIn('id="nav-booking-create"', html)
+        self.assertNotIn('<span>Đặt sân</span>', html)
+
+        booking_match = resolve(reverse('bookings:booking_create'))
+        self.assertEqual(booking_match.app_name, 'bookings')
+        self.assertEqual(booking_match.url_name, 'booking_create')
+
+    def test_profile_nav_renders_single_user_icon(self):
+        html = self.render_dashboard()
+        profile_nav_html = self.get_profile_nav_html(html)
+
+        self.assertIn('<span>Hồ sơ</span>', profile_nav_html)
+        self.assertEqual(profile_nav_html.count('<svg'), 1)
+
+    def test_owner_sidebar_shows_venue_management_without_service_nav(self):
+        html = self.render_dashboard(self.owner_user)
+
+        self.assertIn('id="nav-venues"', html)
+        self.assertIn('<span>Quản lý cơ sở</span>', html)
+        self.assertNotIn('id="nav-owner-services"', html)
+        self.assertNotIn('<span>Quản lý dịch vụ</span>', html)
+
+        service_match = resolve(reverse('services:owner_serviceitem_list'))
+        self.assertEqual(service_match.app_name, 'services')
+        self.assertEqual(service_match.url_name, 'owner_serviceitem_list')
+
+    def test_customer_sidebar_does_not_show_owner_management(self):
+        html = self.render_dashboard(self.user)
+
+        self.assertNotIn('id="nav-owner-services"', html)
+        self.assertNotIn('<span>Quản lý dịch vụ</span>', html)
+        self.assertNotIn('<span>Quản lý cơ sở</span>', html)
+
+
+class OwnerRegistrationAdminRequestTests(TestCase):
+    def setUp(self):
+        self.admin_role, _ = Role.objects.get_or_create(name=Role.ADMIN)
+        self.customer_role, _ = Role.objects.get_or_create(name=Role.CUSTOMER)
+        self.owner_role, _ = Role.objects.get_or_create(name=Role.OWNER)
+
+        self.admin_user = User.objects.create_user(
+            username='owner_req_admin',
+            email='owner-req-admin@test.com',
+            password='Password123!',
+        )
+        UserRole.objects.create(user=self.admin_user, role=self.admin_role)
+
+        self.customer_user = User.objects.create_user(
+            username='owner_req_customer',
+            email='owner-req-customer@test.com',
+            password='Password123!',
+        )
+        UserRole.objects.update_or_create(user=self.customer_user, defaults={'role': self.customer_role})
+
+    def create_owner_request(self, email='owner-request@test.com'):
+        return OwnerRegistrationRequest.objects.create(
+            email=email,
+            first_name='Nguyen',
+            last_name='Owner',
+            phone='0901234567',
+            business_name='Pending Owner Business',
+            bank_account_number='123456789',
+            bank_name='Test Bank',
+            password_hash=make_password('Password123!'),
+        )
+
+    def test_admin_profile_no_longer_renders_owner_registration_queue(self):
+        self.create_owner_request('profile-owner-request@test.com')
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(reverse('accounts:profile'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('pending_owner_requests', response.context)
+        self.assertNotContains(response, 'Yêu cầu đăng ký chủ sân chờ duyệt')
+        self.assertNotContains(response, 'Pending Owner Business')
+        self.assertContains(response, reverse('venues:admin_request_list'))
+
+    def test_rejected_owner_registration_email_can_be_submitted_again(self):
+        owner_request = self.create_owner_request('retry-owner-request@test.com')
+        owner_request.status = OwnerRegistrationRequest.REJECTED
+        owner_request.reviewed_by = self.admin_user
+        owner_request.save(update_fields=['status', 'reviewed_by'])
+
+        response = self.client.post(reverse('accounts:register_owner'), {
+            'email': 'retry-owner-request@test.com',
+            'first_name': 'Retry',
+            'last_name': 'Owner',
+            'phone': '0907654321',
+            'business_name': 'Retry Owner Business',
+            'bank_account_number': '987654321',
+            'bank_name': 'Retry Bank',
+            'password': 'Password123!',
+            'password_confirm': 'Password123!',
+        })
+
+        self.assertRedirects(response, reverse('accounts:login'), fetch_redirect_response=False)
+        self.assertEqual(
+            OwnerRegistrationRequest.objects.filter(email='retry-owner-request@test.com').count(),
+            1,
+        )
+        owner_request.refresh_from_db()
+        self.assertEqual(owner_request.status, OwnerRegistrationRequest.PENDING)
+        self.assertIsNone(owner_request.reviewed_by)
+        self.assertEqual(owner_request.first_name, 'Retry')
+        self.assertEqual(owner_request.business_name, 'Retry Owner Business')
+
+    def test_admin_approves_owner_request_and_returns_to_request_page(self):
+        owner_request = self.create_owner_request('approved-owner-request@test.com')
+        next_url = f"{reverse('venues:admin_request_list')}?status={OwnerRegistrationRequest.PENDING}"
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(
+            reverse('accounts:admin_approve_owner', kwargs={'pk': owner_request.pk}),
+            {'next': next_url},
+        )
+
+        self.assertRedirects(response, next_url, fetch_redirect_response=False)
+        owner_request.refresh_from_db()
+        self.assertEqual(owner_request.status, OwnerRegistrationRequest.APPROVED)
+        self.assertEqual(owner_request.reviewed_by, self.admin_user)
+        self.assertIsNotNone(owner_request.reviewed_at)
+
+        approved_user = User.objects.get(email='approved-owner-request@test.com')
+        self.assertTrue(approved_user.check_password('Password123!'))
+        self.assertTrue(OwnerProfile.objects.filter(
+            user=approved_user,
+            business_name='Pending Owner Business',
+            is_verified=True,
+        ).exists())
+        self.assertTrue(UserRole.objects.filter(user=approved_user, role=self.owner_role).exists())
+        self.assertTrue(Wallet.objects.filter(user=approved_user).exists())
+
+    def test_admin_rejects_owner_request_and_returns_to_request_page(self):
+        owner_request = self.create_owner_request('rejected-owner-request@test.com')
+        next_url = f"{reverse('venues:admin_request_list')}?status={OwnerRegistrationRequest.PENDING}"
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(
+            reverse('accounts:admin_reject_owner', kwargs={'pk': owner_request.pk}),
+            {'next': next_url},
+        )
+
+        self.assertRedirects(response, next_url, fetch_redirect_response=False)
+        owner_request.refresh_from_db()
+        self.assertEqual(owner_request.status, OwnerRegistrationRequest.REJECTED)
+        self.assertEqual(owner_request.reviewed_by, self.admin_user)
+        self.assertIsNotNone(owner_request.reviewed_at)
+        self.assertFalse(User.objects.filter(email='rejected-owner-request@test.com').exists())
+        self.assertFalse(UserRole.objects.filter(
+            user__email='rejected-owner-request@test.com',
+            role=self.owner_role,
+        ).exists())
+
+    def test_owner_request_actions_default_to_admin_request_page_without_next(self):
+        owner_request = self.create_owner_request('default-redirect-owner-request@test.com')
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(reverse('accounts:admin_reject_owner', kwargs={'pk': owner_request.pk}))
+
+        self.assertRedirects(
+            response,
+            reverse('venues:admin_request_list'),
+            fetch_redirect_response=False,
+        )
+
+    def test_non_admin_cannot_approve_or_reject_owner_registration_request(self):
+        approve_request = self.create_owner_request('blocked-approve-owner-request@test.com')
+        reject_request = self.create_owner_request('blocked-reject-owner-request@test.com')
+        self.client.force_login(self.customer_user)
+
+        approve_response = self.client.post(
+            reverse('accounts:admin_approve_owner', kwargs={'pk': approve_request.pk}),
+            {'next': reverse('venues:admin_request_list')},
+        )
+        reject_response = self.client.post(
+            reverse('accounts:admin_reject_owner', kwargs={'pk': reject_request.pk}),
+            {'next': reverse('venues:admin_request_list')},
+        )
+
+        self.assertRedirects(
+            approve_response,
+            reverse('accounts:profile'),
+            fetch_redirect_response=False,
+        )
+        self.assertRedirects(
+            reject_response,
+            reverse('accounts:profile'),
+            fetch_redirect_response=False,
+        )
+        approve_request.refresh_from_db()
+        reject_request.refresh_from_db()
+        self.assertEqual(approve_request.status, OwnerRegistrationRequest.PENDING)
+        self.assertEqual(reject_request.status, OwnerRegistrationRequest.PENDING)
 
 
 class AdminUserManagementTests(TestCase):

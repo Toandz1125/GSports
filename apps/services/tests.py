@@ -930,6 +930,25 @@ class OwnerServiceCreateRealTemplateTests(TestCase):
         self.assertContains(response, 'Thêm dịch vụ')
         self.assertContains(response, f'href="{reverse("services:owner_serviceitem_create")}"')
 
+    def test_owner_service_root_renders_owner_management(self):
+        ServiceItem.objects.create(
+            venue=self.venue, name='Sting', category=ServiceItem.DRINK,
+            price=Decimal('12000'), stock=5, is_active=True,
+        )
+        ServiceItem.objects.create(
+            venue=self.other_venue, name='Other Sting', category=ServiceItem.DRINK,
+            price=Decimal('13000'), stock=5, is_active=True,
+        )
+        self.client.force_login(self.owner_user)
+
+        response = self.client.get(reverse('services:serviceitem_list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'services/owner_serviceitem_list.html')
+        self.assertContains(response, 'Quản lý dịch vụ')
+        self.assertContains(response, 'Sting')
+        self.assertNotContains(response, 'Other Sting')
+
     def test_owner_create_form_page_renders(self):
         self.client.force_login(self.owner_user)
         response = self.client.get(reverse('services:owner_serviceitem_create'))

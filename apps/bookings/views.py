@@ -115,19 +115,66 @@ def _parse_booking_date(value):
     return parse_date(str(value))
 
 
-def _get_field_from_value(value):
+def _get_field_from_value(value, queryset=None):
     if isinstance(value, Field):
         return value
     if not value:
         return None
+    queryset = queryset if queryset is not None else get_bookable_fields_queryset()
     try:
-        return get_bookable_fields_queryset().get(pk=value)
+        return queryset.get(pk=value)
     except (Field.DoesNotExist, TypeError, ValueError):
         return None
 
 
-def _get_default_field():
-    return get_bookable_fields_queryset().order_by('pk').first()
+def _get_venue_from_value(value, queryset=None):
+    if isinstance(value, Venue):
+        return value
+    if not value:
+        return None
+    queryset = queryset if queryset is not None else Venue.objects.filter(status=Venue.ACTIVE, is_deleted=False)
+    try:
+        return queryset.get(pk=value)
+    except (Venue.DoesNotExist, TypeError, ValueError):
+        return None
+
+
+def _booking_base_field_queryset_for_user(user):
+    queryset = get_bookable_fields_queryset()
+
+    from apps.accounts.models import Role
+    from apps.bookings.permissions import user_has_role
+
+    if user_has_role(user, Role.STAFF):
+        if hasattr(user, 'staff_profile') and user.staff_profile.owner:
+            queryset = queryset.filter(venue__owner=user.staff_profile.owner)
+        else:
+            queryset = queryset.none()
+    elif user_has_role(user, Role.OWNER):
+        if hasattr(user, 'owner_profile'):
+            queryset = queryset.filter(venue__owner=user.owner_profile)
+        else:
+            queryset = queryset.none()
+    return queryset
+
+
+def _booking_venue_queryset_for_user(user):
+    queryset = Venue.objects.filter(status=Venue.ACTIVE, is_deleted=False).order_by('name')
+
+    from apps.accounts.models import Role
+    from apps.bookings.permissions import user_has_role
+
+    if user_has_role(user, Role.STAFF):
+        if hasattr(user, 'staff_profile') and user.staff_profile.owner:
+            queryset = queryset.filter(owner=user.staff_profile.owner)
+        else:
+            queryset = queryset.none()
+    elif user_has_role(user, Role.OWNER):
+        if hasattr(user, 'owner_profile'):
+            queryset = queryset.filter(owner=user.owner_profile)
+        else:
+            queryset = queryset.none()
+    return queryset
 
 
 class BookingListView(LoginRequiredMixin, ListView):
@@ -307,6 +354,7 @@ class BookingDetailView(LoginRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         # Flip the booking to CANCELLED if its 10-minute hold has expired.
         if cancel_expired_booking_if_needed(self.object):
+            self.object.refresh_from_db()
             messages.warning(self.request, BOOKING_EXPIRED_MESSAGE)
         context['can_edit_booking_services'] = self.object.can_modify_services()
         context['booking_service_lock_message'] = self.object.get_service_modification_block_message()
@@ -372,15 +420,61 @@ class BookingCreateView(LoginRequiredMixin, FormView):
     template_name = 'bookings/booking_form.html'
     form_class = BookingCreateForm
 
+    def _base_field_queryset(self):
+        return _booking_base_field_queryset_for_user(self.request.user)
+
+    def _venue_queryset(self):
+        return _booking_venue_queryset_for_user(self.request.user)
+
+    def _fields_for_venue(self, venue):
+        if not venue:
+            return self._base_field_queryset().none()
+        return self._base_field_queryset().filter(
+            venue=venue,
+            status=FIELD_ACTIVE_STATUS,
+            venue__status=Venue.ACTIVE,
+            venue__is_deleted=False,
+        ).order_by('name')
+
+    def _request_data(self):
+        return self.request.POST if self.request.method == 'POST' else self.request.GET
+
+    def _request_venue_id(self):
+        data = self._request_data()
+        return data.get('venue') or data.get('venue_id')
+
+    def _request_field_id(self):
+        data = self._request_data()
+        return (
+            data.get('field')
+            or data.get('field_id')
+            or self.kwargs.get('field_id')
+        )
+
     def get_initial(self):
         initial = super().get_initial()
+        field_queryset = self._base_field_queryset()
+        venue_queryset = self._venue_queryset()
         selected_field = _get_field_from_value(
             self.kwargs.get('field_id') or self.request.GET.get('field_id') or self.request.GET.get('field'),
-        ) or _get_default_field()
+            field_queryset,
+        )
+        if selected_field and not field_queryset.filter(pk=selected_field.pk).exists():
+            selected_field = None
+        selected_venue = _get_venue_from_value(
+            self.request.GET.get('venue') or self.request.GET.get('venue_id'),
+            venue_queryset,
+        )
+        if not selected_venue and selected_field:
+            selected_venue = selected_field.venue
+        if selected_venue and selected_field and selected_field.venue_id != selected_venue.pk:
+            selected_field = None
         selected_date = _parse_booking_date(
             self.request.GET.get('booking_date'),
         ) or timezone.localdate()
 
+        if selected_venue:
+            initial['venue'] = selected_venue.pk
         if selected_field:
             initial['field'] = selected_field.pk
         initial['booking_date'] = selected_date
@@ -388,31 +482,28 @@ class BookingCreateView(LoginRequiredMixin, FormView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        user = self.request.user
-        queryset = get_bookable_fields_queryset()
-        
-        # Import lazy để tránh circular imports
-        from apps.accounts.models import Role
-        from apps.bookings.permissions import user_has_role
-        
-        if user_has_role(user, Role.STAFF):
-            if hasattr(user, 'staff_profile') and user.staff_profile.owner:
-                queryset = queryset.filter(venue__owner=user.staff_profile.owner)
-            else:
-                queryset = queryset.none()
-        elif user_has_role(user, Role.OWNER):
-            if hasattr(user, 'owner_profile'):
-                queryset = queryset.filter(venue__owner=user.owner_profile)
-            else:
-                queryset = queryset.none()
-                
-        kwargs['field_queryset'] = queryset
+        kwargs['field_queryset'] = self._base_field_queryset()
+        kwargs['venue_queryset'] = self._venue_queryset()
+        if self.request.method == 'GET':
+            kwargs['venue_id'] = self._request_venue_id()
+            kwargs['field_id'] = self._request_field_id()
+        elif not self.request.POST.get('field') and self.kwargs.get('field_id'):
+            kwargs['field_id'] = self.kwargs['field_id']
         return kwargs
 
     def _get_context_selection(self, form):
         cleaned_data = getattr(form, 'cleaned_data', {}) or {}
+        selected_venue = cleaned_data.get('venue') or getattr(form, 'selected_venue', None)
         selected_field = cleaned_data.get('field')
         selected_date = cleaned_data.get('booking_date')
+
+        if not selected_venue:
+            raw_venue = (
+                form.data.get(form.add_prefix('venue'))
+                if form.is_bound
+                else form.initial.get('venue')
+            )
+            selected_venue = _get_venue_from_value(raw_venue, form.fields['venue'].queryset)
 
         if not selected_field:
             raw_field = (
@@ -420,10 +511,17 @@ class BookingCreateView(LoginRequiredMixin, FormView):
                 if form.is_bound
                 else form.initial.get('field')
             )
-            selected_field = _get_field_from_value(raw_field)
+            try:
+                selected_field = form.fields['field'].queryset.get(pk=raw_field)
+            except (Field.DoesNotExist, TypeError, ValueError):
+                selected_field = None
 
-        if not selected_field and not form.is_bound:
-            selected_field = _get_default_field()
+        if selected_field and not selected_venue:
+            selected_venue = selected_field.venue
+        if selected_venue and selected_field and selected_field.venue_id != selected_venue.pk:
+            selected_field = None
+        if selected_venue and selected_field and not form.fields['field'].queryset.filter(pk=selected_field.pk).exists():
+            selected_field = None
 
         if not selected_date:
             raw_date = (
@@ -434,33 +532,54 @@ class BookingCreateView(LoginRequiredMixin, FormView):
             selected_date = _parse_booking_date(raw_date)
 
         selected_date = selected_date or timezone.localdate()
-        return selected_field, selected_date
+        return selected_venue, selected_field, selected_date
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         # Free up slots held by expired pending bookings before drawing the picker.
         cancel_expired_pending_bookings()
         form = context['form']
-        selected_field, selected_date = self._get_context_selection(form)
-        time_blocks = get_time_blocks_for_field_date(selected_field, selected_date)
-        unavailable_blocks = get_unavailable_time_blocks(
-            selected_field,
-            selected_date,
-            time_blocks,
-        )
-        slot_options = get_booking_slot_options(
-            selected_field,
-            selected_date,
-            time_blocks,
-            unavailable_blocks,
-        )
+        selected_venue, selected_field, selected_date = self._get_context_selection(form)
+        fields_for_selected_venue = self._fields_for_venue(selected_venue)
+        form.fields['field'].queryset = fields_for_selected_venue
+        if selected_field and not fields_for_selected_venue.filter(pk=selected_field.pk).exists():
+            selected_field = None
+        time_blocks = []
+        unavailable_blocks = []
+        slot_options = []
+        if selected_field:
+            time_blocks = get_time_blocks_for_field_date(selected_field, selected_date)
+            unavailable_blocks = get_unavailable_time_blocks(
+                selected_field,
+                selected_date,
+                time_blocks,
+            )
+            slot_options = get_booking_slot_options(
+                selected_field,
+                selected_date,
+                time_blocks,
+                unavailable_blocks,
+            )
+        booking_empty_message = ''
+        if getattr(form, 'field_venue_mismatch', False):
+            booking_empty_message = BookingCreateForm.FIELD_VENUE_MISMATCH_MESSAGE
+        elif not selected_venue:
+            booking_empty_message = 'Chọn cơ sở để xem danh sách sân'
+        elif selected_venue and not fields_for_selected_venue.exists():
+            booking_empty_message = 'Cơ sở này chưa có sân khả dụng'
+        elif selected_venue and not selected_field:
+            booking_empty_message = 'Chọn sân con để xem khung giờ khả dụng.'
         context.update({
-            'bookable_fields': form.fields['field'].queryset,
+            'venues': form.fields['venue'].queryset,
+            'bookable_fields': fields_for_selected_venue,
+            'fields_for_selected_venue': fields_for_selected_venue,
             'time_blocks': time_blocks,
             'unavailable_blocks': unavailable_blocks,
             'slot_options': slot_options,
+            'selected_venue': selected_venue,
             'selected_field': selected_field,
             'selected_date': selected_date,
+            'booking_empty_message': booking_empty_message,
         })
         return context
 
@@ -504,6 +623,34 @@ class BookingCreateView(LoginRequiredMixin, FormView):
 
     def get_success_url(self):
         return reverse('bookings:booking_detail', kwargs={'pk': self.booking.pk})
+
+
+class BookingVenueFieldsView(LoginRequiredMixin, View):
+    def get(self, request, venue_id):
+        venue = _get_venue_from_value(
+            venue_id,
+            _booking_venue_queryset_for_user(request.user),
+        )
+        if not venue:
+            return JsonResponse({'ok': False, 'fields': []}, status=404)
+
+        fields = _booking_base_field_queryset_for_user(request.user).filter(
+            venue=venue,
+            status=FIELD_ACTIVE_STATUS,
+            venue__status=Venue.ACTIVE,
+            venue__is_deleted=False,
+        ).order_by('name')
+
+        return JsonResponse({
+            'ok': True,
+            'fields': [
+                {
+                    'id': field.pk,
+                    'name': field.name,
+                }
+                for field in fields
+            ],
+        })
 
 
 class BookingFieldServicesView(LoginRequiredMixin, View):
@@ -584,7 +731,11 @@ class BookingStatusView(LoginRequiredMixin, View):
             'status': booking.status,
             'status_display': booking.get_status_display(),
             'can_pay': booking.can_pay(),
-            'payment_deadline': booking.payment_deadline.isoformat() if booking.payment_deadline else None,
+            'payment_deadline': (
+                booking.get_effective_payment_deadline().isoformat()
+                if booking.get_effective_payment_deadline()
+                else None
+            ),
             'server_time': timezone.now().isoformat(),
             'checkout_url': reverse('payments:booking_checkout', kwargs={'booking_pk': booking.pk})
             if booking.can_pay() else None,
@@ -892,10 +1043,26 @@ class BookingCheckoutView(LoginRequiredMixin, View):
     """Compatibility route: real checkout lives in apps.payments."""
 
     def get(self, request, *args, **kwargs):
+        booking = get_object_or_404(
+            Booking.objects.select_related('booking_package', 'booking_package__user'),
+            pk=kwargs['booking_pk'],
+            booking_package__user=request.user,
+        )
+        if cancel_expired_booking_if_needed(booking):
+            booking.refresh_from_db()
+        if not booking.can_pay():
+            effective_deadline = booking.get_effective_payment_deadline()
+            if booking.status == Booking.PAID:
+                messages.info(request, 'Booking đã được thanh toán')
+            elif booking.status == Booking.CANCELLED and effective_deadline and effective_deadline <= timezone.now():
+                messages.warning(request, BOOKING_EXPIRED_MESSAGE)
+            else:
+                messages.error(request, 'Booking hiện không thể thanh toán.')
+            return redirect('bookings:booking_detail', pk=booking.pk)
         return redirect('payments:booking_checkout', booking_pk=kwargs['booking_pk'])
 
     def post(self, request, *args, **kwargs):
-        return redirect('payments:booking_checkout', booking_pk=kwargs['booking_pk'])
+        return self.get(request, *args, **kwargs)
 
 
 class BookingPayView(LoginRequiredMixin, View):

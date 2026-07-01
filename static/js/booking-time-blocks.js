@@ -2,17 +2,152 @@
     const filterForm = document.querySelector('[data-booking-filter-form]');
     if (!filterForm) return;
 
+    const venueSelect = filterForm.querySelector('[data-booking-venue-select]');
     const fieldSelect = filterForm.querySelector('[data-booking-field-select]');
     const dateInput = filterForm.querySelector('[data-booking-date-input]');
+    const venueFieldsUrlTemplate = filterForm.dataset.venueFieldsUrlTemplate || '';
+    const STALE_FILTER_PARAMS = ['field', 'field_id', 'slot', 'selected_slots', 'start_time', 'end_time'];
 
-    [fieldSelect, dateInput].forEach((control) => {
-        if (!control) return;
-        control.addEventListener('change', () => {
-            if (fieldSelect && fieldSelect.value && dateInput && dateInput.value) {
-                filterForm.submit();
-            }
+    function clearSelectedSlots() {
+        document.querySelectorAll('[data-slot-card].slot-card--selected').forEach((card) => {
+            card.classList.remove('slot-card--selected');
         });
-    });
+        document.querySelectorAll('[data-selected-slot-inputs]').forEach((holder) => {
+            holder.innerHTML = '';
+        });
+        document.querySelectorAll('input[name="start_time"], input[name="end_time"]').forEach((input) => {
+            input.value = '';
+        });
+    }
+
+    function buildCleanFilterUrl() {
+        const url = new URL(filterForm.action || window.location.pathname, window.location.origin);
+        const params = new URLSearchParams();
+        STALE_FILTER_PARAMS.forEach((param) => params.delete(param));
+        url.search = params.toString();
+        return url;
+    }
+
+    function venueFieldsUrl(venueValue) {
+        if (!venueFieldsUrlTemplate || !venueValue) return '';
+        return venueFieldsUrlTemplate.replace('/0/', `/${encodeURIComponent(venueValue)}/`);
+    }
+
+    function resetFieldOptions(message) {
+        if (!fieldSelect) return;
+        fieldSelect.innerHTML = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = message || '-- Chọn sân con --';
+        fieldSelect.appendChild(placeholder);
+        fieldSelect.value = '';
+    }
+
+    function populateFieldOptions(fields, selectedFieldValue) {
+        if (!fieldSelect) return;
+        resetFieldOptions('-- Chọn sân con --');
+        fields.forEach((field) => {
+            const option = document.createElement('option');
+            option.value = String(field.id);
+            option.dataset.venueId = venueSelect ? String(venueSelect.value || '') : '';
+            option.textContent = field.name;
+            if (selectedFieldValue && String(selectedFieldValue) === String(field.id)) {
+                option.selected = true;
+            }
+            fieldSelect.appendChild(option);
+        });
+        fieldSelect.disabled = !fields.length;
+    }
+
+    function loadFieldsForVenue(venueValue, selectedFieldValue) {
+        const url = venueFieldsUrl(venueValue);
+        if (!fieldSelect || !url) return Promise.resolve();
+        fieldSelect.disabled = true;
+        resetFieldOptions(venueValue ? 'Đang tải sân con...' : 'Chọn cơ sở trước');
+        if (!venueValue) return Promise.resolve();
+
+        return fetch(url, {
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        })
+            .then((response) => (response.ok ? response.json() : { ok: false, fields: [] }))
+            .then((payload) => {
+                const fields = payload && payload.ok && Array.isArray(payload.fields)
+                    ? payload.fields
+                    : [];
+                populateFieldOptions(fields, selectedFieldValue);
+            })
+            .catch(() => {
+                resetFieldOptions('-- Chọn sân con --');
+                fieldSelect.disabled = true;
+            });
+    }
+
+    function reloadBookingFilter(includeField) {
+        clearSelectedSlots();
+        const url = buildCleanFilterUrl();
+        const venueValue = venueSelect ? venueSelect.value : '';
+        const fieldValue = fieldSelect ? fieldSelect.value : '';
+        const dateValue = dateInput ? dateInput.value : '';
+        const selectedOption = fieldSelect && fieldSelect.selectedOptions.length
+            ? fieldSelect.selectedOptions[0]
+            : null;
+
+        if (venueValue) url.searchParams.set('venue', venueValue);
+        if (
+            includeField
+            && venueValue
+            && fieldValue
+            && selectedOption
+            && String(selectedOption.dataset.venueId || '') === String(venueValue)
+        ) {
+            url.searchParams.set('field', fieldValue);
+        }
+        if (dateValue) url.searchParams.set('booking_date', dateValue);
+
+        window.location.assign(url.toString());
+    }
+
+    if (venueSelect) {
+        venueSelect.addEventListener('change', () => {
+            if (fieldSelect) {
+                fieldSelect.value = '';
+                loadFieldsForVenue(venueSelect.value);
+            }
+            reloadBookingFilter(false);
+        });
+    }
+
+    if (fieldSelect) {
+        fieldSelect.addEventListener('change', () => {
+            if (!venueSelect || !venueSelect.value) {
+                fieldSelect.value = '';
+                clearSelectedSlots();
+                return;
+            }
+            reloadBookingFilter(true);
+        });
+    }
+
+    if (dateInput) {
+        dateInput.addEventListener('change', () => {
+            reloadBookingFilter(true);
+        });
+    }
+
+    if (
+        venueSelect
+        && venueSelect.value
+        && fieldSelect
+    ) {
+        if (fieldSelect.options.length <= 1) {
+            loadFieldsForVenue(venueSelect.value);
+        } else {
+            fieldSelect.disabled = false;
+        }
+    }
 })();
 
 (function () {

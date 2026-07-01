@@ -6,7 +6,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 
 from apps.services.models import ServiceItem
-from apps.venues.models import Field
+from apps.venues.models import Field, Venue
 from .services import (
     BOOKING_INVALID_SLOT_ERROR,
     BOOKING_NO_SLOT_SELECTED_ERROR,
@@ -29,7 +29,9 @@ def generate_time_block_choices(open_time=None, close_time=None):
 
 class BookingCreateForm(forms.Form):
     SERVICE_FIELD_PREFIX = 'service_quantity_'
+    FIELD_VENUE_MISMATCH_MESSAGE = 'Vui lòng chọn sân thuộc cơ sở đã chọn.'
 
+    venue = forms.ModelChoiceField(label='Cơ sở', queryset=Venue.objects.none(), required=False)
     field = forms.ModelChoiceField(label='Sân', queryset=Field.objects.none())
     booking_date = forms.DateField(label='Ngày đặt', widget=forms.DateInput(attrs={'type': 'date'}))
     start_time = forms.TimeField(
@@ -54,8 +56,24 @@ class BookingCreateForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         field_queryset = kwargs.pop('field_queryset', None)
+        venue_queryset = kwargs.pop('venue_queryset', None)
+        selected_venue_id = kwargs.pop('venue_id', None)
+        selected_field_id = kwargs.pop('field_id', None)
         super().__init__(*args, **kwargs)
-        self.fields['field'].queryset = field_queryset or get_bookable_fields_queryset()
+        self.base_field_queryset = (
+            field_queryset
+            if field_queryset is not None
+            else get_bookable_fields_queryset()
+        )
+        self.fields['venue'].queryset = (
+            venue_queryset
+            if venue_queryset is not None
+            else Venue.objects.filter(status=Venue.ACTIVE, is_deleted=False).order_by('name')
+        )
+        self.selected_venue = None
+        self.resolved_field = None
+        self.field_venue_mismatch = False
+        self._configure_field_queryset(selected_venue_id, selected_field_id)
         self.calculated_price = None
         self.price_rule = None
         self.selected_slot_ranges = []
@@ -77,16 +95,62 @@ class BookingCreateForm(forms.Form):
                 }),
             )
 
-    @classmethod
-    def get_service_quantity_field_name(cls, service_item_id):
-        return f'{cls.SERVICE_FIELD_PREFIX}{service_item_id}'
+    def _raw_selected_venue_id(self, selected_venue_id=None):
+        if selected_venue_id:
+            return selected_venue_id
+        field_name = self.add_prefix('venue')
+        if self.is_bound:
+            return self.data.get(field_name)
+        initial_venue = self.initial.get('venue')
+        return getattr(initial_venue, 'pk', initial_venue)
 
-    def _raw_selected_field_id(self):
+    def _raw_selected_field_id(self, selected_field_id=None):
+        if selected_field_id:
+            return selected_field_id
         field_name = self.add_prefix('field')
         if self.is_bound:
             return self.data.get(field_name)
         initial_field = self.initial.get('field')
         return getattr(initial_field, 'pk', initial_field)
+
+    def _resolve_field_from_base_queryset(self, field_id):
+        if not field_id:
+            return None
+        try:
+            return self.base_field_queryset.get(pk=field_id)
+        except (Field.DoesNotExist, TypeError, ValueError):
+            return None
+
+    def _configure_field_queryset(self, selected_venue_id=None, selected_field_id=None):
+        venue_id = self._raw_selected_venue_id(selected_venue_id)
+        field_id = self._raw_selected_field_id(selected_field_id)
+        resolved_field = self._resolve_field_from_base_queryset(field_id)
+        self.resolved_field = resolved_field
+
+        if not venue_id and resolved_field:
+            venue_id = resolved_field.venue_id
+
+        if venue_id:
+            try:
+                self.selected_venue = self.fields['venue'].queryset.get(pk=venue_id)
+            except (Venue.DoesNotExist, TypeError, ValueError):
+                self.selected_venue = None
+
+        if self.selected_venue:
+            self.fields['field'].queryset = self.base_field_queryset.filter(
+                venue=self.selected_venue,
+            ).order_by('name')
+            self.initial.setdefault('venue', self.selected_venue.pk)
+            if resolved_field and resolved_field.venue_id == self.selected_venue.pk:
+                self.initial.setdefault('field', resolved_field.pk)
+            elif resolved_field:
+                self.field_venue_mismatch = True
+        else:
+            self.fields['field'].queryset = self.base_field_queryset.none()
+
+    @classmethod
+    def get_service_quantity_field_name(cls, service_item_id):
+        return f'{cls.SERVICE_FIELD_PREFIX}{service_item_id}'
 
     def _resolve_service_items(self):
         field_id = self._raw_selected_field_id()
@@ -181,9 +245,26 @@ class BookingCreateForm(forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
+        venue = cleaned_data.get('venue')
         field = cleaned_data.get('field')
         booking_date = cleaned_data.get('booking_date')
         slot_ranges = []
+
+        if field and not venue:
+            venue = field.venue
+            cleaned_data['venue'] = venue
+
+        if venue:
+            venue_status = (getattr(venue, 'status', '') or '').upper()
+            if venue_status != Venue.ACTIVE or getattr(venue, 'is_deleted', False):
+                self.add_error('venue', 'Cơ sở không khả dụng để đặt sân.')
+
+        if field and venue and field.venue_id != venue.pk:
+            self.add_error('field', self.FIELD_VENUE_MISMATCH_MESSAGE)
+            field = None
+            cleaned_data['field'] = None
+        elif self.field_venue_mismatch:
+            self.add_error('field', self.FIELD_VENUE_MISMATCH_MESSAGE)
 
         booking_request_is_valid = True
         try:

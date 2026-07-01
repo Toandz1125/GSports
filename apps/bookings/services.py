@@ -20,7 +20,7 @@ DEFAULT_OPEN_TIME = time(5, 30)
 DEFAULT_CLOSE_TIME = time(23, 30)
 # Pending bookings hold their slots for this long before being auto-cancelled.
 # This is purely a booking-side hold; it does not touch the payments module.
-BOOKING_PAYMENT_TIMEOUT_MINUTES = 10
+BOOKING_PAYMENT_TIMEOUT_MINUTES = Booking.PAYMENT_TIMEOUT_MINUTES
 TIME_BLOCK_FORMAT = '%H:%M'
 # Internal lock granularity stays at 30 minutes because existing Redis keys and
 # validators are built around :00/:30 boundaries.
@@ -90,11 +90,20 @@ def cancel_expired_pending_bookings(now=None):
         expires_at__lte=now,
     ).update(status=SlotLock.EXPIRED)
 
+    legacy_deadline_cutoff = now - timedelta(minutes=BOOKING_PAYMENT_TIMEOUT_MINUTES)
+    expired_by_deadline = Q(
+        payment_deadline__isnull=False,
+        payment_deadline__lte=now,
+    )
+    expired_legacy_null_deadline = Q(
+        payment_deadline__isnull=True,
+        created_at__lte=legacy_deadline_cutoff,
+    )
     expired_ids = list(
         Booking.objects.filter(
             status=Booking.PENDING,
-            payment_deadline__isnull=False,
-            payment_deadline__lte=now,
+        ).filter(
+            expired_by_deadline | expired_legacy_null_deadline,
         ).values_list('pk', flat=True)
     )
     if not expired_ids:
@@ -113,10 +122,11 @@ def cancel_expired_booking_if_needed(booking, now=None):
     if booking is None:
         return False
     now = now or timezone.now()
+    deadline = booking.get_effective_payment_deadline()
     if (
         booking.status == Booking.PENDING
-        and booking.payment_deadline
-        and booking.payment_deadline <= now
+        and deadline
+        and deadline <= now
     ):
         booking.status = Booking.CANCELLED
         booking.save(update_fields=['status', 'updated_at'])

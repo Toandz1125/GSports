@@ -7,6 +7,7 @@ from .views import (
     BookingCreateView,
     BookingDetailView,
     BookingFieldServicesView,
+    BookingVenueFieldsView,
     BookingHistoryListView,
     BookingListView,
     BookingStatusView,
@@ -29,6 +30,7 @@ urlpatterns = [
     path('create/', BookingCreateView.as_view(), name='booking_create'),
     path('fields/<int:field_id>/create/', BookingCreateView.as_view(), name='booking_create_for_field'),
     path('availability/', BookingAvailabilityView.as_view(), name='booking_availability'),
+    path('venues/<int:venue_id>/fields/', BookingVenueFieldsView.as_view(), name='venue_fields'),
     path('fields/<int:field_id>/services/', BookingFieldServicesView.as_view(), name='field_services'),
     path('fields/<int:field_id>/detail/', FieldDetailJSONView.as_view(), name='field_detail'),
     # Role-based management dashboards (non-/admin)

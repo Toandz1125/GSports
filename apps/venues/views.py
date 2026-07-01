@@ -13,7 +13,7 @@ from django.utils import timezone
 from django.views import View
 from django.views.generic import DetailView, FormView, ListView, UpdateView
 
-from apps.accounts.models import FavoriteVenue, Notification, Role
+from apps.accounts.models import FavoriteVenue, Notification, OwnerRegistrationRequest, Role
 from apps.bookings.permissions import (
     AdminRequiredMixin,
     OwnerAssetRequiredMixin,
@@ -253,7 +253,28 @@ class VenueListView(LoginRequiredMixin, ListView):
     template_name = 'venues/venue_list.html'
     context_object_name = 'venues'
 
+    def is_owner_management_context(self):
+        return (
+            self.request.user.is_authenticated
+            and user_has_role(self.request.user, Role.OWNER)
+            and not is_admin(self.request.user)
+        )
+
+    def get_template_names(self):
+        if self.is_owner_management_context():
+            return ['venues/owner_venue_list.html']
+        return [self.template_name]
+
     def get_queryset(self):
+        if self.is_owner_management_context():
+            owner_profile = get_owner_profile(self.request.user)
+            if not owner_profile:
+                return Venue.objects.none()
+            return Venue.objects.filter(
+                owner=owner_profile,
+                is_deleted=False,
+            ).prefetch_related('fields', 'service_items').order_by('name')
+
         venues = list(public_venue_queryset().order_by('name'))
         for venue in venues:
             add_rating_display(venue)
@@ -261,6 +282,10 @@ class VenueListView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        if self.is_owner_management_context():
+            context['owner_profile'] = get_owner_profile(self.request.user)
+            return context
+
         favorite_venue_ids = set()
         if self.request.user.is_authenticated:
             favorite_venue_ids = set(
@@ -277,22 +302,40 @@ class VenueDetailView(LoginRequiredMixin, DetailView):
     context_object_name = 'venue'
 
     def get_queryset(self):
+        if (
+            self.request.user.is_authenticated
+            and user_has_role(self.request.user, Role.OWNER)
+            and not is_admin(self.request.user)
+        ):
+            owner_profile = get_owner_profile(self.request.user)
+            if not owner_profile:
+                return Venue.objects.none()
+            return (
+                Venue.objects.filter(owner=owner_profile, is_deleted=False)
+                .prefetch_related('fields__field_type__sport')
+            )
         return public_venue_queryset().prefetch_related('fields__field_type__sport')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         venue = add_rating_display(self.object)
+        owner_profile = (
+            get_owner_profile(self.request.user)
+            if self.request.user.is_authenticated
+            else None
+        )
+        is_owner_venue = bool(owner_profile and venue.owner_id == owner_profile.id)
         reviews = (
             venue.reviews.select_related('user')
             .order_by('-created_at')
         )
         context['venue'] = venue
-        context['fields'] = (
-            venue.fields.select_related('field_type', 'field_type__sport')
-            .filter(status='ACTIVE')
-            .order_by('name')
-        )
+        fields = venue.fields.select_related('field_type', 'field_type__sport').order_by('name')
+        if not is_owner_venue:
+            fields = fields.filter(status='ACTIVE')
+        context['fields'] = fields
         context['reviews'] = reviews
+        context['is_owner_venue'] = is_owner_venue
         context['user_review'] = None
         context['is_favorite'] = False
         if self.request.user.is_authenticated:
@@ -453,20 +496,40 @@ class AdminRequestListView(AdminRequiredMixin, ListView):
         )
         return queryset.order_by(pending_first, '-created_at')[:50]
 
+    def get_owner_requests(self):
+        queryset = OwnerRegistrationRequest.objects.select_related('reviewed_by')
+        active_status = getattr(self, 'active_status', '')
+        if active_status:
+            queryset = queryset.filter(status=active_status)
+        return queryset.order_by('-created_at')
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         active_status = getattr(self, 'active_status', '')
         field_requests = self.get_field_requests()
+        owner_requests = self.get_owner_requests()
         context['field_requests'] = field_requests
+        context['owner_requests'] = owner_requests
+        context['owner_request_count'] = owner_requests.count()
         context['status_choices'] = OwnerVenueRequest.STATUS_CHOICES
         context['active_status'] = active_status
         context['status_filter'] = active_status
+        raw_status = (self.request.GET.get('status') or '').strip()
+        context['current_status'] = raw_status if raw_status == 'all' else active_status
         context['pending_venue_request_count'] = OwnerVenueRequest.objects.filter(
             status=OwnerVenueRequest.PENDING,
         ).count()
         context['pending_field_request_count'] = FieldCreationRequest.objects.filter(
             status=FieldCreationRequest.PENDING,
         ).count()
+        context['pending_owner_request_count'] = OwnerRegistrationRequest.objects.filter(
+            status=OwnerRegistrationRequest.PENDING,
+        ).count()
+        context['total_request_count'] = (
+            len(context['venue_requests'])
+            + len(field_requests)
+            + context['owner_request_count']
+        )
         return context
 
 
@@ -910,6 +973,41 @@ class OwnerVenueCreateView(OwnerProfileContextMixin, FormView):
         context['page_title'] = 'Tạo cơ sở mới'
         context['submit_label'] = 'Gửi yêu cầu duyệt'
         context['back_url'] = reverse('venues:owner_venue_list')
+        context['form_intro'] = 'Thông tin cơ sở sẽ được gửi tới admin duyệt trước khi xuất hiện trong hệ thống.'
+        return context
+
+
+class OwnerVenueUpdateView(OwnerProfileContextMixin, FormView):
+    template_name = 'venues/owner_venue_form.html'
+    form_class = VenueCreateForm
+
+    def dispatch(self, request, *args, **kwargs):
+        self.set_owner_profile(request)
+        if not request.user.is_authenticated:
+            return super().dispatch(request, *args, **kwargs)
+        self.require_owner_profile()
+        self.venue = get_object_or_404(
+            Venue.objects.filter(owner=self.owner_profile, is_deleted=False),
+            pk=kwargs['pk'],
+        )
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['instance'] = self.venue
+        return kwargs
+
+    def form_valid(self, form):
+        form.save()
+        messages.success(self.request, f'Đã cập nhật cơ sở "{self.venue.name}".')
+        return redirect('venues:venue_detail', pk=self.venue.pk)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = f'Sửa cơ sở {self.venue.name}'
+        context['submit_label'] = 'Lưu thay đổi'
+        context['back_url'] = reverse('venues:venue_detail', kwargs={'pk': self.venue.pk})
+        context['form_intro'] = 'Cập nhật thông tin hiển thị của cơ sở thuộc quyền quản lý của bạn.'
         return context
 
 
