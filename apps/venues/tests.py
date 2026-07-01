@@ -630,6 +630,91 @@ class OwnerPriceRuleListViewTests(TestCase):
         self.assertContains(response, 'Thêm mức giá')
 
 
+class PublicVenueRouteTests(TestCase):
+    """Public venue navigation must not resolve to owner-only management URLs."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.owner_role, _ = Role.objects.get_or_create(name=Role.OWNER)
+        self.customer_role, _ = Role.objects.get_or_create(name=Role.CUSTOMER)
+        self.admin_role, _ = Role.objects.get_or_create(name=Role.ADMIN)
+
+        self.owner_user = User.objects.create_user(
+            username='public-owner',
+            email='public-owner@example.com',
+            password='password',
+        )
+        UserRole.objects.update_or_create(
+            user=self.owner_user,
+            defaults={'role': self.owner_role},
+        )
+        self.owner = OwnerProfile.objects.create(
+            user=self.owner_user,
+            business_name='Public Owner',
+            is_verified=True,
+        )
+        self.customer_user = User.objects.create_user(
+            username='public-customer',
+            email='public-customer@example.com',
+            password='password',
+        )
+        UserRole.objects.update_or_create(
+            user=self.customer_user,
+            defaults={'role': self.customer_role},
+        )
+        self.admin_user = User.objects.create_user(
+            username='public-admin',
+            email='public-admin@example.com',
+            password='password',
+        )
+        UserRole.objects.update_or_create(
+            user=self.admin_user,
+            defaults={'role': self.admin_role},
+        )
+        self.venue = Venue.objects.create(
+            owner=self.owner,
+            name='Public Venue',
+            address='1 Public Street',
+            status=Venue.ACTIVE,
+        )
+
+    def test_public_venue_list_name_uses_public_route(self):
+        self.client.force_login(self.customer_user)
+        response = self.client.get(reverse('venues:venue_list'))
+
+        self.assertEqual(reverse('venues:venue_list'), '/co-so/')
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'venues/venue_list.html')
+        self.assertContains(response, 'Public Venue')
+
+    def test_public_venue_detail_name_uses_public_route(self):
+        self.client.force_login(self.customer_user)
+        response = self.client.get(reverse('venues:venue_detail', kwargs={'pk': self.venue.pk}))
+
+        self.assertEqual(reverse('venues:venue_detail', kwargs={'pk': self.venue.pk}), f'/co-so/{self.venue.pk}/')
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'venues/venue_detail.html')
+        self.assertContains(response, 'Public Venue')
+
+    def test_owner_venue_list_redirects_non_owner_sessions(self):
+        owner_url = reverse('venues:owner_venue_list')
+
+        self.client.force_login(self.customer_user)
+        response = self.client.get(owner_url)
+        self.assertRedirects(response, reverse('venues:venue_list'), fetch_redirect_response=False)
+
+        self.client.force_login(self.admin_user)
+        response = self.client.get(owner_url)
+        self.assertRedirects(response, reverse('venues:admin_venue_list'), fetch_redirect_response=False)
+
+    def test_owner_venue_list_still_allows_owners(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(reverse('venues:owner_venue_list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Public Venue')
+
+
 class VenueFieldApprovalFlowTests(TestCase):
     """Owner create requests must go through admin approval before a real
     ``Venue``/``Field`` is created. Uses the real templates/URLconf so the

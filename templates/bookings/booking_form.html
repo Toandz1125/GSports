@@ -1,5 +1,5 @@
 {% extends 'accounts/dashboard.html' %}
-{% load static %}
+{% load static l10n %}
 
 {% block title %}Đặt sân — GSports{% endblock %}
 
@@ -265,6 +265,46 @@
         gap: 1rem;
     }
 
+    .booking-estimate {
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        background: var(--bg-main);
+        padding: 0.9rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+    }
+
+    .booking-estimate__title {
+        color: var(--text-main);
+        font-size: 0.9rem;
+        font-weight: 800;
+        margin: 0 0 0.15rem;
+    }
+
+    .booking-estimate__row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+    }
+
+    .booking-estimate__row span:last-child {
+        color: var(--text-main);
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .booking-estimate__row--total {
+        border-top: 1px solid var(--border-color);
+        margin-top: 0.2rem;
+        padding-top: 0.6rem;
+        color: var(--text-main);
+        font-weight: 800;
+    }
+
     .service-table {
         width: 100%;
         border-collapse: collapse;
@@ -367,7 +407,7 @@
             {% if slot_options %}
             <div class="slot-grid">
                 {% for slot in slot_options %}
-                <div class="slot-card {% if slot.is_bookable %}slot-card--available{% else %}slot-card--disabled{% endif %}" data-slot-card data-slot-value="{{ slot.value }}" data-slot-start="{{ slot.start_label }}">
+                <div class="slot-card {% if slot.is_bookable %}slot-card--available{% else %}slot-card--disabled{% endif %}" data-slot-card data-slot-value="{{ slot.value }}" data-slot-start="{{ slot.start_label }}" data-slot-price="{{ slot.price|default:0|unlocalize }}">
                     <div class="slot-card__time">
                         <strong>{{ slot.start_label }}-{{ slot.end_label }}</strong>
                         {% if slot.price %}
@@ -377,7 +417,7 @@
                         {% endif %}
                     </div>
                     {% if slot.is_bookable %}
-                    <button type="submit" name="slot" value="{{ slot.value }}" data-slot-toggle data-time="{{ slot.start_label }}" class="btn btn--primary slot-booking-button time-block">
+                    <button type="submit" name="slot" value="{{ slot.value }}" data-slot-toggle data-slot-button data-slot-value="{{ slot.value }}" data-slot-price="{{ slot.price|default:0|unlocalize }}" data-time="{{ slot.start_label }}" class="btn btn--primary slot-booking-button time-block">
                         Chọn
                     </button>
                     {% else %}
@@ -395,9 +435,20 @@
 
         <aside class="booking-panel service-panel" data-service-section data-services-url-template="/dat-san/fields/__FIELD_ID__/services/">
             <h2>Thông tin thêm</h2>
-            <div class="booking-field">
-                <label for="{{ form.note.id_for_label }}">Ghi chú</label>
-                {{ form.note }}
+            <div class="booking-estimate">
+                <h3 class="booking-estimate__title">Tạm tính</h3>
+                <div class="booking-estimate__row">
+                    <span>Tiền sân</span>
+                    <span data-field-subtotal>0đ</span>
+                </div>
+                <div class="booking-estimate__row">
+                    <span>Tiền dịch vụ</span>
+                    <span data-service-subtotal>0đ</span>
+                </div>
+                <div class="booking-estimate__row booking-estimate__row--total">
+                    <span>Tổng cộng</span>
+                    <strong data-grand-total>0đ</strong>
+                </div>
             </div>
 
             {% if form.service_quantity_fields %}

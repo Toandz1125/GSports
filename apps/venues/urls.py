@@ -22,6 +22,8 @@ from .views import (
     AdminVenueRestoreView,
     AdminVenueSoftDeleteView,
     AdminVenueUpdateView,
+    FavoriteVenueListApiView,
+    FavoriteVenueToggleApiView,
     FieldManageView,
     FieldPricingUpdateView,
     FieldServicePriceView,
@@ -34,11 +36,17 @@ from .views import (
     OwnerPriceRuleDeleteView,
     OwnerVenueCreateView,
     OwnerVenueListView,
+    VenueDetailView,
+    VenueListView,
 )
 
 app_name = 'venues'
 
 urlpatterns = [
+    path('', VenueListView.as_view(), name='venue_list'),
+    path('<int:pk>/', VenueDetailView.as_view(), name='venue_detail'),
+    path('api/favorites/', FavoriteVenueListApiView.as_view(), name='favorite_venue_list_api'),
+    path('api/favorites/toggle/', FavoriteVenueToggleApiView.as_view(), name='favorite_venue_toggle_api'),
     path('admin/requests/', AdminRequestListView.as_view(), name='admin_request_list'),
     path(
         'admin/requests/venues/<int:pk>/approve/',
@@ -143,11 +151,6 @@ urlpatterns = [
         name='owner_venue_list',
     ),
     path(
-        'owner/venues/',
-        OwnerVenueListView.as_view(),
-        name='venue_list',
-    ),
-    path(
         'owner/venues/create/',
         OwnerVenueCreateView.as_view(),
         name='owner_venue_create',
@@ -156,11 +159,6 @@ urlpatterns = [
         'owner/venues/create/',
         OwnerVenueCreateView.as_view(),
         name='venue_create',
-    ),
-    path(
-        'owner/venues/<int:pk>/fields/',
-        OwnerFieldListView.as_view(),
-        name='venue_detail',
     ),
     path(
         'owner/venues/<int:venue_pk>/fields/',

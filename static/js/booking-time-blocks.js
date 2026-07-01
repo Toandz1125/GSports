@@ -109,6 +109,38 @@
     const resultMessage = bookingForm.querySelector('[data-booking-result-message]');
     const selectedSlots = new Map();
 
+    function parseMoney(value) {
+        const amount = Number(value);
+        return Number.isFinite(amount) ? amount : 0;
+    }
+
+    function formatVnd(amount) {
+        const roundedAmount = Math.round(parseMoney(amount));
+        return `${new Intl.NumberFormat('vi-VN').format(roundedAmount)}đ`;
+    }
+
+    function updateEstimate() {
+        const fieldSubtotal = bookingForm.querySelector('[data-field-subtotal]');
+        const serviceSubtotal = bookingForm.querySelector('[data-service-subtotal]');
+        const grandTotal = bookingForm.querySelector('[data-grand-total]');
+
+        let fieldTotal = 0;
+        bookingForm.querySelectorAll('[data-slot-card].slot-card--selected').forEach((card) => {
+            fieldTotal += parseMoney(card.dataset.slotPrice);
+        });
+
+        let serviceTotal = 0;
+        bookingForm.querySelectorAll('[data-service-quantity]').forEach((input) => {
+            const quantity = Math.max(0, parseMoney(input.value));
+            const price = parseMoney(input.dataset.servicePrice);
+            serviceTotal += quantity * price;
+        });
+
+        if (fieldSubtotal) fieldSubtotal.textContent = formatVnd(fieldTotal);
+        if (serviceSubtotal) serviceSubtotal.textContent = formatVnd(serviceTotal);
+        if (grandTotal) grandTotal.textContent = formatVnd(fieldTotal + serviceTotal);
+    }
+
     function showError(message) {
         if (!errorBox) return;
         errorBox.textContent = message || 'Không thể tạo booking. Vui lòng thử lại.';
@@ -168,6 +200,17 @@
         }
         syncHiddenInputs();
         clearError();
+        updateEstimate();
+    }
+
+    function resetSelectedSlots() {
+        selectedSlots.forEach((card) => {
+            card.classList.remove('slot-card--selected');
+            setButtonSelected(card.querySelector('[data-slot-toggle]'), false);
+        });
+        selectedSlots.clear();
+        syncHiddenInputs();
+        updateEstimate();
     }
 
     function extractErrorMessage(payload) {
@@ -190,6 +233,18 @@
             event.preventDefault();
             toggleSlot(button.closest('[data-slot-card]'), button);
         });
+    });
+
+    bookingForm.addEventListener('input', (event) => {
+        if (event.target.matches('[data-service-quantity]')) {
+            updateEstimate();
+        }
+    });
+
+    bookingForm.addEventListener('change', (event) => {
+        if (event.target.matches('[data-service-quantity]')) {
+            updateEstimate();
+        }
     });
 
     bookingForm.addEventListener('submit', (event) => {
@@ -226,8 +281,7 @@
             // panel / "Thanh toán" / "Chi tiết booking" buttons on this screen.
             // Keep the submit button disabled while navigating to avoid a double
             // submit. checkout_url is intentionally not used here anymore.
-            selectedSlots.clear();
-            syncHiddenInputs();
+            resetSelectedSlots();
             if (resultBox) resultBox.hidden = false;
             if (resultMessage) {
                 resultMessage.textContent = 'Đặt sân thành công, đang chuyển sang chi tiết booking...';
@@ -240,4 +294,6 @@
             if (submitButton) submitButton.disabled = false;
         });
     });
+
+    updateEstimate();
 })();

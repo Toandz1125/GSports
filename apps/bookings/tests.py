@@ -1363,6 +1363,13 @@ class BookingRealTemplateRenderingTests(TestCase):
             open_time=time(8, 0),
             close_time=time(12, 0),
         )
+        self.service_item = ServiceItem.objects.create(
+            venue=self.venue,
+            name='Template Water',
+            category=ServiceItem.DRINK,
+            price=Decimal('15000.00'),
+            stock=20,
+        )
 
     def test_real_booking_form_renders_book_button_for_available_slot(self):
         self.client.force_login(self.customer)
@@ -1378,6 +1385,26 @@ class BookingRealTemplateRenderingTests(TestCase):
         self.assertContains(response, 'data-time="09:00"')
         self.assertContains(response, 'name="slot" value="09:00|10:00"')
         self.assertContains(response, 'csrfmiddlewaretoken')
+
+    def test_real_booking_form_renders_estimate_box_and_price_data(self):
+        self.client.force_login(self.customer)
+
+        response = self.client.get(reverse('bookings:booking_create'), {
+            'field': self.field.pk,
+            'booking_date': self.booking_date.isoformat(),
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'Ghi chú')
+        self.assertContains(response, 'Tạm tính')
+        self.assertContains(response, 'Tiền sân')
+        self.assertContains(response, 'Tiền dịch vụ')
+        self.assertContains(response, 'Tổng cộng')
+        self.assertContains(response, 'data-field-subtotal')
+        self.assertContains(response, 'data-service-subtotal')
+        self.assertContains(response, 'data-grand-total')
+        self.assertContains(response, 'data-slot-price="100000.00"')
+        self.assertContains(response, 'data-service-price="15000.00"')
 
     def test_real_booking_form_has_no_payment_or_detail_buttons(self):
         """The booking screen must not show a 'Thanh toán' / 'Chi tiết booking'
