@@ -22,12 +22,17 @@ def room_list(request):
     rooms_data = []
     for room in rooms:
         last_msg = None
+        needs_reply = False
         if room.last_message_id:
             last_msg = {
                 'text': room.last_message.message_text[:80],
+                'sender_id': room.last_message.sender_id,
                 'sender_name': room.last_message.sender.get_full_name() or room.last_message.sender.email,
                 'created_at': room.last_message.created_at.strftime('%H:%M %d/%m'),
             }
+            # Nếu người gửi cuối là khách hàng → phía cơ sở cần rep
+            # Nếu người gửi cuối là staff/owner → phía khách cần rep
+            needs_reply = (room.last_message.sender_id == room.customer_id)
 
         rooms_data.append({
             'id': room.id,
@@ -36,6 +41,8 @@ def room_list(request):
             'customer_id': room.customer_id,
             'customer_name': room.customer.get_full_name() or room.customer.email,
             'last_message': last_msg,
+            'last_message_id': room.last_message_id or 0,
+            'needs_reply': needs_reply,
             'created_at': room.created_at.strftime('%d/%m/%Y'),
         })
 
@@ -134,7 +141,46 @@ def room_messages(request, room_id):
     })
 
 
-# ─── Helper functions ────────────────────────────────────────
+@login_required
+@require_POST
+def room_send_message(request, room_id):
+    """POST /api/chat/rooms/<id>/messages/send/ — Gửi tin nhắn qua HTTP (fallback khi WS lỗi)."""
+    user = request.user
+
+    try:
+        room = ChatRoom.objects.get(id=room_id)
+    except ChatRoom.DoesNotExist:
+        return JsonResponse({'error': 'Room not found'}, status=404)
+
+    if not _user_has_room_access(user, room):
+        return JsonResponse({'error': 'Forbidden'}, status=403)
+
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    message_text = body.get('message', '').strip()
+    if not message_text:
+        return JsonResponse({'error': 'Message cannot be empty'}, status=400)
+
+    message = ChatMessage.objects.create(
+        room=room,
+        sender=user,
+        message_text=message_text,
+    )
+    room.last_message = message
+    room.save(update_fields=['last_message'])
+
+    return JsonResponse({
+        'id': message.id,
+        'sender_id': user.id,
+        'sender_name': user.get_full_name() or user.email,
+        'message_text': message.message_text,
+        'created_at': message.created_at.strftime('%H:%M %d/%m'),
+    }, status=201)
+
+
 
 def _get_user_rooms(user):
     """Lấy danh sách phòng chat dựa trên role của user."""

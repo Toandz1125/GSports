@@ -632,6 +632,21 @@
             <span>Quản lý sân con</span>
         </a>
         {% endif %}
+
+        {% if user.is_authenticated and not user.owner_profile %}
+        <button
+            id="btn-open-chat"
+            class="btn btn--primary"
+            data-venue-id="{{ venue.pk }}"
+            data-venue-name="{{ venue.name }}"
+            style="gap: 0.5rem;"
+            title="Nhắn tin với cơ sở">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px; flex-shrink:0;">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <span>Chat với cơ sở</span>
+        </button>
+        {% endif %}
     </div>
 </div>
 
@@ -961,4 +976,24 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
+
+{% if user.is_authenticated and not user.owner_profile %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const openChatBtn = document.getElementById('btn-open-chat');
+    if (openChatBtn) {
+        openChatBtn.addEventListener('click', function () {
+            const venueId = this.dataset.venueId;
+            const venueName = this.dataset.venueName;
+            if (window.openChatWithVenue) {
+                window.openChatWithVenue(venueId, venueName);
+            } else {
+                console.error('[Chat] Global chat widget function not found.');
+            }
+        });
+    }
+});
+</script>
+{% endif %}
+
 {% endblock %}
