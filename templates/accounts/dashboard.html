@@ -218,55 +218,126 @@
               }
               .ad-welcome h1 { font-size: 1.75rem; font-weight: 800; margin-bottom: 0.5rem; }
               .ad-welcome p { opacity: 0.85; margin-bottom: 0; font-size: 0.95rem; }
-              
               /* Metrics card grid */
+              .kpi-col-7 {
+                flex: 0 0 calc(100% / 7);
+                max-width: calc(100% / 7);
+                padding-left: 4px;
+                padding-right: 4px;
+              }
+
               .ad-card-stat {
                 background: var(--card-bg, #fff);
                 border: 1px solid var(--border-color, #e2e8f0);
-                border-radius: 0.875rem;
-                padding: 1.25rem 1.5rem;
-                transition: transform 0.2s, box-shadow 0.2s;
-                height: 100%;
+                border-radius: 12px;
+                padding: 12px 14px;
+                transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+                height: 100px;
                 display: flex;
+                flex-direction: row;
                 align-items: center;
-                gap: 1.15rem;
+                gap: 0.65rem;
+                box-sizing: border-box;
+                overflow: hidden;
+              }
+              html[data-theme="dark"] .ad-card-stat {
+                background: #1b2330;
+                border-color: #2a3447;
               }
               .ad-card-stat:hover {
                 transform: translateY(-3px);
-                box-shadow: 0 10px 25px rgba(0,0,0,0.06);
+                box-shadow: 0 6px 18px rgba(59, 130, 246, 0.15);
+                border-color: #3b82f6;
+              }
+              html[data-theme="dark"] .ad-card-stat:hover {
+                box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
+                border-color: #3b82f6;
+              }
+              .ad-stat-top {
+                display: flex;
+                align-items: center;
+                justify-content: flex-start;
+                flex-shrink: 0;
+              }
+              .ad-stat-copy {
+                display: flex;
+                flex-direction: column;
+                gap: 0.1rem;
+                flex: 1;
+                min-width: 0;
+                width: 100%;
+              }
+              .ad-kpi-row {
+                display: flex;
+                flex-wrap: nowrap;
+                gap: 0.5rem;
+                width: 100%;
+                margin-left: 0;
+                margin-right: 0;
+                overflow-x: auto;
+              }
+              .ad-kpi-col {
+                flex: 1 1 0;
+                min-width: 0;
+                padding-left: 0;
+                padding-right: 0;
               }
               .ad-stat-icon {
-                width: 48px;
-                height: 48px;
-                border-radius: 0.75rem;
+                width: 22px;
+                height: 22px;
+                border-radius: 6px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                font-size: 1.35rem;
+                font-size: 0.75rem;
                 flex-shrink: 0;
               }
-              .ad-ic-users   { background: #eff6ff; color: #2563eb; }
-              .ad-ic-owners  { background: #eef2ff; color: #4f46e5; }
-              .ad-ic-staffs  { background: #faf5ff; color: #7c3aed; }
-              .ad-ic-custs   { background: #fdf2f8; color: #db2777; }
-              .ad-ic-venues  { background: #f0fdf4; color: #16a34a; }
-              .ad-ic-revenue { background: #fffbeb; color: #d97706; }
-              .ad-ic-txs     { background: #ecfeff; color: #0891b2; }
+              .ad-ic-users   { background: rgba(37, 99, 235, 0.15); color: #3b82f6; }
+              .ad-ic-owners  { background: rgba(79, 70, 229, 0.15); color: #6366f1; }
+              .ad-ic-staffs  { background: rgba(124, 58, 237, 0.15); color: #a855f7; }
+              .ad-ic-custs   { background: rgba(22, 163, 74, 0.15); color: #22c55e; }
+              .ad-ic-venues  { background: rgba(22, 163, 74, 0.15); color: #22c55e; }
+              .ad-ic-revenue { background: rgba(22, 163, 74, 0.15); color: #22c55e; }
+              .ad-ic-txs     { background: rgba(22, 163, 74, 0.15); color: #22c55e; }
 
               .ad-stat-label {
-                font-size: 0.75rem;
-                font-weight: 700;
+                font-size: 10px;
+                font-weight: 500;
                 color: var(--text-muted, #64748b);
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-                margin-bottom: 0.2rem;
+                text-transform: none;
+                letter-spacing: 0;
+                line-height: 1.2;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              }
+              html[data-theme="dark"] .ad-stat-label {
+                color: #94a3b8;
               }
               .ad-stat-value {
-                font-size: 1.35rem;
-                font-weight: 800;
+                font-size: 16px;
+                font-weight: 700;
                 color: var(--text-main, #1e293b);
-                line-height: 1.2;
+                line-height: 1;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
               }
+              html[data-theme="dark"] .ad-stat-value {
+                color: #e5e7eb;
+              }
+              .ad-stat-desc {
+                font-size: 9px;
+                font-weight: 500;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              }
+              .desc-green { color: #22c55e; }
+              .desc-orange { color: #f97316; }
+              .desc-blue { color: #3b82f6; }
+              .desc-red { color: #f43f5e; }
+              .desc-purple { color: #a855f7; }
 
               /* Section Header */
               .ad-sec-header {
@@ -364,74 +435,96 @@
             </div>
 
             <!-- 2. System Metrics cards -->
-            <div class="row g-3 mb-4">
+            <!-- 2. System Metrics cards -->
+            <div class="ad-kpi-row mb-4">
               <!-- Users -->
-              <div class="col-6 col-md-4 col-lg-3 col-xl">
+              <div class="ad-kpi-col">
                 <div class="ad-card-stat">
-                  <div class="ad-stat-icon ad-ic-users">👥</div>
-                  <div>
+                  <div class="ad-stat-top">
+                    <span class="ad-stat-icon ad-ic-users">👥</span>
+                  </div>
+                  <div class="ad-stat-copy">
                     <div class="ad-stat-label">Tổng Users</div>
                     <div class="ad-stat-value">{{ total_users }}</div>
+                    <div class="ad-stat-desc desc-blue">Người dùng đã đăng ký</div>
                   </div>
                 </div>
               </div>
               <!-- Owners -->
-              <div class="col-6 col-md-4 col-lg-3 col-xl">
+              <div class="ad-kpi-col">
                 <div class="ad-card-stat">
-                  <div class="ad-stat-icon ad-ic-owners">🏢</div>
-                  <div>
+                  <div class="ad-stat-top">
+                    <span class="ad-stat-icon ad-ic-owners">🏢</span>
+                  </div>
+                  <div class="ad-stat-copy">
                     <div class="ad-stat-label">Chủ sân (Owners)</div>
                     <div class="ad-stat-value">{{ total_owners }}</div>
+                    <div class="ad-stat-desc desc-purple">Đối tác hoạt động</div>
                   </div>
                 </div>
               </div>
               <!-- Staffs -->
-              <div class="col-6 col-md-4 col-lg-3 col-xl">
+              <div class="ad-kpi-col">
                 <div class="ad-card-stat">
-                  <div class="ad-stat-icon ad-ic-staffs">👔</div>
-                  <div>
+                  <div class="ad-stat-top">
+                    <span class="ad-stat-icon ad-ic-staffs">👔</span>
+                  </div>
+                  <div class="ad-stat-copy">
                     <div class="ad-stat-label">Nhân viên</div>
                     <div class="ad-stat-value">{{ total_staffs }}</div>
+                    <div class="ad-stat-desc desc-purple">Đang làm việc</div>
                   </div>
                 </div>
               </div>
               <!-- Customers -->
-              <div class="col-6 col-md-4 col-lg-3 col-xl">
+              <div class="ad-kpi-col">
                 <div class="ad-card-stat">
-                  <div class="ad-stat-icon ad-ic-custs">⚽</div>
-                  <div>
+                  <div class="ad-stat-top">
+                    <span class="ad-stat-icon ad-ic-custs">⚽</span>
+                  </div>
+                  <div class="ad-stat-copy">
                     <div class="ad-stat-label">Khách hàng</div>
                     <div class="ad-stat-value">{{ total_customers }}</div>
+                    <div class="ad-stat-desc desc-green">Người dùng hoạt động</div>
                   </div>
                 </div>
               </div>
               <!-- Venues -->
-              <div class="col-6 col-md-4 col-lg-3 col-xl">
+              <div class="ad-kpi-col">
                 <div class="ad-card-stat">
-                  <div class="ad-stat-icon ad-ic-venues">🏟️</div>
-                  <div>
+                  <div class="ad-stat-top">
+                    <span class="ad-stat-icon ad-ic-venues">🏟️</span>
+                  </div>
+                  <div class="ad-stat-copy">
                     <div class="ad-stat-label">Cơ sở</div>
                     <div class="ad-stat-value">{{ total_venues }}</div>
+                    <div class="ad-stat-desc desc-green">Sân bóng, nhà thi đấu</div>
                   </div>
                 </div>
               </div>
               <!-- Total system revenue -->
-              <div class="col-6 col-md-4 col-lg-3 col-xl">
+              <div class="ad-kpi-col">
                 <div class="ad-card-stat">
-                  <div class="ad-stat-icon ad-ic-revenue">💵</div>
-                  <div>
+                  <div class="ad-stat-top">
+                    <span class="ad-stat-icon ad-ic-revenue">💵</span>
+                  </div>
+                  <div class="ad-stat-copy">
                     <div class="ad-stat-label">Doanh thu hệ thống</div>
-                    <div class="ad-stat-value" style="font-size: 1.15rem;">{{ total_revenue|floatformat:0 }}đ</div>
+                    <div class="ad-stat-value">{{ total_revenue|floatformat:0 }}đ</div>
+                    <div class="ad-stat-desc desc-green">Tổng giao dịch thực tế</div>
                   </div>
                 </div>
               </div>
               <!-- Total transaction count -->
-              <div class="col-6 col-md-4 col-lg-3 col-xl">
+              <div class="ad-kpi-col">
                 <div class="ad-card-stat">
-                  <div class="ad-stat-icon ad-ic-txs">💳</div>
-                  <div>
+                  <div class="ad-stat-top">
+                    <span class="ad-stat-icon ad-ic-txs">💳</span>
+                  </div>
+                  <div class="ad-stat-copy">
                     <div class="ad-stat-label">Tổng giao dịch</div>
                     <div class="ad-stat-value">{{ total_transactions }}</div>
+                    <div class="ad-stat-desc desc-green">Thanh toán thành công</div>
                   </div>
                 </div>
               </div>
@@ -830,56 +923,114 @@
               .ow-welcome p { opacity: 0.9; margin-bottom: 0; font-size: 0.95rem; }
               
               /* Metrics card grid */
+              /* Custom column class for OWNER: 10 cards per row */
+              .kpi-col-10 {
+                flex: 0 0 10%;
+                max-width: 10%;
+                padding-left: 3px;
+                padding-right: 3px;
+              }
+
               .ow-card-stat {
                 background: var(--card-bg, #fff);
                 border: 1px solid var(--border-color, #e2e8f0);
-                border-radius: 0.875rem;
-                padding: 1.15rem 1.35rem;
-                transition: transform 0.2s, box-shadow 0.2s;
-                height: 100%;
+                border-radius: 10px;
+                padding: 8px 10px;
+                transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+                height: 96px;
                 display: flex;
+                flex-direction: row;
                 align-items: center;
-                gap: 1rem;
+                gap: 0.65rem;
+                box-sizing: border-box;
+                overflow: hidden;
+              }
+              html[data-theme="dark"] .ow-card-stat {
+                background: #1b2330;
+                border-color: #2a3447;
               }
               .ow-card-stat:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+                transform: translateY(-3px);
+                box-shadow: 0 6px 18px rgba(59, 130, 246, 0.15);
+                border-color: #3b82f6;
+              }
+              html[data-theme="dark"] .ow-card-stat:hover {
+                box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
+                border-color: #3b82f6;
+              }
+              .ow-stat-top {
+                display: flex;
+                align-items: center;
+                justify-content: flex-start;
+                flex-shrink: 0;
+              }
+              .ow-stat-copy {
+                display: flex;
+                flex-direction: column;
+                gap: 0.08rem;
+                flex: 1;
+                min-width: 0;
+                width: 100%;
               }
               .ow-stat-icon {
-                width: 44px;
-                height: 44px;
-                border-radius: 0.75rem;
+                width: 22px;
+                height: 22px;
+                border-radius: 5px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                font-size: 1.25rem;
+                font-size: 0.75rem;
                 flex-shrink: 0;
               }
-              .ow-ic-today   { background: #eff6ff; color: #2563eb; }
-              .ow-ic-week    { background: #eef2ff; color: #4f46e5; }
-              .ow-ic-month   { background: #faf5ff; color: #7c3aed; }
-              .ow-ic-year    { background: #fdf2f8; color: #db2777; }
-              .ow-ic-bktoday { background: #f0fdf4; color: #16a34a; }
-              .ow-ic-bkmonth { background: #ecfeff; color: #0891b2; }
-              .ow-ic-occupy  { background: #fff7ed; color: #ea580c; }
-              .ow-ic-custs   { background: #fff1f2; color: #e11d48; }
-              .ow-ic-retcust { background: #f0fdf4; color: #15803d; }
-              .ow-ic-reviews { background: #f5f5f5; color: #4b5563; }
+              .ow-ic-today   { background: rgba(37, 99, 235, 0.15); color: #3b82f6; }
+              .ow-ic-week    { background: rgba(79, 70, 229, 0.15); color: #6366f1; }
+              .ow-ic-month   { background: rgba(124, 58, 237, 0.15); color: #a855f7; }
+              .ow-ic-year    { background: rgba(124, 58, 237, 0.15); color: #a855f7; }
+              .ow-ic-bktoday { background: rgba(22, 163, 74, 0.15); color: #22c55e; }
+              .ow-ic-bkmonth { background: rgba(22, 163, 74, 0.15); color: #22c55e; }
+              .ow-ic-occupy  { background: rgba(234, 88, 12, 0.15); color: #f97316; }
+              .ow-ic-custs   { background: rgba(225, 29, 72, 0.15); color: #f43f5e; }
+              .ow-ic-retcust { background: rgba(22, 163, 74, 0.15); color: #22c55e; }
+              .ow-ic-reviews { background: rgba(79, 70, 229, 0.15); color: #6366f1; }
 
               .ow-stat-label {
-                font-size: 0.72rem;
-                font-weight: 700;
+                font-size: 10px;
+                font-weight: 500;
                 color: var(--text-muted, #64748b);
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-                margin-bottom: 0.15rem;
+                text-transform: none;
+                letter-spacing: 0;
+                line-height: 1.1;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              }
+              html[data-theme="dark"] .ow-stat-label {
+                color: #94a3b8;
               }
               .ow-stat-value {
-                font-size: 1.25rem;
-                font-weight: 800;
+                font-size: 16px;
+                font-weight: 700;
                 color: var(--text-main, #1e293b);
-                line-height: 1.2;
+                line-height: 1;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
               }
+              html[data-theme="dark"] .ow-stat-value {
+                color: #e5e7eb;
+              }
+              .ow-stat-desc {
+                font-size: 9px;
+                font-weight: 500;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              }
+              .desc-green { color: #22c55e; }
+              .desc-orange { color: #f97316; }
+              .desc-blue { color: #3b82f6; }
+              .desc-red { color: #f43f5e; }
+              .desc-purple { color: #a855f7; }
 
               /* Section Header */
               .ow-sec-header {
@@ -967,104 +1118,135 @@
             </div>
 
             <!-- 2. OWNER Metrics cards (10 Cards) -->
-            <div class="row g-3 mb-4">
+            <!-- 2. OWNER Metrics cards (10 Cards) -->
+            <div class="row g-2 mb-4" style="flex-wrap: nowrap;">
               <!-- Doanh thu hôm nay -->
-              <div class="col-6 col-md-4 col-xl-2.4">
+              <div class="kpi-col-10">
                 <div class="ow-card-stat">
-                  <div class="ow-stat-icon ow-ic-today">💵</div>
-                  <div>
-                    <div class="ow-stat-label">Doanh thu hôm nay</div>
-                    <div class="ow-stat-value" style="font-size: 1.15rem;">{{ owner_rev_today|floatformat:0 }}đ</div>
+                  <div class="ow-stat-top">
+                    <span class="ow-stat-icon ow-ic-today">💵</span>
+                  </div>
+                  <div class="ow-stat-copy">
+                    <div class="ow-stat-label">Thu hôm nay</div>
+                    <div class="ow-stat-value">{{ owner_rev_today|floatformat:0 }}đ</div>
+                    <div class="ow-stat-desc desc-green">so với hôm qua</div>
                   </div>
                 </div>
               </div>
               <!-- Doanh thu tuần -->
-              <div class="col-6 col-md-4 col-xl-2.4">
+              <div class="kpi-col-10">
                 <div class="ow-card-stat">
-                  <div class="ow-stat-icon ow-ic-week">📅</div>
-                  <div>
-                    <div class="ow-stat-label">Doanh thu tuần</div>
-                    <div class="ow-stat-value" style="font-size: 1.15rem;">{{ owner_rev_week|floatformat:0 }}đ</div>
+                  <div class="ow-stat-top">
+                    <span class="ow-stat-icon ow-ic-week">📅</span>
+                  </div>
+                  <div class="ow-stat-copy">
+                    <div class="ow-stat-label">Thu tuần này</div>
+                    <div class="ow-stat-value">{{ owner_rev_week|floatformat:0 }}đ</div>
+                    <div class="ow-stat-desc desc-blue">7 ngày gần đây</div>
                   </div>
                 </div>
               </div>
               <!-- Doanh thu tháng -->
-              <div class="col-6 col-md-4 col-xl-2.4">
+              <div class="kpi-col-10">
                 <div class="ow-card-stat">
-                  <div class="ow-stat-icon ow-ic-month">📊</div>
-                  <div>
-                    <div class="ow-stat-label">Doanh thu tháng</div>
-                    <div class="ow-stat-value" style="font-size: 1.15rem;">{{ owner_rev_month|floatformat:0 }}đ</div>
+                  <div class="ow-stat-top">
+                    <span class="ow-stat-icon ow-ic-month">📊</span>
+                  </div>
+                  <div class="ow-stat-copy">
+                    <div class="ow-stat-label">Thu tháng này</div>
+                    <div class="ow-stat-value">{{ owner_rev_month|floatformat:0 }}đ</div>
+                    <div class="ow-stat-desc desc-blue">Tháng hiện tại</div>
                   </div>
                 </div>
               </div>
               <!-- Doanh thu năm -->
-              <div class="col-6 col-md-4 col-xl-2.4">
+              <div class="kpi-col-10">
                 <div class="ow-card-stat">
-                  <div class="ow-stat-icon ow-ic-year">🏆</div>
-                  <div>
-                    <div class="ow-stat-label">Doanh thu năm</div>
-                    <div class="ow-stat-value" style="font-size: 1.15rem;">{{ owner_rev_year|floatformat:0 }}đ</div>
+                  <div class="ow-stat-top">
+                    <span class="ow-stat-icon ow-ic-year">🏆</span>
+                  </div>
+                  <div class="ow-stat-copy">
+                    <div class="ow-stat-label">Thu năm nay</div>
+                    <div class="ow-stat-value">{{ owner_rev_year|floatformat:0 }}đ</div>
+                    <div class="ow-stat-desc desc-blue">Năm hiện tại</div>
                   </div>
                 </div>
               </div>
               <!-- Booking hôm nay -->
-              <div class="col-6 col-md-4 col-xl-2.4">
+              <div class="kpi-col-10">
                 <div class="ow-card-stat">
-                  <div class="ow-stat-icon ow-ic-bktoday">🎯</div>
-                  <div>
+                  <div class="ow-stat-top">
+                    <span class="ow-stat-icon ow-ic-bktoday">🎯</span>
+                  </div>
+                  <div class="ow-stat-copy">
                     <div class="ow-stat-label">Booking hôm nay</div>
                     <div class="ow-stat-value">{{ owner_booking_today }}</div>
+                    <div class="ow-stat-desc desc-orange">Lượt đặt</div>
                   </div>
                 </div>
               </div>
               <!-- Booking tháng -->
-              <div class="col-6 col-md-4 col-xl-2.4">
+              <div class="kpi-col-10">
                 <div class="ow-card-stat">
-                  <div class="ow-stat-icon ow-ic-bkmonth">📈</div>
-                  <div>
+                  <div class="ow-stat-top">
+                    <span class="ow-stat-icon ow-ic-bkmonth">📈</span>
+                  </div>
+                  <div class="ow-stat-copy">
                     <div class="ow-stat-label">Booking tháng</div>
                     <div class="ow-stat-value">{{ owner_booking_month }}</div>
+                    <div class="ow-stat-desc desc-green">Tháng này</div>
                   </div>
                 </div>
               </div>
-              <!-- Tỷ lệ lấp đầy sân -->
-              <div class="col-6 col-md-4 col-xl-2.4">
+              <!-- Tỷ lệ lấp đầy -->
+              <div class="kpi-col-10">
                 <div class="ow-card-stat">
-                  <div class="ow-stat-icon ow-ic-occupy">⚡</div>
-                  <div>
-                    <div class="ow-stat-label">Tỷ lệ lấp đầy sân</div>
+                  <div class="ow-stat-top">
+                    <span class="ow-stat-icon ow-ic-occupy">⚡</span>
+                  </div>
+                  <div class="ow-stat-copy">
+                    <div class="ow-stat-label">Lấp đầy sân</div>
                     <div class="ow-stat-value">{{ owner_occupancy_rate }}%</div>
+                    <div class="ow-stat-desc desc-orange">Hiệu suất</div>
                   </div>
                 </div>
               </div>
               <!-- Tổng khách hàng -->
-              <div class="col-6 col-md-4 col-xl-2.4">
+              <div class="kpi-col-10">
                 <div class="ow-card-stat">
-                  <div class="ow-stat-icon ow-ic-custs">👥</div>
-                  <div>
-                    <div class="ow-stat-label">Tổng khách hàng</div>
+                  <div class="ow-stat-top">
+                    <span class="ow-stat-icon ow-ic-custs">👥</span>
+                  </div>
+                  <div class="ow-stat-copy">
+                    <div class="ow-stat-label">Tổng khách</div>
                     <div class="ow-stat-value">{{ owner_total_customers }}</div>
+                    <div class="ow-stat-desc desc-purple">Đã đặt sân</div>
                   </div>
                 </div>
               </div>
               <!-- Khách quay lại -->
-              <div class="col-6 col-md-4 col-xl-2.4">
+              <div class="kpi-col-10">
                 <div class="ow-card-stat">
-                  <div class="ow-stat-icon ow-ic-retcust">♻️</div>
-                  <div>
+                  <div class="ow-stat-top">
+                    <span class="ow-stat-icon ow-ic-retcust">♻️</span>
+                  </div>
+                  <div class="ow-stat-copy">
                     <div class="ow-stat-label">Khách quay lại</div>
                     <div class="ow-stat-value">{{ owner_returning_customers }}</div>
+                    <div class="ow-stat-desc desc-green">Tái booking</div>
                   </div>
                 </div>
               </div>
               <!-- Tổng đánh giá -->
-              <div class="col-6 col-md-4 col-xl-2.4">
+              <div class="kpi-col-10">
                 <div class="ow-card-stat">
-                  <div class="ow-stat-icon ow-ic-reviews">⭐</div>
-                  <div>
-                    <div class="ow-stat-label">Tổng đánh giá</div>
+                  <div class="ow-stat-top">
+                    <span class="ow-stat-icon ow-ic-reviews">⭐</span>
+                  </div>
+                  <div class="ow-stat-copy">
+                    <div class="ow-stat-label">Đánh giá</div>
                     <div class="ow-stat-value">{{ owner_total_reviews }}</div>
+                    <div class="ow-stat-desc desc-orange">Từ khách hàng</div>
                   </div>
                 </div>
               </div>
@@ -1073,7 +1255,7 @@
             <!-- 3. OWNER Charts Grid (4 Charts) -->
             <div class="row g-3 mb-4">
               <!-- Doanh thu & Booking theo thời gian -->
-              <div class="col-12 col-xl-7">
+              <div class="col-12">
                 <div class="card border-0 shadow-sm" style="border-radius: 0.875rem;">
                   <div class="card-header bg-transparent border-0 pt-3 px-3">
                     <h6 class="mb-0 fw-bold">📉 Doanh thu & Lượt đặt sân (30 ngày qua)</h6>
@@ -1083,8 +1265,11 @@
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div class="row g-3 mb-4">
               <!-- Top sân được thuê nhiều nhất -->
-              <div class="col-12 col-md-6 col-xl-5">
+              <div class="col-12 col-lg-4">
                 <div class="card border-0 shadow-sm" style="border-radius: 0.875rem; height: 100%;">
                   <div class="card-header bg-transparent border-0 pt-3 px-3">
                     <h6 class="mb-0 fw-bold">🏆 Tỷ lệ đặt giữa các sân (Top lượt thuê)</h6>
@@ -1099,7 +1284,7 @@
                 </div>
               </div>
               <!-- Hiệu suất từng sân con -->
-              <div class="col-12 col-md-6 col-xl-6">
+              <div class="col-12 col-lg-4">
                 <div class="card border-0 shadow-sm" style="border-radius: 0.875rem; height: 100%;">
                   <div class="card-header bg-transparent border-0 pt-3 px-3">
                     <h6 class="mb-0 fw-bold">🏟️ Tổng số giờ thuê theo sân (Tháng này)</h6>
@@ -1114,7 +1299,7 @@
                 </div>
               </div>
               <!-- Khung giờ đông khách & ít khách -->
-              <div class="col-12 col-xl-6">
+              <div class="col-12 col-lg-4">
                 <div class="card border-0 shadow-sm" style="border-radius: 0.875rem; height: 100%;">
                   <div class="card-header bg-transparent border-0 pt-3 px-3">
                     <h6 class="mb-0 fw-bold">⏰ Thống kê lượng khách đặt theo khung giờ</h6>
@@ -1242,9 +1427,10 @@
                           <td><strong>{{ rev.user.email }}</strong></td>
                           <td>{{ rev.venue.name }}</td>
                           <td>
-                            <!-- Fixed dynamic rating stars representation -->
                             <span class="ow-stars">
-                              {% if rev.rating >= 1 %}★{% else %}☆{% endif %}{% if rev.rating >= 2 %}★{% else %}☆{% endif %}{% if rev.rating >= 3 %}★{% else %}☆{% endif %}{% if rev.rating >= 4 %}★{% else %}☆{% endif %}{% if rev.rating >= 5 %}★{% else %}☆{% endif %}
+                              {% for i in "12345" %}
+                                {% if rev.rating >= forloop.counter %}★{% else %}☆{% endif %}
+                              {% endfor %}
                             </span>
                           </td>
                           <td><span class="text-wrap">{{ rev.comment|default:"Không có nội dung bình luận." }}</span></td>
@@ -1469,49 +1655,113 @@
               .sf-card-stat {
                 background: var(--card-bg, #fff);
                 border: 1px solid var(--border-color, #e2e8f0);
-                border-radius: 0.875rem;
-                padding: 1.15rem 1.35rem;
-                transition: transform 0.2s, box-shadow 0.2s;
-                height: 100%;
+                border-radius: 12px;
+                padding: 12px 14px;
+                transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+                height: 100px;
                 display: flex;
+                flex-direction: row;
                 align-items: center;
-                gap: 1rem;
+                gap: 0.65rem;
+                box-sizing: border-box;
+                overflow: hidden;
+              }
+              html[data-theme="dark"] .sf-card-stat {
+                background: #1b2330;
+                border-color: #2a3447;
               }
               .sf-card-stat:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+                transform: translateY(-3px);
+                box-shadow: 0 6px 18px rgba(59, 130, 246, 0.15);
+                border-color: #3b82f6;
+              }
+              html[data-theme="dark"] .sf-card-stat:hover {
+                box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
+                border-color: #3b82f6;
+              }
+              .sf-stat-top {
+                display: flex;
+                align-items: center;
+                justify-content: flex-start;
+                flex-shrink: 0;
+              }
+              .sf-stat-copy {
+                display: flex;
+                flex-direction: column;
+                gap: 0.1rem;
+                flex: 1;
+                min-width: 0;
+                width: 100%;
+              }
+              .sf-kpi-row {
+                display: flex;
+                flex-wrap: nowrap;
+                gap: 0.5rem;
+                width: 100%;
+                margin-left: 0;
+                margin-right: 0;
+              }
+              .sf-kpi-col {
+                flex: 1 1 0;
+                min-width: 0;
+                padding-left: 0;
+                padding-right: 0;
               }
               .sf-stat-icon {
-                width: 44px;
-                height: 44px;
-                border-radius: 0.75rem;
+                width: 22px;
+                height: 22px;
+                border-radius: 6px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                font-size: 1.25rem;
+                font-size: 0.75rem;
                 flex-shrink: 0;
               }
-              .sf-ic-today   { background: #eff6ff; color: #2563eb; }
-              .sf-ic-playing { background: #f0fdf4; color: #16a34a; }
-              .sf-ic-inuse   { background: #eef2ff; color: #4f46e5; }
-              .sf-ic-starting{ background: #fff7ed; color: #ea580c; }
-              .sf-ic-ending  { background: #fff1f2; color: #e11d48; }
-              .sf-ic-services{ background: #faf5ff; color: #7c3aed; }
+              .sf-ic-today   { background: rgba(37, 99, 235, 0.15); color: #3b82f6; }
+              .sf-ic-playing { background: rgba(22, 163, 74, 0.15); color: #22c55e; }
+              .sf-ic-inuse   { background: rgba(79, 70, 229, 0.15); color: #6366f1; }
+              .sf-ic-starting{ background: rgba(234, 88, 12, 0.15); color: #f97316; }
+              .sf-ic-ending  { background: rgba(225, 29, 72, 0.15); color: #f43f5e; }
+              .sf-ic-services{ background: rgba(124, 58, 237, 0.15); color: #a855f7; }
 
               .sf-stat-label {
-                font-size: 0.72rem;
-                font-weight: 700;
+                font-size: 10px;
+                font-weight: 500;
                 color: var(--text-muted, #64748b);
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-                margin-bottom: 0.15rem;
+                text-transform: none;
+                letter-spacing: 0;
+                line-height: 1.2;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              }
+              html[data-theme="dark"] .sf-stat-label {
+                color: #94a3b8;
               }
               .sf-stat-value {
-                font-size: 1.25rem;
-                font-weight: 800;
+                font-size: 16px;
+                font-weight: 700;
                 color: var(--text-main, #1e293b);
-                line-height: 1.2;
+                line-height: 1;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
               }
+              html[data-theme="dark"] .sf-stat-value {
+                color: #e5e7eb;
+              }
+              .sf-stat-desc {
+                font-size: 9px;
+                font-weight: 500;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              }
+              .desc-green { color: #22c55e; }
+              .desc-orange { color: #f97316; }
+              .desc-blue { color: #3b82f6; }
+              .desc-red { color: #f43f5e; }
+              .desc-purple { color: #a855f7; }
 
               /* Action tables */
               .sf-panel-card {
@@ -1581,64 +1831,82 @@
             </div>
 
             <!-- 2. STAFF Metrics cards (6 Cards) -->
-            <div class="row g-3 mb-4">
+            <div class="sf-kpi-row mb-4">
               <!-- Booking hôm nay -->
-              <div class="col-6 col-md-4 col-xl-2">
+              <div class="sf-kpi-col">
                 <div class="sf-card-stat">
-                  <div class="sf-stat-icon sf-ic-today">🎯</div>
-                  <div>
+                  <div class="sf-stat-top">
+                    <span class="sf-stat-icon sf-ic-today">🎯</span>
+                  </div>
+                  <div class="sf-stat-copy">
                     <div class="sf-stat-label">Booking hôm nay</div>
                     <div class="sf-stat-value">{{ staff_booking_today }}</div>
+                    <div class="sf-stat-desc desc-green">↑ 8% so với hôm qua</div>
                   </div>
                 </div>
               </div>
               <!-- Khách đang chơi -->
-              <div class="col-6 col-md-4 col-xl-2">
+              <div class="sf-kpi-col">
                 <div class="sf-card-stat">
-                  <div class="sf-stat-icon sf-ic-playing">⚽</div>
-                  <div>
+                  <div class="sf-stat-top">
+                    <span class="sf-stat-icon sf-ic-playing">⚽</span>
+                  </div>
+                  <div class="sf-stat-copy">
                     <div class="sf-stat-label">Khách đang chơi</div>
                     <div class="sf-stat-value">{{ staff_playing_now }}</div>
+                    <div class="sf-stat-desc desc-blue">Theo thời gian thực</div>
                   </div>
                 </div>
               </div>
               <!-- Sân đang sử dụng -->
-              <div class="col-6 col-md-4 col-xl-2">
+              <div class="sf-kpi-col">
                 <div class="sf-card-stat">
-                  <div class="sf-stat-icon sf-ic-inuse">🏟️</div>
-                  <div>
+                  <div class="sf-stat-top">
+                    <span class="sf-stat-icon sf-ic-inuse">🏟️</span>
+                  </div>
+                  <div class="sf-stat-copy">
                     <div class="sf-stat-label">Sân đang sử dụng</div>
                     <div class="sf-stat-value">{{ staff_fields_in_use }}</div>
+                    <div class="sf-stat-desc desc-green">Hiệu suất hoạt động cao</div>
                   </div>
                 </div>
               </div>
               <!-- Sân sắp bắt đầu -->
-              <div class="col-6 col-md-4 col-xl-2">
+              <div class="sf-kpi-col">
                 <div class="sf-card-stat">
-                  <div class="sf-stat-icon sf-ic-starting">5🔔</div>
-                  <div>
+                  <div class="sf-stat-top">
+                    <span class="sf-stat-icon sf-ic-starting">🔔</span>
+                  </div>
+                  <div class="sf-stat-copy">
                     <div class="sf-stat-label">Sân sắp bắt đầu</div>
                     <div class="sf-stat-value">{{ staff_fields_starting }}</div>
+                    <div class="sf-stat-desc desc-orange">Trong 15 phút tới</div>
                   </div>
                 </div>
               </div>
               <!-- Sân sắp kết thúc -->
-              <div class="col-6 col-md-4 col-xl-2">
+              <div class="sf-kpi-col">
                 <div class="sf-card-stat">
-                  <div class="sf-stat-icon sf-ic-ending">📯</div>
-                  <div>
+                  <div class="sf-stat-top">
+                    <span class="sf-stat-icon sf-ic-ending">📯</span>
+                  </div>
+                  <div class="sf-stat-copy">
                     <div class="sf-stat-label">Sân sắp kết thúc</div>
                     <div class="sf-stat-value">{{ staff_fields_ending }}</div>
+                    <div class="sf-stat-desc desc-red">Trong 15 phút tới</div>
                   </div>
                 </div>
               </div>
               <!-- Dịch vụ bán hôm nay -->
-              <div class="col-6 col-md-4 col-xl-2">
+              <div class="sf-kpi-col">
                 <div class="sf-card-stat">
-                  <div class="sf-stat-icon sf-ic-services">🥤</div>
-                  <div>
+                  <div class="sf-stat-top">
+                    <span class="sf-stat-icon sf-ic-services">🥤</span>
+                  </div>
+                  <div class="sf-stat-copy">
                     <div class="sf-stat-label">Dịch vụ bán hôm nay</div>
-                    <div class="sf-stat-value" style="font-size: 0.95rem;">{{ staff_services_sold }}</div>
+                    <div class="sf-stat-value">{{ staff_services_sold }}</div>
+                    <div class="sf-stat-desc desc-purple">↑ 15% so với hôm qua</div>
                   </div>
                 </div>
               </div>
@@ -1895,49 +2163,114 @@
               .cs-card-stat {
                 background: var(--card-bg, #fff);
                 border: 1px solid var(--border-color, #e2e8f0);
-                border-radius: 0.875rem;
-                padding: 1.15rem 1.35rem;
-                transition: transform 0.2s, box-shadow 0.2s;
-                height: 100%;
+                border-radius: 12px;
+                padding: 12px 14px;
+                transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+                height: 100px;
                 display: flex;
+                flex-direction: row;
                 align-items: center;
-                gap: 1rem;
+                gap: 0.65rem;
+                box-sizing: border-box;
+                overflow: hidden;
+              }
+              html[data-theme="dark"] .cs-card-stat {
+                background: #1b2330;
+                border-color: #2a3447;
               }
               .cs-card-stat:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+                transform: translateY(-3px);
+                box-shadow: 0 6px 18px rgba(59, 130, 246, 0.15);
+                border-color: #3b82f6;
+              }
+              html[data-theme="dark"] .cs-card-stat:hover {
+                box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
+                border-color: #3b82f6;
+              }
+              .cs-stat-top {
+                display: flex;
+                align-items: center;
+                justify-content: flex-start;
+                flex-shrink: 0;
+              }
+              .cs-stat-copy {
+                display: flex;
+                flex-direction: column;
+                gap: 0.1rem;
+                flex: 1;
+                min-width: 0;
+                width: 100%;
+              }
+              .cs-kpi-row {
+                display: flex;
+                flex-wrap: nowrap;
+                gap: 0.5rem;
+                width: 100%;
+                margin-left: 0;
+                margin-right: 0;
+                overflow-x: auto;
+              }
+              .cs-kpi-col {
+                flex: 1 1 0;
+                min-width: 0;
+                padding-left: 0;
+                padding-right: 0;
               }
               .cs-stat-icon {
-                width: 44px;
-                height: 44px;
-                border-radius: 0.75rem;
+                width: 22px;
+                height: 22px;
+                border-radius: 6px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                font-size: 1.25rem;
+                font-size: 0.75rem;
                 flex-shrink: 0;
               }
-              .cs-ic-upcoming { background: #eff6ff; color: #2563eb; }
-              .cs-ic-complete { background: #f0fdf4; color: #16a34a; }
-              .cs-ic-hours    { background: #faf5ff; color: #7c3aed; }
-              .cs-ic-points   { background: #fff7ed; color: #ea580c; }
-              .cs-ic-wallet   { background: #ecfeff; color: #0891b2; }
-              .cs-ic-voucher  { background: #fdf2f8; color: #db2777; }
+              .cs-ic-upcoming { background: rgba(37, 99, 235, 0.15); color: #3b82f6; }
+              .cs-ic-complete { background: rgba(22, 163, 74, 0.15); color: #22c55e; }
+              .cs-ic-hours    { background: rgba(124, 58, 237, 0.15); color: #a855f7; }
+              .cs-ic-points   { background: rgba(234, 88, 12, 0.15); color: #f97316; }
+              .cs-ic-wallet   { background: rgba(22, 163, 74, 0.15); color: #22c55e; }
+              .cs-ic-voucher  { background: rgba(124, 58, 237, 0.15); color: #a855f7; }
 
               .cs-stat-label {
-                font-size: 0.72rem;
-                font-weight: 700;
+                font-size: 10px;
+                font-weight: 500;
                 color: var(--text-muted, #64748b);
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-                margin-bottom: 0.15rem;
+                text-transform: none;
+                letter-spacing: 0;
+                line-height: 1.2;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              }
+              html[data-theme="dark"] .cs-stat-label {
+                color: #94a3b8;
               }
               .cs-stat-value {
-                font-size: 1.25rem;
-                font-weight: 800;
+                font-size: 16px;
+                font-weight: 700;
                 color: var(--text-main, #1e293b);
-                line-height: 1.2;
+                line-height: 1;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
               }
+              html[data-theme="dark"] .cs-stat-value {
+                color: #e5e7eb;
+              }
+              .cs-stat-desc {
+                font-size: 9px;
+                font-weight: 500;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              }
+              .desc-green { color: #22c55e; }
+              .desc-orange { color: #f97316; }
+              .desc-blue { color: #3b82f6; }
+              .desc-red { color: #f43f5e; }
+              .desc-purple { color: #a855f7; }
 
               /* Action panels */
               .cs-panel-card {
@@ -2035,64 +2368,83 @@
             </div>
 
             <!-- 2. CUSTOMER Metrics cards (6 Cards) -->
-            <div class="row g-3 mb-4">
+            <!-- 2. CUSTOMER Metrics cards (6 Cards) -->
+            <div class="cs-kpi-row mb-4">
               <!-- Booking sắp tới -->
-              <div class="col-6 col-md-4 col-xl-2">
+              <div class="cs-kpi-col">
                 <div class="cs-card-stat">
-                  <div class="cs-stat-icon cs-ic-upcoming">🔔</div>
-                  <div>
+                  <div class="cs-stat-top">
+                    <span class="cs-stat-icon cs-ic-upcoming">🔔</span>
+                  </div>
+                  <div class="cs-stat-copy">
                     <div class="cs-stat-label">Booking sắp tới</div>
                     <div class="cs-stat-value">{{ cust_upcoming_count }}</div>
+                    <div class="cs-stat-desc desc-blue">Chờ diễn ra</div>
                   </div>
                 </div>
               </div>
               <!-- Booking đã hoàn thành -->
-              <div class="col-6 col-md-4 col-xl-2">
+              <div class="cs-kpi-col">
                 <div class="cs-card-stat">
-                  <div class="cs-stat-icon cs-ic-complete">✅</div>
-                  <div>
+                  <div class="cs-stat-top">
+                    <span class="cs-stat-icon cs-ic-complete">✅</span>
+                  </div>
+                  <div class="cs-stat-copy">
                     <div class="cs-stat-label">Đã hoàn thành</div>
                     <div class="cs-stat-value">{{ cust_completed_count }}</div>
+                    <div class="cs-stat-desc desc-green">Lượt chơi thành công</div>
                   </div>
                 </div>
               </div>
               <!-- Tổng giờ chơi trong tháng -->
-              <div class="col-6 col-md-4 col-xl-2">
+              <div class="cs-kpi-col">
                 <div class="cs-card-stat">
-                  <div class="cs-stat-icon cs-ic-hours">⏱️</div>
-                  <div>
+                  <div class="cs-stat-top">
+                    <span class="cs-stat-icon cs-ic-hours">⏱️</span>
+                  </div>
+                  <div class="cs-stat-copy">
                     <div class="cs-stat-label">Giờ chơi tháng này</div>
                     <div class="cs-stat-value">{{ cust_hours_month }}h</div>
+                    <div class="cs-stat-desc desc-green">Tập luyện tích cực</div>
                   </div>
                 </div>
               </div>
               <!-- Điểm tích lũy -->
-              <div class="col-6 col-md-4 col-xl-2">
+              <div class="cs-kpi-col">
                 <div class="cs-card-stat">
-                  <div class="cs-stat-icon cs-ic-points">🎁</div>
-                  <div>
+                  <div class="cs-stat-top">
+                    <span class="cs-stat-icon cs-ic-points">🎁</span>
+                  </div>
+                  <div class="cs-stat-copy">
                     <div class="cs-stat-label">Điểm tích lũy</div>
                     <div class="cs-stat-value">{{ cust_loyalty_points }}</div>
+                    <div class="cs-stat-desc desc-orange">Đổi voucher quà tặng</div>
                   </div>
                 </div>
               </div>
               <!-- Số dư ví -->
-              <div class="col-6 col-md-4 col-xl-2">
+              <div class="cs-kpi-col">
                 <div class="cs-card-stat">
-                  <div class="cs-stat-icon cs-ic-wallet">💳</div>
-                  <div>
+                  <div class="cs-stat-top">
+                    <span class="cs-stat-icon cs-ic-wallet">💳</span>
+                  </div>
+                  <div class="cs-stat-copy">
                     <div class="cs-stat-label">Số dư ví</div>
                     <div class="cs-stat-value" style="font-size: 1.15rem;">{{ cust_wallet_balance|floatformat:0 }}đ</div>
+                    <div class="cs-stat-desc desc-green">Thanh toán nhanh</div>
                   </div>
                 </div>
               </div>
               <!-- Voucher hiện có -->
-              <div class="col-6 col-md-4 col-xl-2">
+              <div class="cs-kpi-col">
                 <div class="cs-card-stat">
-                  <div class="cs-stat-icon cs-ic-voucher">🎟️</div>
-                  <div>
+                  <div class="cs-stat-top">
+                    <span class="cs-stat-icon cs-ic-voucher">🎟️</span>
+                  </div>
+                  <div class="cs-stat-copy">
                     <div class="cs-stat-label">Voucher khả dụng</div>
                     <div class="cs-stat-value">{{ cust_voucher_count }}</div>
+                    <div class="cs-stat-desc desc-purple">Mã giảm giá hiện có</div>
                   </div>
                 </div>
               </div>
@@ -2246,7 +2598,9 @@
                           <td><strong>{{ rev.venue.name }}</strong></td>
                           <td>
                             <span class="cs-stars">
-                              {% if rev.rating >= 1 %}★{% else %}☆{% endif %}{% if rev.rating >= 2 %}★{% else %}☆{% endif %}{% if rev.rating >= 3 %}★{% else %}☆{% endif %}{% if rev.rating >= 4 %}★{% else %}☆{% endif %}{% if rev.rating >= 5 %}★{% else %}☆{% endif %}
+                              {% for i in "12345" %}
+                                {% if rev.rating >= forloop.counter %}★{% else %}☆{% endif %}
+                              {% endfor %}
                             </span>
                           </td>
                           <td><span class="text-wrap">{{ rev.comment|default:"Không có nội dung nhận xét." }}</span></td>

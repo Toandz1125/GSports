@@ -12,8 +12,8 @@ class Review(models.Model):
         blank=True, null=True, related_name='review',
     )
     rating = models.SmallIntegerField(
-        validators=[MinValueValidator(0), MaxValueValidator(5)],
-        help_text='0-5 sao'
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        help_text='1-5 sao'
     )
     comment = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -26,3 +26,13 @@ class Review(models.Model):
 
     def __str__(self):
         return f'{self.venue.name} — {self.rating}★ by {self.user.email}'
+
+    @property
+    def stars_list(self):
+        stars = []
+        for i in range(1, 6):
+            if (self.rating or 0) >= i:
+                stars.append('full')
+            else:
+                stars.append('empty')
+        return stars

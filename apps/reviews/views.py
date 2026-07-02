@@ -21,14 +21,13 @@ class CreateReviewView(LoginRequiredMixin, View):
 
         try:
             rating = int(rating_val)
-            if rating < 0 or rating > 5:
+            if rating < 1 or rating > 5:
                 raise ValueError()
         except ValueError:
             if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-                return JsonResponse({'ok': False, 'error': 'Số sao không hợp lệ (0-5).'}, status=400)
+                return JsonResponse({'ok': False, 'error': 'Số sao không hợp lệ (1-5).'}, status=400)
             return redirect('venues:venue_detail', pk=venue.pk)
 
-        # Tạo mới đánh giá của user đối với cơ sở này để không bị ghi đè
         review = Review.objects.create(
             user=request.user,
             venue=venue,
@@ -40,7 +39,7 @@ class CreateReviewView(LoginRequiredMixin, View):
         if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.content_type == 'application/json':
             return JsonResponse({
                 'ok': True,
-                'message': 'Cảm ơn bạn đã gửi đánh giá!' if created else 'Đánh giá của bạn đã được cập nhật!',
+                'message': 'Cảm ơn bạn đã gửi bình luận!',
                 'rating': review.rating,
                 'comment': review.comment,
                 'user': review.user.email,

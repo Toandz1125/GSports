@@ -57,8 +57,6 @@ class Venue(models.Model):
         for i in range(1, 6):
             if avg >= i:
                 stars.append('full')
-            elif avg >= i - 0.5:
-                stars.append('half')
             else:
                 stars.append('empty')
         return stars

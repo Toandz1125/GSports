@@ -1,0 +1,208 @@
+{% extends 'accounts/dashboard.html' %}
+{% load static %}
+
+{% block title %}Đổi ảnh đại diện — GSports{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .avatar-edit-card {
+        max-width: 720px;
+        margin: 0 auto 2rem;
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+        padding: 2rem;
+    }
+
+    .avatar-edit-card__title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text-main);
+        margin-bottom: 0.75rem;
+    }
+
+    .avatar-edit-card__description {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        margin-bottom: 1.5rem;
+        line-height: 1.6;
+    }
+
+    .avatar-preview {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        border: 1px dashed var(--border-color);
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.02);
+        margin-bottom: 1.5rem;
+    }
+
+    .avatar-preview__image {
+        width: 88px;
+        height: 88px;
+        border-radius: 999px;
+        object-fit: cover;
+        background: var(--bg-body);
+        border: 1px solid var(--border-color);
+        flex-shrink: 0;
+    }
+
+    .avatar-preview__fallback {
+        width: 88px;
+        height: 88px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(135deg, var(--primary-600), var(--primary-400));
+        color: #fff;
+        font-size: 2rem;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+
+    .avatar-preview__meta {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        min-width: 0;
+    }
+
+    .avatar-preview__label {
+        font-weight: 600;
+        color: var(--text-main);
+    }
+
+    .avatar-preview__hint {
+        color: var(--text-muted);
+        font-size: 0.875rem;
+        line-height: 1.5;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .form-group label {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text-muted);
+    }
+
+    .form-group input[type="file"] {
+        width: 100%;
+        padding: 0.85rem 1rem;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-color);
+        background: var(--bg-body);
+        color: var(--text-main);
+    }
+
+    .form-group input[type="file"]::file-selector-button {
+        border: 0;
+        border-radius: 999px;
+        padding: 0.55rem 0.9rem;
+        margin-right: 0.75rem;
+        background: var(--primary-600);
+        color: #fff;
+        cursor: pointer;
+        font-weight: 600;
+    }
+
+    .form-group input[type="file"]::file-selector-button:hover {
+        background: var(--primary-700);
+    }
+
+    .form-error {
+        color: #dc2626;
+        font-size: 0.8rem;
+        line-height: 1.4;
+    }
+
+    .avatar-edit-card__actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--border-color);
+    }
+
+    @media (max-width: 640px) {
+        .avatar-edit-card {
+            padding: 1.25rem;
+        }
+
+        .avatar-preview {
+            align-items: flex-start;
+        }
+
+        .avatar-edit-card__actions {
+            flex-direction: column-reverse;
+        }
+
+        .avatar-edit-card__actions .btn {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="avatar-edit-card">
+    <h3 class="avatar-edit-card__title">Đổi ảnh đại diện</h3>
+    <p class="avatar-edit-card__description">
+        Chọn một ảnh từ máy tính của bạn. Hệ thống hỗ trợ JPEG, PNG và WebP, tối đa 5 MB.
+    </p>
+
+    <div class="avatar-preview">
+        {% if user.avatar %}
+        <img src="{{ user.avatar.url }}" alt="Avatar hiện tại" class="avatar-preview__image">
+        {% else %}
+        <div class="avatar-preview__fallback">
+            {% if user.first_name or user.last_name %}{{ user.first_name|first|upper }}{% else %}{{ user.username|first|upper }}{% endif %}
+        </div>
+        {% endif %}
+        <div class="avatar-preview__meta">
+            <div class="avatar-preview__label">Ảnh hiện tại</div>
+            <div class="avatar-preview__hint">Bạn có thể tải ảnh mới từ máy lên để thay thế ảnh đại diện đang dùng.</div>
+        </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+        <div class="auth-form__errors" style="margin-bottom: 1rem;">
+            {% for error in form.non_field_errors %}
+            <p class="auth-form__error-text" style="color: #dc2626; font-size: 0.875rem;">{{ error }}</p>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="form-group {% if form.avatar.errors %}form-group--error{% endif %}">
+            <label for="{{ form.avatar.id_for_label }}">{{ form.avatar.label }}</label>
+            {{ form.avatar }}
+            {% if form.avatar.errors %}
+            <div class="form-error">
+                {% for error in form.avatar.errors %}
+                <div>{{ error }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="avatar-edit-card__actions">
+            <a href="{% url 'accounts:profile' %}" class="btn btn--secondary">Hủy bỏ</a>
+            <button type="submit" class="btn btn--primary">Tải ảnh lên</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
