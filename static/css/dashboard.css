@@ -702,12 +702,18 @@
 }
 
 /* Table headers */
-[data-theme="dark"] .ad-table th {
+[data-theme="dark"] .ad-table th,
+[data-theme="dark"] .ow-table th,
+[data-theme="dark"] .sf-table th,
+[data-theme="dark"] .cs-table th {
     background: rgba(255,255,255,0.04) !important;
     color: var(--text-muted) !important;
     border-color: var(--border-color) !important;
 }
-[data-theme="dark"] .ad-table td {
+[data-theme="dark"] .ad-table td,
+[data-theme="dark"] .ow-table td,
+[data-theme="dark"] .sf-table td,
+[data-theme="dark"] .cs-table td {
     border-color: var(--border-color) !important;
     color: var(--text-main) !important;
 }
@@ -720,30 +726,57 @@
     background: var(--bg-surface) !important;
     border-color: var(--border-color) !important;
 }
-[data-theme="dark"] .ad-panel-hdr {
+[data-theme="dark"] .ad-panel-hdr,
+[data-theme="dark"] .ow-panel-hdr,
+[data-theme="dark"] .sf-panel-hdr,
+[data-theme="dark"] .cs-panel-hdr {
     background: rgba(255,255,255,0.03) !important;
     border-color: var(--border-color) !important;
 }
 
 /* Icon backgrounds dark */
-[data-theme="dark"] .ad-ic-users   { background: rgba(37, 99, 235, 0.15)  !important; }
-[data-theme="dark"] .ad-ic-owners  { background: rgba(79, 70, 229, 0.15)  !important; }
-[data-theme="dark"] .ad-ic-staffs  { background: rgba(124, 58, 237, 0.15) !important; }
-[data-theme="dark"] .ad-ic-custs   { background: rgba(219, 39, 119, 0.15) !important; }
-[data-theme="dark"] .ad-ic-venues  { background: rgba(22, 163, 74, 0.15)  !important; }
-[data-theme="dark"] .ad-ic-revenue { background: rgba(217, 119, 6, 0.15)  !important; }
-[data-theme="dark"] .ad-ic-txs     { background: rgba(8, 145, 178, 0.15)  !important; }
+[data-theme="dark"] .ad-ic-users   { background: rgba(37, 99, 235, 0.15)  !important; color: #60a5fa !important; }
+[data-theme="dark"] .ad-ic-owners  { background: rgba(79, 70, 229, 0.15)  !important; color: #818cf8 !important; }
+[data-theme="dark"] .ad-ic-staffs  { background: rgba(124, 58, 237, 0.15) !important; color: #c084fc !important; }
+[data-theme="dark"] .ad-ic-custs   { background: rgba(219, 39, 119, 0.15) !important; color: #f472b6 !important; }
+[data-theme="dark"] .ad-ic-venues  { background: rgba(22, 163, 74, 0.15)  !important; color: #34d399 !important; }
+[data-theme="dark"] .ad-ic-revenue { background: rgba(217, 119, 6, 0.15)  !important; color: #fb923c !important; }
+[data-theme="dark"] .ad-ic-txs     { background: rgba(8, 145, 178, 0.15)  !important; color: #22d3ee !important; }
 
-[data-theme="dark"] .ow-ic-today   { background: rgba(37, 99, 235, 0.15)  !important; }
-[data-theme="dark"] .ow-ic-week    { background: rgba(79, 70, 229, 0.15)  !important; }
-[data-theme="dark"] .ow-ic-month   { background: rgba(124, 58, 237, 0.15) !important; }
-[data-theme="dark"] .ow-ic-year    { background: rgba(219, 39, 119, 0.15) !important; }
-[data-theme="dark"] .ow-ic-bktoday { background: rgba(22, 163, 74, 0.15)  !important; }
-[data-theme="dark"] .ow-ic-bkmonth { background: rgba(8, 145, 178, 0.15)  !important; }
-[data-theme="dark"] .ow-ic-occupy  { background: rgba(234, 88, 12, 0.15)  !important; }
-[data-theme="dark"] .ow-ic-custs   { background: rgba(225, 29, 72, 0.15)  !important; }
-[data-theme="dark"] .ow-ic-retcust { background: rgba(21, 128, 61, 0.15)  !important; }
-[data-theme="dark"] .ow-ic-reviews { background: rgba(75, 85, 99, 0.2)    !important; }
+[data-theme="dark"] .ow-ic-today   { background: rgba(37, 99, 235, 0.15)  !important; color: #60a5fa !important; }
+[data-theme="dark"] .ow-ic-week    { background: rgba(79, 70, 229, 0.15)  !important; color: #818cf8 !important; }
+[data-theme="dark"] .ow-ic-month   { background: rgba(124, 58, 237, 0.15) !important; color: #c084fc !important; }
+[data-theme="dark"] .ow-ic-year    { background: rgba(219, 39, 119, 0.15) !important; color: #f472b6 !important; }
+[data-theme="dark"] .ow-ic-bktoday { background: rgba(22, 163, 74, 0.15)  !important; color: #34d399 !important; }
+[data-theme="dark"] .ow-ic-bkmonth { background: rgba(8, 145, 178, 0.15)  !important; color: #22d3ee !important; }
+[data-theme="dark"] .ow-ic-occupy  { background: rgba(234, 88, 12, 0.15)  !important; color: #fb923c !important; }
+[data-theme="dark"] .ow-ic-custs   { background: rgba(225, 29, 72, 0.15)  !important; color: #f43f5e !important; }
+[data-theme="dark"] .ow-ic-retcust { background: rgba(21, 128, 61, 0.15)  !important; color: #34d399 !important; }
+[data-theme="dark"] .ow-ic-reviews { background: rgba(75, 85, 99, 0.2)    !important; color: #94a3b8 !important; }
+
+[data-theme="dark"] .sf-ic-today    { background: rgba(37, 99, 235, 0.15) !important; color: #60a5fa !important; }
+[data-theme="dark"] .sf-ic-playing  { background: rgba(16, 185, 129, 0.15) !important; color: #34d399 !important; }
+[data-theme="dark"] .sf-ic-inuse    { background: rgba(79, 70, 229, 0.15) !important; color: #818cf8 !important; }
+[data-theme="dark"] .sf-ic-starting { background: rgba(234, 88, 12, 0.15) !important; color: #fb923c !important; }
+[data-theme="dark"] .sf-ic-ending   { background: rgba(239, 68, 68, 0.15) !important; color: #f87171 !important; }
+[data-theme="dark"] .sf-ic-services { background: rgba(139, 92, 246, 0.15) !important; color: #c084fc !important; }
+
+[data-theme="dark"] .cs-ic-upcoming { background: rgba(37, 99, 235, 0.15) !important; color: #60a5fa !important; }
+[data-theme="dark"] .cs-ic-complete { background: rgba(16, 185, 129, 0.15) !important; color: #34d399 !important; }
+[data-theme="dark"] .cs-ic-hours    { background: rgba(139, 92, 246, 0.15) !important; color: #c084fc !important; }
+[data-theme="dark"] .cs-ic-points   { background: rgba(234, 88, 12, 0.15) !important; color: #fb923c !important; }
+[data-theme="dark"] .cs-ic-wallet   { background: rgba(8, 145, 178, 0.15) !important; color: #22d3ee !important; }
+[data-theme="dark"] .cs-ic-voucher  { background: rgba(219, 39, 119, 0.15) !important; color: #f472b6 !important; }
+
+/* Voucher cards dark mode */
+[data-theme="dark"] .cs-voucher-card {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border-color: var(--border-color) !important;
+}
+[data-theme="dark"] .cs-voucher-code {
+    background: rgba(99, 102, 241, 0.2) !important;
+    color: #818cf8 !important;
+}
 
 /* Badge dark mode */
 [data-theme="dark"] .ad-badge--pending { background: rgba(234, 88, 12, 0.15)  !important; }

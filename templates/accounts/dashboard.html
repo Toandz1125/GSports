@@ -2138,8 +2138,8 @@
 
             <!-- 4. CUSTOMER Tables Grid -->
             <div class="row g-3">
-              <!-- Lịch sử đặt sân -->
-              <div class="col-12 col-lg-6">
+              <!-- Lịch sử đặt sân gần đây (Full-width for better spacing of 5 columns) -->
+              <div class="col-12">
                 <div class="cs-panel-card">
                   <div class="cs-panel-hdr">
                     <span>📅 Lịch sử đặt sân gần đây</span>
@@ -2220,34 +2220,6 @@
                         {% endfor %}
                       </tbody>
                     </table>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Sân yêu thích -->
-              <div class="col-12 col-lg-6">
-                <div class="cs-panel-card" style="height: 100%;">
-                  <div class="cs-panel-hdr">
-                    <span>❤️ Cơ sở sân thể thao yêu thích</span>
-                  </div>
-                  <div class="cs-panel-body p-3">
-                    <div class="row g-2">
-                      {% for fav in cust_favorite_venues %}
-                      <div class="col-12 col-sm-6">
-                        <div class="card p-2 border shadow-none" style="border-radius: 0.5rem; background: #fafafa;">
-                          <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                              <strong style="font-size: 0.85rem;"><a href="{% url 'venues:venue_detail' fav.venue.id %}" class="text-decoration-none text-dark">{{ fav.venue.name }}</a></strong>
-                              <div style="font-size: 0.72rem; color: #64748b;" class="text-truncate">{{ fav.venue.address }}</div>
-                            </div>
-                            <span class="cs-stars">★ {{ fav.venue.rating_avg }}</span>
-                          </div>
-                        </div>
-                      </div>
-                      {% empty %}
-                      <div class="col-12 text-center text-muted py-4">Bạn chưa lưu cơ sở yêu thích nào.</div>
-                      {% endfor %}
-                    </div>
                   </div>
                 </div>
               </div>

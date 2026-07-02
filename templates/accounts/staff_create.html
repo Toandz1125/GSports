@@ -108,7 +108,9 @@
         height: 2rem;
         background: transparent !important;
         background-color: transparent !important;
-        border: none;
+        border: none !important;
+        outline: none !important;
+        box-shadow: none !important;
         cursor: pointer;
         color: var(--text-muted, #64748b);
         display: flex;
@@ -117,11 +119,19 @@
         transition: color 0.2s ease;
         z-index: 5;
         flex-shrink: 0;
+        padding: 0;
+        border-radius: 0 !important;
     }
-    .password-toggle-btn:hover {
+    .password-toggle-btn:hover,
+    .password-toggle-btn:focus,
+    .password-toggle-btn:active {
         color: var(--primary-600, #4f46e5);
         background: transparent !important;
         background-color: transparent !important;
+        border: none !important;
+        outline: none !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
     }
     .password-toggle-btn.is-active {
         color: var(--primary-600, #4f46e5);
